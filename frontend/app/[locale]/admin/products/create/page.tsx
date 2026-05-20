@@ -1,0 +1,37 @@
+"use client";
+
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Box } from "@mui/material";
+import { useAppDispatch } from "@/Store/store";
+import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import ProductForm from "@/features/Product/ProductForm";
+
+const CreateProductPage = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [
+          { title: t("products"), link: `/admin/products` },
+          { title: t("createProduct") },
+        ],
+        breadCrumbBtns: [],
+      })
+    );
+    return () => {
+      dispatch(resetBreadCrumbActions());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Box py={3}>
+      <ProductForm />
+    </Box>
+  );
+};
+
+export default CreateProductPage;

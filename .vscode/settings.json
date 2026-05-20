@@ -1,0 +1,6 @@
+{
+  "cSpell.ignorePaths": [
+    "**/locales/ar/**",
+    "**/locales/ur/**"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "app": {
+    "languages": ["en", "ar"],
+    "defaultLanguage": "en",
+    "rtlLanguages": ["ar"],
+    "theme": {
+      "primaryColor": "#654321"
+    }
+  }
+}
