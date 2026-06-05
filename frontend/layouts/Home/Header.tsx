@@ -85,7 +85,6 @@ const NavLink = styled("span", {
 const Navbar = () => {
   const { t } = useTranslation();
   const pathname = usePathname();
-  const theme = useTheme();
   const newPathname = pathname.split("/")[2] ? "/" + pathname.split("/")[2] : "/";
 
   const isHomePage = newPathname === "/";
@@ -121,7 +120,7 @@ const Navbar = () => {
             <CustomLink href="/">
               <LogoWrapper>
                 <Image
-                  src={getBackendUri(logo) ?? "/images/placeholder.png"}
+                  src={"/logo.webp"}
                   alt="logo"
                   width={0}
                   height={60}

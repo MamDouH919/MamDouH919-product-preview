@@ -271,5 +271,9 @@
     "clearFilters": "مسح الفلاتر",
     "noProductsFound": "لا توجد منتجات",
     "browseProductsSubtitle": "اكتشف مجموعتنا الكاملة",
-    "productDetails": "تفاصيل المنتج"
+    "productDetails": "تفاصيل المنتج",
+    "variants": "المتغيرات",
+    "currency": "العملة",
+    "whatsappMoreDetails": "مزيد من التفاصيل عبر واتساب",
+    "whatsappProductMessage": "مرحباً، أريد معرفة المزيد عن هذا المنتج:"
 }

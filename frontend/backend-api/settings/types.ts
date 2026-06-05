@@ -18,4 +18,5 @@ export type Setting = {
   address?: string;
   socialMedia?: SocialMediaItem[];
   primaryColor?: string;
+  currency?: LocalizedField;
 };

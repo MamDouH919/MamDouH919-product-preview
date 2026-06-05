@@ -271,5 +271,9 @@
     "clearFilters": "Clear Filters",
     "noProductsFound": "No products found",
     "browseProductsSubtitle": "Explore our complete collection",
-    "productDetails": "Product Details"
+    "productDetails": "Product Details",
+    "variants": "Variants",
+    "currency": "Currency",
+    "whatsappMoreDetails": "More Details on WhatsApp",
+    "whatsappProductMessage": "Hi, I'd like to know more about this product:"
 }

@@ -31,7 +31,7 @@ function CategoryCard({ category, lang }: { category: Category; lang: string }) 
         sx={{
           border: "1px solid",
           borderColor: "divider",
-          borderRadius: 2,
+          borderRadius: 1,
           overflow: "hidden",
           height: "100%",
           transition: "all 0.3s",

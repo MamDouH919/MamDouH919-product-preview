@@ -16,7 +16,10 @@ import Skeleton from "@mui/material/Skeleton"
 import Typography from "@mui/material/Typography"
 import Card from "@mui/material/Card"
 import { useTheme, alpha } from "@mui/material/styles"
+import { useCurrency } from "@/Hooks/useCurrency"
 import { ShoppingBag, ArrowLeft, ChevronRight } from "lucide-react"
+import WhatsAppButton from "@/components/WhatsAppButton"
+import { Grid } from "@mui/material"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -27,6 +30,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
   const theme = useTheme()
   const name = localized(product.name, lang)
   const image = product.images?.[0]
+  const currency = useCurrency()
 
   return (
     <CustomLink href={`/products/${product.slug}`} style={{ textDecoration: "none", display: "block" }}>
@@ -35,7 +39,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
         sx={{
           border: "1px solid",
           borderColor: "grey.100",
-          borderRadius: 2,
+          borderRadius: 1,
           overflow: "hidden",
           height: "100%",
           transition: "all 0.3s",
@@ -103,23 +107,26 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           >
             {product.price != null ? (
               <Typography variant="subtitle2" fontWeight={700} color="primary">
-                {product.price.toLocaleString()}
+                {product.price.toLocaleString()} {currency}
               </Typography>
             ) : (
               <Box />
             )}
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <ShoppingBag size={16} color={theme.palette.primary.main} />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <WhatsAppButton slug={product.slug} productName={name} />
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ShoppingBag size={16} color={theme.palette.primary.main} />
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -230,9 +237,9 @@ export default function CategoryPage({ params }: PageProps) {
             {t("home")}
           </CustomLink>
           <ChevronRight size={14} color={theme.palette.text.disabled} />
-          <Typography variant="body2" color="text.secondary">
+          <CustomLink href="/categories" style={{ color: theme.palette.text.secondary, textDecoration: "none", fontSize: 14 }}>
             {t("categories")}
-          </Typography>
+          </CustomLink>
           <ChevronRight size={14} color={theme.palette.text.disabled} />
           <Typography variant="body2" color="text.primary" fontWeight={500}>
             {name}
@@ -386,17 +393,16 @@ export default function CategoryPage({ params }: PageProps) {
                 </Typography>
               </Box>
             ) : (
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                  gap: 2,
-                }}
+              <Grid
+                container
+                spacing={2}
               >
                 {products.map((product) => (
-                  <ProductCard key={product._id} product={product} lang={lang} />
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 4 }} key={product._id}>
+                    <ProductCard  product={product} lang={lang} />
+                  </Grid>
                 ))}
-              </Box>
+              </Grid>
             )}
           </Box>
         </Box>

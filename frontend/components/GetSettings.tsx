@@ -22,6 +22,7 @@ const GetSettings = ({ children }: { children: React.ReactNode }) => {
                     logo: settings.logo,
                     favicon: settings.favicon,
                     primaryColor: settings.primaryColor,
+                    currency: settings.currency as any,
                     phone: settings.phone,
                     whatsapp: settings.whatsapp,
                     landLine: settings.landLine,

@@ -12,6 +12,9 @@ import { useTranslation } from "react-i18next"
 import { ShoppingBag, SlidersHorizontal, X, ChevronRight } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
 import Image from "next/image"
+import { useTheme, alpha } from "@mui/material/styles"
+import { useCurrency } from "@/Hooks/useCurrency"
+import WhatsAppButton from "@/components/WhatsAppButton"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -22,11 +25,12 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
   const name = localized(product.name, lang)
   const categoryName = localized(product.category?.name, lang)
   const image = product.images?.[0]
+  const currency = useCurrency()
 
   return (
     <CustomLink
       href={`/products/${product.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-[#004842]/25 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-(--primary-25) shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
     >
       <div className="relative overflow-hidden bg-gray-50 aspect-square">
         {image ? (
@@ -42,7 +46,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           </div>
         )}
         {categoryName && (
-          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-[#004842] px-2 py-0.5 rounded-full shadow-sm">
+          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-(--primary) px-2 py-0.5 rounded-full shadow-sm">
             {categoryName}
           </span>
         )}
@@ -53,13 +57,16 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
         <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug flex-1">{name}</p>
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
           {product.price != null ? (
-            <span className="text-base font-bold text-[#004842]">{product.price.toLocaleString()}</span>
+            <span className="text-base font-bold text-(--primary)">{product.price.toLocaleString()} {currency}</span>
           ) : (
             <span />
           )}
-          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#004842]/8 group-hover:bg-[#004842] transition-colors duration-300">
-            <ShoppingBag className="w-4 h-4 text-[#004842] group-hover:text-white transition-colors duration-300" />
-          </span>
+          <div className="flex items-center gap-1.5">
+            <WhatsAppButton slug={product.slug} productName={name} />
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-(--primary-8) group-hover:bg-(--primary) transition-colors duration-300">
+              <ShoppingBag className="w-4 h-4 text-(--primary) group-hover:text-white transition-colors duration-300" />
+            </span>
+          </div>
         </div>
       </div>
     </CustomLink>
@@ -116,7 +123,7 @@ function SidebarContent({
       <button
         onClick={() => onCategorySelect(undefined)}
         className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-start w-full ${
-          !selectedCategoryId ? "bg-[#004842] text-white shadow-sm" : "text-gray-700 hover:bg-gray-100"
+          !selectedCategoryId ? "bg-(--primary) text-white shadow-sm" : "text-gray-700 hover:bg-gray-100"
         }`}
       >
         {t("allCategories")}
@@ -132,7 +139,7 @@ function SidebarContent({
                 onClick={() => onCategorySelect(cat._id)}
                 className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-start w-full ${
                   selectedCategoryId === cat._id
-                    ? "bg-[#004842] text-white shadow-sm"
+                    ? "bg-(--primary) text-white shadow-sm"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
@@ -143,7 +150,7 @@ function SidebarContent({
               </button>
 
               {selectedCategoryId === cat._id && subCategories.filter((s) => s.isActive).length > 0 && (
-                <div className="ms-3 mt-1 flex flex-col gap-0.5 border-s-2 border-[#004842]/20 ps-3">
+                <div className="ms-3 mt-1 flex flex-col gap-0.5 border-s-2 border-(--primary-20) ps-3">
                   {subCategories
                     .filter((s) => s.isActive)
                     .sort((a, b) => a.order - b.order)
@@ -155,13 +162,13 @@ function SidebarContent({
                         }
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-start w-full ${
                           selectedSubCategoryId === sub._id
-                            ? "bg-[#004842]/10 text-[#004842] font-medium"
+                            ? "bg-(--primary-10) text-(--primary) font-medium"
                             : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                         }`}
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                            selectedSubCategoryId === sub._id ? "bg-[#004842]" : "bg-gray-300"
+                            selectedSubCategoryId === sub._id ? "bg-(--primary)" : "bg-gray-300"
                           }`}
                         />
                         {localized(sub.name, lang)}
@@ -188,6 +195,7 @@ function SidebarContent({
 export default function ProductsPage() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
+  const theme = useTheme()
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>()
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string | undefined>()
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
@@ -226,10 +234,20 @@ export default function ProductsPage() {
     t,
   }
 
+  const cssVars = {
+    "--primary": theme.palette.primary.main,
+    "--primary-dark": theme.palette.primary.dark,
+    "--primary-8": alpha(theme.palette.primary.main, 0.08),
+    "--primary-10": alpha(theme.palette.primary.main, 0.1),
+    "--primary-20": alpha(theme.palette.primary.main, 0.2),
+    "--primary-25": alpha(theme.palette.primary.main, 0.25),
+    "--primary-30": alpha(theme.palette.primary.main, 0.3),
+  } as React.CSSProperties
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" style={cssVars}>
       {/* Hero */}
-      <div className="bg-[#004842] text-white py-14 px-4">
+      <div className="bg-(--primary) text-white py-14 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-2 text-sm text-white/60 mb-4">
             <CustomLink href="/" className="hover:text-white transition-colors">
@@ -267,12 +285,12 @@ export default function ProductsPage() {
               {/* Mobile filter button */}
               <button
                 onClick={() => setMobileFilterOpen(true)}
-                className="lg:hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 shadow-sm hover:border-[#004842]/30 transition-colors"
+                className="lg:hidden flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 shadow-sm hover:border-(--primary-30) transition-colors"
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 {t("filters")}
                 {(selectedCategoryId || selectedSubCategoryId) && (
-                  <span className="w-2 h-2 rounded-full bg-[#004842]" />
+                  <span className="w-2 h-2 rounded-full bg-(--primary)" />
                 )}
               </button>
             </div>
@@ -288,7 +306,7 @@ export default function ProductsPage() {
                   {(selectedCategoryId || selectedSubCategoryId) && (
                     <button
                       onClick={handleClearFilters}
-                      className="mt-2 text-sm text-[#004842] underline underline-offset-4"
+                      className="mt-2 text-sm text-(--primary) underline underline-offset-4"
                     >
                       {t("clearFilters")}
                     </button>
@@ -334,7 +352,7 @@ export default function ProductsPage() {
             <div className="px-5 py-4 border-t border-gray-100">
               <button
                 onClick={() => setMobileFilterOpen(false)}
-                className="w-full py-3 bg-[#004842] text-white rounded-xl font-medium text-sm hover:bg-[#003833] transition-colors"
+                className="w-full py-3 bg-(--primary) hover:bg-(--primary-dark) text-white rounded-xl font-medium text-sm transition-colors"
               >
                 {t("viewAll")}
               </button>

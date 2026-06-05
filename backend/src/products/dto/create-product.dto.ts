@@ -10,6 +10,18 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
+
+export class ProductVariantDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  label!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+}
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 
 export class CreateProductDto {
@@ -72,6 +84,13 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiProperty({ required: false, type: [ProductVariantDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantDto)
+  variants?: ProductVariantDto[];
 
   @ApiProperty({ required: false })
   @IsOptional()

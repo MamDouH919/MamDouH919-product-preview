@@ -21,47 +21,76 @@ const cairo = Cairo({
   variable: "--font-cairo",
 });
 
-async function fetchSiteSettings() {
-  if (!process.env.NEXT_PUBLIC_BACKEND_URL) return null;
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/settings`, {
-      next: { revalidate: 300 },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
-
-function getLocalizedString(field: any, locale: string): string {
-  if (!field) return "";
-  if (typeof field === "string") return field;
-  return field[locale] || field[config.app.defaultLanguage] || "";
-}
+const SITE_DEFAULTS = {
+  ar: {
+    title: "جراڤيتي | عطور فاخرة",
+    titleTemplate: "%s | جراڤيتي",
+    description: "اكتشف مجموعة جراڤيتي من العطور الفاخرة. تعرّف على الأسعار والتفاصيل الكاملة لكل منتج.",
+    keywords: "عطور، عطور فاخرة، جراڤيتي، بخور، أسعار عطور، عطر رجالي، عطر نسائي، تشكيلة عطور",
+  },
+  en: {
+    title: "Gravity | Luxury Perfumes",
+    titleTemplate: "%s | Gravity",
+    description: "Explore Gravity's exclusive luxury perfume collection. View prices and full product details for every fragrance.",
+    keywords: "perfumes, luxury perfumes, Gravity, fragrances, scents, cologne, perfume prices, fragrance collection, men perfume, women perfume",
+  },
+} as const;
 
 export async function generateMetadata(
   { params }: { params: Promise<{ locale: string }> }
 ): Promise<Metadata> {
   const { locale } = await params;
-  const settings = await fetchSiteSettings();
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-  const title = getLocalizedString(settings?.siteTitle, locale) || "Blue Sky";
-  const description = getLocalizedString(settings?.siteDescription, locale);
+  const lang = locale === "ar" ? "ar" : "en";
+  const { title, titleTemplate, description, keywords } = SITE_DEFAULTS[lang];
 
   return {
-    title,
-    description,
-    icons: {
-      icon: settings?.favicon ? `${backendUrl}${settings.favicon}` : "/favicon.ico",
-      apple: settings?.logo ? `${backendUrl}${settings.logo}` : undefined,
+    metadataBase: new URL(siteUrl),
+    applicationName: "Gravity",
+
+    title: {
+      default: title,
+      template: titleTemplate,
     },
+
+    description,
+    keywords,
+
+    authors: [{ name: "Gravity" }],
+    category: "Perfumes & Fragrances",
+
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true },
+    },
+
+    icons: {
+      shortcut: "/favicon.ico",
+      icon: [
+        { url: "/icon0.svg", type: "image/svg+xml" },
+        { url: "/icon1.png", type: "image/png", sizes: "any" },
+      ],
+      apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+    },
+
+    manifest: "/manifest.json",
+
     openGraph: {
+      type: "website",
+      siteName: "Gravity",
       title,
       description,
-      images: settings?.logo ? [`${backendUrl}${settings.logo}`] : [],
+      locale: locale === "ar" ? "ar_SA" : "en_US",
+      images: [{ url: "/logo.webp", width: 1200, height: 630, alt: title }],
+    },
+
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/logo.webp"],
     },
   };
 }

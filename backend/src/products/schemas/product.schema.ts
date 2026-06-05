@@ -2,6 +2,17 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { LocalizedField, LocalizedFieldSchema } from '../../common/schemas/localized-field.schema';
 
+@Schema({ _id: false })
+export class ProductVariant {
+  @Prop({ required: true })
+  label!: string;
+
+  @Prop({ required: false })
+  price?: number;
+}
+
+export const ProductVariantSchema = SchemaFactory.createForClass(ProductVariant);
+
 @Schema({ timestamps: true })
 export class Product extends Document {
   @Prop({ required: true, type: LocalizedFieldSchema })
@@ -33,6 +44,9 @@ export class Product extends Document {
 
   @Prop({ type: [String], default: [] })
   tags!: string[];
+
+  @Prop({ type: [ProductVariantSchema], default: [] })
+  variants!: ProductVariant[];
 
   @Prop({ default: true })
   isActive!: boolean;

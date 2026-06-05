@@ -4,7 +4,7 @@ import { useAppDispatch } from "@/Store/store";
 import { changeAuthData } from "@/Store/slices/auth";
 import { fetchMe } from "@/backend-api/auth/queries";
 import { setAuthToken } from "@/lib/api";
-import { getTokenFromCookie } from "@/actions/cookies";
+import { getTokenFromCookie, handleLogout } from "@/actions/cookies";
 
 const GetUserLogged = ({ children }: { children: React.ReactNode }) => {
     const dispatch = useAppDispatch();
@@ -33,6 +33,7 @@ const GetUserLogged = ({ children }: { children: React.ReactNode }) => {
                     isSuper: user.isSuper ?? false,
                 }));
             } catch {
+                handleLogout();
                 dispatch(changeAuthData({ isInitialized: true }));
             }
         })();

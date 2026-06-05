@@ -44,6 +44,9 @@ export class Setting extends Document {
 
   @Prop({ default: '#1976d2' })
   primaryColor?: string;
+
+  @Prop({ type: LocalizedFieldSchema, required: false })
+  currency?: LocalizedField;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

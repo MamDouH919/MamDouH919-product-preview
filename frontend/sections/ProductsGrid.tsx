@@ -7,6 +7,9 @@ import { useTranslation } from "react-i18next"
 import { ShoppingBag } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
 import Image from "next/image"
+import { useCurrency } from "@/Hooks/useCurrency"
+import WhatsAppButton from "@/components/WhatsAppButton"
+import { Container } from "@mui/material"
 
 function localizedName(field: Product["name"], lang: string) {
   return field[lang] || field["ar"] || field["en"] || ""
@@ -16,6 +19,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
   const name = localizedName(product.name, lang)
   const categoryName = localizedName(product.category?.name ?? {}, lang)
   const image = product.images?.[0]
+  const currency = useCurrency()
 
   return (
     <CustomLink
@@ -55,17 +59,47 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           {name}
         </p>
 
+        {/* Variants */}
+        {product.variants?.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {product.variants.map((v, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#004842]/8 text-[#004842]"
+              >
+                {v.label}
+                {v.price != null && (
+                  <span className="opacity-70">· {v.price.toLocaleString()} {currency}</span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-          {product.price != null ? (
+          {product.variants?.length > 0 ? (
+            (() => {
+              const prices = product.variants.map((v) => v.price).filter((p): p is number => p != null)
+              const min = prices.length ? Math.min(...prices) : null
+              return min != null ? (
+                <span className="text-base font-bold text-[#004842]">
+                  {min.toLocaleString()} {currency}+
+                </span>
+              ) : <span />
+            })()
+          ) : product.price != null ? (
             <span className="text-base font-bold text-[#004842]">
-              {product.price.toLocaleString()}
+              {product.price.toLocaleString()} {currency}
             </span>
           ) : (
             <span />
           )}
-          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#004842]/8 group-hover:bg-[#004842] transition-colors duration-300">
-            <ShoppingBag className="w-4 h-4 text-[#004842] group-hover:text-white transition-colors duration-300" />
-          </span>
+          <div className="flex items-center gap-1.5">
+            <WhatsAppButton slug={product.slug} productName={name} />
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#004842]/8 group-hover:bg-[#004842] transition-colors duration-300">
+              <ShoppingBag className="w-4 h-4 text-[#004842] group-hover:text-white transition-colors duration-300" />
+            </span>
+          </div>
         </div>
       </div>
     </CustomLink>
@@ -97,41 +131,43 @@ export default function ProductsGrid() {
     .sort((a, b) => a.order - b.order)
 
   return (
-    <div className="px-4 flex flex-col gap-5">
-      {/* Section header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="w-1 h-6 rounded-full bg-[#004842]" />
-          <h2 className="text-xl font-bold text-gray-800">{t("products")}</h2>
+    <Container>
+      <div className="px-4 flex flex-col gap-5">
+        {/* Section header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="w-1 h-6 rounded-full bg-[#004842]" />
+            <h2 className="text-xl font-bold text-gray-800">{t("products")}</h2>
+          </div>
+          {!isLoading && products.length > 0 && (
+            <CustomLink
+              href="/products"
+              className="text-sm font-medium text-[#004842] hover:underline underline-offset-4"
+            >
+              {t("viewAll")}
+            </CustomLink>
+          )}
         </div>
-        {!isLoading && products.length > 0 && (
-          <CustomLink
-            href="/products"
-            className="text-sm font-medium text-[#004842] hover:underline underline-offset-4"
-          >
-            {t("viewAll")}
-          </CustomLink>
+
+        {/* Empty state */}
+        {!isLoading && products.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400">
+            <ShoppingBag className="w-14 h-14 opacity-30" />
+            <p className="text-base font-medium">{t("noData")}</p>
+          </div>
         )}
-      </div>
 
-      {/* Empty state */}
-      {!isLoading && products.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400">
-          <ShoppingBag className="w-14 h-14 opacity-30" />
-          <p className="text-base font-medium">{t("noData")}</p>
-        </div>
-      )}
-
-      {/* Grid */}
-      {(isLoading || products.length > 0) && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-          {isLoading
-            ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-            : products.map((product) => (
+        {/* Grid */}
+        {(isLoading || products.length > 0) && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+            {isLoading
+              ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
+              : products.map((product) => (
                 <ProductCard key={product._id} product={product} lang={i18n.language} />
               ))}
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </Container>
   )
 }

@@ -8,6 +8,7 @@ export interface SettingsState {
     logo?: string;
     favicon?: string;
     primaryColor?: string;
+    currency?: Record<string, string>;
     phone?: string;
     whatsapp?: string;
     landLine?: string;

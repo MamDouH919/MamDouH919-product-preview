@@ -30,6 +30,11 @@ export class ProductsService {
   constructor(@InjectModel(Product.name) private productModel: Model<Product>) {}
 
   async create(createProductDto: CreateProductDto, files: Express.Multer.File[]): Promise<Product> {
+    if (typeof (createProductDto as any).variants === 'string') {
+      try { createProductDto.variants = JSON.parse((createProductDto as any).variants); }
+      catch { createProductDto.variants = []; }
+    }
+
     if (files.length > 0) {
       const compressed = await Promise.all(
         files.map(async (f) => toPublicPath(await compressImage(f))),
@@ -103,6 +108,11 @@ export class ProductsService {
   }
 
   async update(id: string, updateProductDto: UpdateProductDto, files: Express.Multer.File[]): Promise<Product> {
+    if (typeof (updateProductDto as any).variants === 'string') {
+      try { updateProductDto.variants = JSON.parse((updateProductDto as any).variants); }
+      catch { updateProductDto.variants = []; }
+    }
+
     const existing = await this.productModel.findById(id).exec();
     if (!existing) throw new NotFoundException(`Product with id ${id} not found`);
 

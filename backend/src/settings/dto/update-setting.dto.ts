@@ -58,4 +58,9 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsString()
   primaryColor?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocalizedFieldDto)
+  currency?: LocalizedFieldDto;
 }

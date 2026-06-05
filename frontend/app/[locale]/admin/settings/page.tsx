@@ -28,7 +28,7 @@ import { ImageInput } from "@/components/MUI/ImageInput";
 import { useSettingsQuery, SETTINGS_QUERY_KEY } from "@/backend-api/settings/hooks";
 import { updateSettings } from "@/backend-api/settings/mutations";
 import { getBackendUri } from "@/utils/helperFunctions";
-import { useAppDispatch } from "@/Store/store";
+import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { updateColor } from "@/Store/slices/settings";
 import { LocalizedField } from "@/backend-api/globalTypes";
@@ -41,6 +41,7 @@ type SocialItem = { key: string; value: string };
 type SettingsFormValues = {
   siteTitle: LocalizedField;
   siteDescription: LocalizedField;
+  currency: LocalizedField;
   logo: File | string | null;
   favicon: File | string | null;
   phone: string;
@@ -58,6 +59,7 @@ const SettingsPage = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
+  const isSuper = useAppSelector((s) => s.auth.isSuper);
   const [activeTab, setActiveTab] = useState(0);
   const { data: settings, isLoading } = useSettingsQuery();
 
@@ -65,6 +67,7 @@ const SettingsPage = () => {
     defaultValues: {
       siteTitle: Object.fromEntries(LANGS.map((l) => [l, ""])),
       siteDescription: Object.fromEntries(LANGS.map((l) => [l, ""])),
+      currency: Object.fromEntries(LANGS.map((l) => [l, ""])),
       logo: null,
       favicon: null,
       phone: "",
@@ -94,6 +97,9 @@ const SettingsPage = () => {
         siteDescription: Object.fromEntries(
           LANGS.map((l) => [l, (settings.siteDescription as any)?.[l] || ""])
         ),
+        currency: Object.fromEntries(
+          LANGS.map((l) => [l, (settings.currency as any)?.[l] || ""])
+        ),
         logo: settings.logo ? getBackendUri(settings.logo) : null,
         favicon: settings.favicon ? getBackendUri(settings.favicon) : null,
         phone: settings.phone ?? "",
@@ -116,8 +122,10 @@ const SettingsPage = () => {
       LANGS.forEach((lang) => {
         const title = (data.siteTitle as any)?.[lang];
         const desc = (data.siteDescription as any)?.[lang];
+        const cur = (data.currency as any)?.[lang];
         if (title) formData.append(`siteTitle[${lang}]`, title);
         if (desc) formData.append(`siteDescription[${lang}]`, desc);
+        if (cur) formData.append(`currency[${lang}]`, cur);
       });
       if (data.logo instanceof File) formData.append("logo", data.logo);
       if (data.favicon instanceof File) formData.append("favicon", data.favicon);
@@ -153,131 +161,177 @@ const SettingsPage = () => {
   return (
     <Box component="form" onSubmit={handleSubmit((d) => mutate(d))}>
       <Stack spacing={3}>
-        {/* Site Info */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>
-            {t("siteInfo")}
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
 
-          <Tabs
-            value={activeTab}
-            onChange={(_, v) => setActiveTab(v)}
-            variant="fullWidth"
-            sx={{ mb: 2 }}
-          >
-            {LANGS.map((lang) => (
-              <Tab
-                key={lang}
-                label={t(lang)}
-                iconPosition="end"
-                icon={tabHasError(lang) ? (
-                  <Box
-                    component="span"
-                    sx={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      bgcolor: "error.main", display: "inline-block", ml: 0.5,
-                    }}
+        {/* ── Super admin only ── */}
+        {isSuper && (
+          <>
+            {/* Site Info */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("siteInfo")}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              <Tabs
+                value={activeTab}
+                onChange={(_, v) => setActiveTab(v)}
+                variant="fullWidth"
+                sx={{ mb: 2 }}
+              >
+                {LANGS.map((lang) => (
+                  <Tab
+                    key={lang}
+                    label={t(lang)}
+                    iconPosition="end"
+                    icon={tabHasError(lang) ? (
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 8, height: 8, borderRadius: "50%",
+                          bgcolor: "error.main", display: "inline-block", ml: 0.5,
+                        }}
+                      />
+                    ) : undefined}
                   />
-                ) : undefined}
-              />
-            ))}
-          </Tabs>
+                ))}
+              </Tabs>
 
-          {LANGS.map((lang, i) => (
-            <Stack
-              key={lang}
-              spacing={2}
-              sx={{ display: activeTab === i ? "flex" : "none" }}
-            >
-              <TextInputComponent
-                name={`siteTitle.${lang}`}
-                label={t("siteTitle")}
-                control={control}
-              />
-              <TextInputComponent
-                name={`siteDescription.${lang}`}
-                label={t("siteDescription")}
-                control={control}
-                multiline
-                rows={3}
-              />
-            </Stack>
-          ))}
-        </Paper>
+              {LANGS.map((lang, i) => (
+                <Stack
+                  key={lang}
+                  spacing={2}
+                  sx={{ display: activeTab === i ? "flex" : "none" }}
+                >
+                  <TextInputComponent
+                    name={`siteTitle.${lang}`}
+                    label={t("siteTitle")}
+                    control={control}
+                  />
+                  <TextInputComponent
+                    name={`siteDescription.${lang}`}
+                    label={t("siteDescription")}
+                    control={control}
+                    multiline
+                    rows={3}
+                  />
+                  <TextInputComponent
+                    name={`currency.${lang}`}
+                    label={t("currency")}
+                    control={control}
+                    placeholder={lang === "ar" ? "ر.س" : "SAR"}
+                  />
+                </Stack>
+              ))}
+            </Paper>
 
-        {/* Images */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>
-            {t("siteImages")}
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          <Grid container spacing={4}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                {t("logo")}
+            {/* Images */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("siteImages")}
               </Typography>
-              <ImageInput
-                name="logo"
-                control={control as any}
-                imagePath={settings?.logo ? getBackendUri(settings.logo) ?? undefined : undefined}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                {t("favicon")}
-              </Typography>
-              <ImageInput
-                name="favicon"
-                control={control as any}
-                imagePath={settings?.favicon ? getBackendUri(settings.favicon) ?? undefined : undefined}
-                accept={{ "image/*": [], "image/x-icon": [".ico"] }}
-              />
-            </Grid>
-          </Grid>
-        </Paper>
+              <Divider sx={{ mb: 3 }} />
+              <Grid container spacing={4}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    {t("logo")}
+                  </Typography>
+                  <ImageInput
+                    name="logo"
+                    control={control as any}
+                    imagePath={settings?.logo ? getBackendUri(settings.logo) ?? undefined : undefined}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    {t("favicon")}
+                  </Typography>
+                  <ImageInput
+                    name="favicon"
+                    control={control as any}
+                    imagePath={settings?.favicon ? getBackendUri(settings.favicon) ?? undefined : undefined}
+                    accept={{ "image/*": [], "image/x-icon": [".ico"] }}
+                  />
+                </Grid>
+              </Grid>
+            </Paper>
 
-        {/* Contact Info */}
+            {/* Appearance */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("appearance")}
+              </Typography>
+              <Divider sx={{ mb: 3 }} />
+              <Controller
+                name="primaryColor"
+                control={control}
+                render={({ field }) => (
+                  <Stack spacing={1.5}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary">
+                      {t("primaryColor")}
+                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                      <Box
+                        sx={{
+                          width: 44, height: 44, borderRadius: 1.5,
+                          border: "2px solid", borderColor: "divider",
+                          overflow: "hidden", cursor: "pointer", flexShrink: 0,
+                          "& input[type='color']": {
+                            width: "200%", height: "200%",
+                            border: "none", padding: 0, cursor: "pointer",
+                            transform: "translate(-25%, -25%)",
+                          },
+                        }}
+                      >
+                        <input
+                          type="color"
+                          value={field.value ?? "#1976d2"}
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                            dispatch(updateColor(e.target.value));
+                          }}
+                        />
+                      </Box>
+                      <TextField
+                        size="small"
+                        value={field.value ?? "#1976d2"}
+                        onChange={(e) => {
+                          field.onChange(e.target.value);
+                          dispatch(updateColor(e.target.value));
+                        }}
+                        sx={{ width: 140 }}
+                        placeholder="#1976d2"
+                      />
+                      <Box
+                        sx={{
+                          flex: 1, height: 44, borderRadius: 1.5,
+                          background: field.value ?? "#1976d2",
+                          border: "1px solid", borderColor: "divider",
+                        }}
+                      />
+                    </Stack>
+                  </Stack>
+                )}
+              />
+            </Paper>
+          </>
+        )}
+
+        {/* Contact Info — visible to all admins */}
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
           <Typography variant="subtitle1" fontWeight={700} mb={2}>
             {t("contactInfo")}
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Stack spacing={2}>
-            <TextField
-              size="small"
-              label={t("phone")}
-              placeholder="+966 55 000 0000"
-              {...register("phone")}
-            />
-            <TextField
-              size="small"
-              label={t("whatsapp")}
-              placeholder="+966 55 000 0000"
-              {...register("whatsapp")}
-            />
-            <TextField
-              size="small"
-              label={t("landLine")}
-              placeholder="+966 1 000 0000"
-              {...register("landLine")}
-            />
-            <TextInputComponent
-              name="email"
-              label={t("email")}
-              control={control}
-            />
-            <TextInputComponent
-              name="address"
-              label={t("address")}
-              control={control}
-              multiline
-              rows={2}
-            />
+            <TextField size="small" label={t("phone")} placeholder="+966 55 000 0000" {...register("phone")} />
+            <TextField size="small" label={t("whatsapp")} placeholder="+966 55 000 0000" {...register("whatsapp")} />
+            <TextField size="small" label={t("landLine")} placeholder="+966 1 000 0000" {...register("landLine")} />
+            <TextInputComponent name="email" label={t("email")} control={control} />
+            <TextInputComponent name="address" label={t("address")} control={control} multiline rows={2} />
           </Stack>
         </Paper>
 
-        {/* Social Media */}
+        {/* Social Media — visible to all admins */}
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
             <Typography variant="subtitle1" fontWeight={700}>
@@ -325,76 +379,6 @@ const SettingsPage = () => {
               ))}
             </Stack>
           )}
-        </Paper>
-
-        {/* Appearance */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>
-            {t("appearance")}
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          <Controller
-            name="primaryColor"
-            control={control}
-            render={({ field }) => (
-              <Stack spacing={1.5}>
-                <Typography variant="body2" fontWeight={600} color="text.secondary">
-                  {t("primaryColor")}
-                </Typography>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <Box
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 1.5,
-                      border: "2px solid",
-                      borderColor: "divider",
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      flexShrink: 0,
-                      "& input[type='color']": {
-                        width: "200%",
-                        height: "200%",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        transform: "translate(-25%, -25%)",
-                      },
-                    }}
-                  >
-                    <input
-                      type="color"
-                      value={field.value ?? "#1976d2"}
-                      onChange={(e) => {
-                        field.onChange(e.target.value);
-                        dispatch(updateColor(e.target.value));
-                      }}
-                    />
-                  </Box>
-                  <TextField
-                    size="small"
-                    value={field.value ?? "#1976d2"}
-                    onChange={(e) => {
-                      field.onChange(e.target.value);
-                      dispatch(updateColor(e.target.value));
-                    }}
-                    sx={{ width: 140 }}
-                    placeholder="#1976d2"
-                  />
-                  <Box
-                    sx={{
-                      flex: 1,
-                      height: 44,
-                      borderRadius: 1.5,
-                      background: field.value ?? "#1976d2",
-                      border: "1px solid",
-                      borderColor: "divider",
-                    }}
-                  />
-                </Stack>
-              </Stack>
-            )}
-          />
         </Paper>
 
         <Button

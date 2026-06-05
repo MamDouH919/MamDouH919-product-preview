@@ -40,6 +40,8 @@ import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 
 type ImageItem = { file: File | string | null };
 
+type VariantItem = { label: string; price: string };
+
 type ProductFormValues = {
   name: LocalizedField;
   description: LocalizedField;
@@ -51,6 +53,7 @@ type ProductFormValues = {
   subCategory: string;
   slug: string;
   tags: string;
+  variants: VariantItem[];
   isActive: boolean;
   order: number;
 };
@@ -79,6 +82,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         description: { ar: defaultData?.description?.ar ?? "", en: defaultData?.description?.en ?? "" },
         shortDescription: { ar: defaultData?.shortDescription?.ar ?? "", en: defaultData?.shortDescription?.en ?? "" },
         images: (defaultData?.images ?? []).map((src) => ({ file: getBackendUri(src) })),
+        variants: (defaultData?.variants ?? []).map((v) => ({ label: v.label, price: String(v.price) })),
         price: defaultData?.price !== undefined ? String(defaultData.price) : "",
         sku: defaultData?.sku ?? "",
         category: defaultData?.category?._id ?? "",
@@ -97,6 +101,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
   const { fields: imageFields, append: appendImage, remove: removeImage } =
     useFieldArray({ control, name: "images" });
+
+  const { fields: variantFields, append: appendVariant, remove: removeVariant } =
+    useFieldArray({ control, name: "variants" });
 
   const mutation = useMutation({
     mutationFn: async (data: ProductFormValues) => {
@@ -121,6 +128,13 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
             : item.file;
           formData.append("images[]", path);
         }
+      }
+
+      if (data.variants?.length) {
+        formData.append(
+          "variants",
+          JSON.stringify(data.variants.map((v) => ({ label: v.label, price: Number(v.price) }))),
+        );
       }
 
       if (data.price) formData.append("price", data.price);
@@ -281,6 +295,54 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
             <TextInputComponent name="order" label={t("order")} control={control} type="number" />
           </Grid>
         </Grid>
+
+        {/* ── Variants ── */}
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+            <Typography variant="subtitle1" fontWeight={700}>
+              {t("variants")}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Add />}
+              onClick={() => appendVariant({ label: "", price: "" })}
+            >
+              {t("add")}
+            </Button>
+          </Stack>
+          <Divider sx={{ mb: 2 }} />
+
+          {variantFields.length === 0 ? (
+            <Typography variant="body2" color="text.disabled">
+              {t("noData")}
+            </Typography>
+          ) : (
+            <Stack spacing={2}>
+              {variantFields.map((field, index) => (
+                <Stack key={field.id} direction="row" spacing={2} alignItems="flex-start">
+                  <TextInputComponent
+                    name={`variants.${index}.label`}
+                    label={t("label")}
+                    control={control}
+                    required
+                  />
+                  <TextInputComponent
+                    name={`variants.${index}.price`}
+                    label={t("price")}
+                    control={control}
+                    type="number"
+                  />
+                  <Tooltip title={t("delete")}>
+                    <IconButton color="error" onClick={() => removeVariant(index)} sx={{ mt: 0.5 }}>
+                      <Delete />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </Paper>
 
         {/* ── Slug & Tags ── */}
         <Grid container spacing={2}>
