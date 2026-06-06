@@ -16,6 +16,14 @@ const FORMAT_MAP: Record<string, keyof sharp.FormatEnum> = {
   '.tif':  'tiff',
 };
 
+const EXT_MAP: Record<string, string> = {
+  jpeg: '.jpg',
+  png:  '.png',
+  webp: '.webp',
+  avif: '.avif',
+  tiff: '.tiff',
+};
+
 /**
  * Compresses an uploaded image file in-place using sharp.
  * Preserves the original file extension. Skips GIF and SVG files.
@@ -33,8 +41,13 @@ export async function compressImage(
   }
 
   const format = FORMAT_MAP[ext] ?? 'jpeg';
-  const outputPath = file.path;
-  const tmpPath = outputPath + '.tmp' + ext;
+  const outputExt = EXT_MAP[format] ?? '.jpg';
+
+  // Strip current extension (if any) and apply the correct one
+  const currentExt = extname(file.path);
+  const basePath = currentExt ? file.path.slice(0, -currentExt.length) : file.path;
+  const outputPath = basePath + outputExt;
+  const tmpPath = outputPath + '.tmp';
 
   await sharp(file.path)
     .resize({ width: maxWidth, withoutEnlargement: true })

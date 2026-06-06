@@ -11,7 +11,7 @@ export const settingImageStorage = diskStorage({
   destination: './uploads/settings',
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + extname(file.originalname));
+    cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
   },
 });
 
