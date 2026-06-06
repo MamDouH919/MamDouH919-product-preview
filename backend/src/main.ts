@@ -9,14 +9,9 @@ async function bootstrap() {
   // ✅ Enable CORS for both production and localhost
   app.enableCors({
     origin: [
-      'https://kaabi.mountain-egy.site',
+      'https://gravity.mountain-egy.site',
       'http://localhost:3001',
       'http://localhost:3000',
-      'http://187.127.155.122:3001',
-      'https://blueskylegal.ae',
-      'https://www.blueskylegal.ae',
-      'https://api.blueskylegal.ae',
-      'http://10.246.212.47:3000'
     ],
     credentials: true, // allow cookies or auth headers
   });
