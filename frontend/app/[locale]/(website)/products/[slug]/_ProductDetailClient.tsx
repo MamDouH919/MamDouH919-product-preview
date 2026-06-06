@@ -10,6 +10,7 @@ import CustomLink from "@/components/CustomLink"
 import Image from "next/image"
 import { useCurrency } from "@/Hooks/useCurrency"
 import WhatsAppButton from "@/components/WhatsAppButton"
+import { useTheme, alpha } from "@mui/material/styles"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -25,7 +26,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
   return (
     <CustomLink
       href={`/products/${product.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-[#004842]/25 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-(--primary-25) shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
     >
       <div className="relative overflow-hidden bg-gray-50 aspect-square">
         {image ? (
@@ -41,7 +42,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           </div>
         )}
         {categoryName && (
-          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-[#004842] px-2 py-0.5 rounded-full shadow-sm">
+          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-(--primary) px-2 py-0.5 rounded-full shadow-sm">
             {categoryName}
           </span>
         )}
@@ -51,14 +52,14 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
         <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug flex-1">{name}</p>
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
           {product.price != null ? (
-            <span className="text-base font-bold text-[#004842]">{product.price.toLocaleString()} {currency}</span>
+            <span className="text-base font-bold text-(--primary)">{product.price.toLocaleString()} {currency}</span>
           ) : (
             <span />
           )}
           <div className="flex items-center gap-1.5">
             <WhatsAppButton slug={product.slug} productName={name} />
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#004842]/8 group-hover:bg-[#004842] transition-colors duration-300">
-              <ShoppingBag className="w-4 h-4 text-[#004842] group-hover:text-white transition-colors duration-300" />
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-(--primary-8) group-hover:bg-(--primary) transition-colors duration-300">
+              <ShoppingBag className="w-4 h-4 text-(--primary) group-hover:text-white transition-colors duration-300" />
             </span>
           </div>
         </div>
@@ -105,6 +106,16 @@ export default function ProductDetailClient({ params }: Props) {
   const [activeImage, setActiveImage] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<number | null>(null)
   const currency = useCurrency()
+  const theme = useTheme()
+
+  const cssVars = {
+    "--primary": theme.palette.primary.main,
+    "--primary-dark": theme.palette.primary.dark,
+    "--primary-8": alpha(theme.palette.primary.main, 0.08),
+    "--primary-10": alpha(theme.palette.primary.main, 0.1),
+    "--primary-25": alpha(theme.palette.primary.main, 0.25),
+    "--primary-50": alpha(theme.palette.primary.main, 0.5),
+  } as React.CSSProperties
 
   const { data: product, isLoading, isError } = useProductBySlugQuery(slug)
 
@@ -137,7 +148,7 @@ export default function ProductDetailClient({ params }: Props) {
           <p className="text-gray-500 text-lg font-medium mb-4">{t("noData")}</p>
           <CustomLink
             href="/products"
-            className="inline-flex items-center gap-2 text-sm text-[#004842] underline underline-offset-4"
+            className="inline-flex items-center gap-2 text-sm text-(--primary) underline underline-offset-4"
           >
             <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
             {t("backToProducts")}
@@ -155,16 +166,16 @@ export default function ProductDetailClient({ params }: Props) {
   const subCategoryName = localized(product.subCategory?.name, lang)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" style={cssVars}>
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 py-3">
           <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
-            <CustomLink href="/" className="hover:text-[#004842] transition-colors">
+            <CustomLink href="/" className="hover:text-(--primary) transition-colors">
               {t("home")}
             </CustomLink>
             <ChevronRight className="w-4 h-4 shrink-0 rtl:rotate-180" />
-            <CustomLink href="/products" className="hover:text-[#004842] transition-colors">
+            <CustomLink href="/products" className="hover:text-(--primary) transition-colors">
               {t("products")}
             </CustomLink>
             <ChevronRight className="w-4 h-4 shrink-0 rtl:rotate-180" />
@@ -207,7 +218,7 @@ export default function ProductDetailClient({ params }: Props) {
                     onClick={() => setActiveImage(idx)}
                     className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                       activeImage === idx
-                        ? "border-[#004842] shadow-md scale-105"
+                        ? "border-(--primary) shadow-md scale-105"
                         : "border-transparent opacity-60 hover:opacity-100"
                     }`}
                   >
@@ -229,7 +240,7 @@ export default function ProductDetailClient({ params }: Props) {
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap gap-2">
               {categoryName && (
-                <span className="text-xs font-semibold uppercase tracking-wide bg-[#004842]/10 text-[#004842] px-3 py-1 rounded-full">
+                <span className="text-xs font-semibold uppercase tracking-wide bg-(--primary-10) text-(--primary) px-3 py-1 rounded-full">
                   {categoryName}
                 </span>
               )}
@@ -248,7 +259,7 @@ export default function ProductDetailClient({ params }: Props) {
                 : product.price
               return displayPrice != null ? (
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-[#004842]">
+                  <span className="text-4xl font-bold text-(--primary)">
                     {displayPrice.toLocaleString()} {currency}
                   </span>
                 </div>
@@ -265,13 +276,13 @@ export default function ProductDetailClient({ params }: Props) {
                       onClick={() => setSelectedVariant(i === activeVariant ? null : i)}
                       className={`flex flex-col items-center px-4 py-2.5 rounded-xl border transition-all duration-200 ${
                         activeVariant === i
-                          ? "bg-[#004842] text-white border-[#004842]"
-                          : "bg-white text-gray-700 border-gray-200 hover:border-[#004842]/50"
+                          ? "bg-(--primary) text-white border-(--primary)"
+                          : "bg-white text-gray-700 border-gray-200 hover:border-(--primary-50)"
                       }`}
                     >
                       <span className="text-sm font-semibold">{variant.label}</span>
                       {variant.price != null && (
-                        <span className={`text-xs mt-0.5 ${activeVariant === i ? "text-white/80" : "text-[#004842]"}`}>
+                        <span className={`text-xs mt-0.5 ${activeVariant === i ? "text-white/80" : "text-(--primary)"}`}>
                           {variant.price.toLocaleString()} {currency}
                         </span>
                       )}
@@ -310,7 +321,7 @@ export default function ProductDetailClient({ params }: Props) {
                     {product.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full hover:bg-[#004842]/10 hover:text-[#004842] transition-colors"
+                        className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full hover:bg-(--primary-10) hover:text-(--primary) transition-colors"
                       >
                         {tag}
                       </span>
@@ -328,7 +339,7 @@ export default function ProductDetailClient({ params }: Props) {
               />
               <CustomLink
                 href="/products"
-                className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[#004842] transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-(--primary) transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
                 {t("backToProducts")}
@@ -340,7 +351,7 @@ export default function ProductDetailClient({ params }: Props) {
         {description && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-16">
             <div className="flex items-center gap-3 mb-5">
-              <span className="w-1 h-6 rounded-full bg-[#004842]" />
+              <span className="w-1 h-6 rounded-full bg-(--primary)" />
               <h2 className="text-xl font-bold text-gray-800">{t("description")}</h2>
             </div>
             <div className="text-gray-600 leading-relaxed whitespace-pre-line">{description}</div>
@@ -350,7 +361,7 @@ export default function ProductDetailClient({ params }: Props) {
         {relatedProducts.length > 0 && (
           <div>
             <div className="flex items-center gap-3 mb-6">
-              <span className="w-1 h-6 rounded-full bg-[#004842]" />
+              <span className="w-1 h-6 rounded-full bg-(--primary)" />
               <h2 className="text-xl font-bold text-gray-800">{t("relatedProducts")}</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">

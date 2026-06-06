@@ -10,6 +10,7 @@ import Image from "next/image"
 import { useCurrency } from "@/Hooks/useCurrency"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import { Container } from "@mui/material"
+import { useTheme, alpha } from "@mui/material/styles"
 
 function localizedName(field: Product["name"], lang: string) {
   return field[lang] || field["ar"] || field["en"] || ""
@@ -24,7 +25,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
   return (
     <CustomLink
       href={`/products/${product.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-[#004842]/25 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-(--primary-25) shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
     >
       {/* Image */}
       <div className="relative overflow-hidden bg-gray-50 aspect-square">
@@ -44,7 +45,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
 
         {/* Category badge */}
         {categoryName && (
-          <span className="absolute top-2.5 start-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-[#004842] px-2 py-0.5 rounded-full shadow-sm">
+          <span className="absolute top-2.5 start-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-(--primary) px-2 py-0.5 rounded-full shadow-sm">
             {categoryName}
           </span>
         )}
@@ -65,7 +66,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
             {product.variants.map((v, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#004842]/8 text-[#004842]"
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--primary-8) text-(--primary)"
               >
                 {v.label}
                 {v.price != null && (
@@ -82,13 +83,13 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
               const prices = product.variants.map((v) => v.price).filter((p): p is number => p != null)
               const min = prices.length ? Math.min(...prices) : null
               return min != null ? (
-                <span className="text-base font-bold text-[#004842]">
+                <span className="text-base font-bold text-(--primary)">
                   {min.toLocaleString()} {currency}+
                 </span>
               ) : <span />
             })()
           ) : product.price != null ? (
-            <span className="text-base font-bold text-[#004842]">
+            <span className="text-base font-bold text-(--primary)">
               {product.price.toLocaleString()} {currency}
             </span>
           ) : (
@@ -96,8 +97,8 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           )}
           <div className="flex items-center gap-1.5">
             <WhatsAppButton slug={product.slug} productName={name} />
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#004842]/8 group-hover:bg-[#004842] transition-colors duration-300">
-              <ShoppingBag className="w-4 h-4 text-[#004842] group-hover:text-white transition-colors duration-300" />
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-(--primary-8) group-hover:bg-(--primary) transition-colors duration-300">
+              <ShoppingBag className="w-4 h-4 text-(--primary) group-hover:text-white transition-colors duration-300" />
             </span>
           </div>
         </div>
@@ -125,24 +126,31 @@ function SkeletonCard() {
 export default function ProductsGrid() {
   const { data, isLoading } = useProductsQuery()
   const { t, i18n } = useTranslation()
+  const theme = useTheme()
 
   const products = (data ?? [])
     .filter((p) => p.isActive)
     .sort((a, b) => a.order - b.order)
 
+  const cssVars = {
+    "--primary": theme.palette.primary.main,
+    "--primary-8": alpha(theme.palette.primary.main, 0.08),
+    "--primary-25": alpha(theme.palette.primary.main, 0.25),
+  } as React.CSSProperties
+
   return (
-    <Container>
+    <Container style={cssVars}>
       <div className="px-4 flex flex-col gap-5">
         {/* Section header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="w-1 h-6 rounded-full bg-[#004842]" />
+            <span className="w-1 h-6 rounded-full bg-(--primary)" />
             <h2 className="text-xl font-bold text-gray-800">{t("products")}</h2>
           </div>
           {!isLoading && products.length > 0 && (
             <CustomLink
               href="/products"
-              className="text-sm font-medium text-[#004842] hover:underline underline-offset-4"
+              className="text-sm font-medium text-(--primary) hover:underline underline-offset-4"
             >
               {t("viewAll")}
             </CustomLink>
