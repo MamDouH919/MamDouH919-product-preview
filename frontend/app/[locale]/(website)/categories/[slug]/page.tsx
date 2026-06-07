@@ -19,7 +19,6 @@ import { useTheme, alpha } from "@mui/material/styles"
 import { useCurrency } from "@/Hooks/useCurrency"
 import { ShoppingBag, ArrowLeft, ChevronRight } from "lucide-react"
 import WhatsAppButton from "@/components/WhatsAppButton"
-import { Grid } from "@mui/material"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -31,6 +30,12 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
   const name = localized(product.name, lang)
   const image = product.images?.[0]
   const currency = useCurrency()
+
+  const variantPrices = (product.variants ?? [])
+    .map((v) => v.price)
+    .filter((p): p is number => p != null)
+  const minPrice = variantPrices.length ? Math.min(...variantPrices) : null
+  const displayPrice = product.variants?.length ? minPrice : product.price
 
   return (
     <CustomLink href={`/products/${product.slug}`} style={{ textDecoration: "none", display: "block" }}>
@@ -50,30 +55,15 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           },
         }}
       >
-        <Box
-          sx={{
-            position: "relative",
-            width: "100%",
-            paddingTop: "100%",
-            bgcolor: "grey.50",
-          }}
-        >
+        {/* Image */}
+        <Box sx={{ position: "relative", width: "100%", paddingTop: "100%", bgcolor: "grey.50" }}>
           {image ? (
-            <Image
-              src={getBackendUri(image)}
-              alt={name}
-              fill
-              style={{ objectFit: "cover" }}
-            />
+            <Image src={getBackendUri(image)} alt={name} fill style={{ objectFit: "cover" }} />
           ) : (
             <Box
               sx={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: "grey.100",
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center", bgcolor: "grey.100",
               }}
             >
               <ShoppingBag size={40} color={theme.palette.grey[300]} />
@@ -82,6 +72,7 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
         </Box>
 
         <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+          {/* Name */}
           <Typography
             variant="body2"
             fontWeight={600}
@@ -95,6 +86,38 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
           >
             {name}
           </Typography>
+
+          {/* Variants */}
+          {product.variants?.length > 0 && (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              {product.variants.map((v, i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    px: 1,
+                    py: 0.25,
+                    borderRadius: 99,
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    color: "primary.main",
+                  }}
+                >
+                  {v.label}
+                  {v.price != null && (
+                    <Box component="span" sx={{ opacity: 0.7 }}>
+                      · {v.price.toLocaleString()} {currency}
+                    </Box>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {/* Price + actions */}
           <Box
             sx={{
               display: "flex",
@@ -105,24 +128,21 @@ function ProductCard({ product, lang }: { product: Product; lang: string }) {
               borderColor: "grey.100",
             }}
           >
-            {product.price != null ? (
+            {displayPrice != null ? (
               <Typography variant="subtitle2" fontWeight={700} color="primary">
-                {product.price.toLocaleString()} {currency}
+                {displayPrice.toLocaleString()} {currency}
+                {product.variants?.length ? "+" : ""}
               </Typography>
             ) : (
               <Box />
             )}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
               <WhatsAppButton slug={product.slug} productName={name} />
               <Box
                 sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
+                  width: 32, height: 32, borderRadius: "50%",
                   bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 <ShoppingBag size={16} color={theme.palette.primary.main} />
@@ -321,56 +341,52 @@ export default function CategoryPage({ params }: PageProps) {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {/* Sub-category chips */}
             {(loadingSubs || hasSubs) && (
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
-                {loadingSubs ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} variant="rounded" width={80} height={32} />
-                  ))
-                ) : (
-                  <>
-                    <Chip
-                      label={t("allProducts")}
-                      onClick={() => setSelectedSubCategoryId(undefined)}
-                      variant={selectedSubCategoryId === undefined ? "filled" : "outlined"}
-                      color={selectedSubCategoryId === undefined ? "primary" : "default"}
-                    />
-                    {activeSubs.map((sub) => (
+              <>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+                  {loadingSubs ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} variant="rounded" width={80} height={32} />
+                    ))
+                  ) : (
+                    <>
                       <Chip
-                        key={sub._id}
-                        label={localized(sub.name, lang)}
-                        onClick={() =>
-                          setSelectedSubCategoryId(
-                            selectedSubCategoryId === sub._id ? undefined : sub._id
-                          )
-                        }
-                        variant={selectedSubCategoryId === sub._id ? "filled" : "outlined"}
-                        color={selectedSubCategoryId === sub._id ? "primary" : "default"}
+                        label={t("allProducts")}
+                        onClick={() => setSelectedSubCategoryId(undefined)}
+                        variant={selectedSubCategoryId === undefined ? "filled" : "outlined"}
+                        color={selectedSubCategoryId === undefined ? "primary" : "default"}
                       />
-                    ))}
-                    <Divider sx={{ mb: 3 }} />
-                  </>
-                )}
-              </Box>
+                      {activeSubs.map((sub) => (
+                        <Chip
+                          key={sub._id}
+                          label={localized(sub.name, lang)}
+                          onClick={() =>
+                            setSelectedSubCategoryId(
+                              selectedSubCategoryId === sub._id ? undefined : sub._id
+                            )
+                          }
+                          variant={selectedSubCategoryId === sub._id ? "filled" : "outlined"}
+                          color={selectedSubCategoryId === sub._id ? "primary" : "default"}
+                        />
+                      ))}
+                    </>
+                  )}
+                </Box>
+                <Divider sx={{ mb: 3 }} />
+              </>
             )}
-
 
             {/* Products */}
             {loadingProducts ? (
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
                   gap: 2,
                 }}
               >
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Box key={i}>
-                    <Skeleton
-                      variant="rectangular"
-                      width="100%"
-                      height={160}
-                      sx={{ borderRadius: 2, mb: 1 }}
-                    />
+                    <Skeleton variant="rectangular" width="100%" height={180} sx={{ borderRadius: 2, mb: 1 }} />
                     <Skeleton variant="text" width="70%" />
                     <Skeleton variant="text" width="40%" />
                   </Box>
@@ -393,16 +409,21 @@ export default function CategoryPage({ params }: PageProps) {
                 </Typography>
               </Box>
             ) : (
-              <Grid
-                container
-                spacing={2}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "repeat(2, 1fr)",
+                    sm: "repeat(2, 1fr)",
+                    md: "repeat(3, 1fr)",
+                  },
+                  gap: 2,
+                }}
               >
                 {products.map((product) => (
-                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 4 }} key={product._id}>
-                    <ProductCard  product={product} lang={lang} />
-                  </Grid>
+                  <ProductCard key={product._id} product={product} lang={lang} />
                 ))}
-              </Grid>
+              </Box>
             )}
           </Box>
         </Box>
