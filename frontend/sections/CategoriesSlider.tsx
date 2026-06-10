@@ -6,7 +6,6 @@ import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
 import Box from "@mui/material/Box"
 import Card from "@mui/material/Card"
-import CardActionArea from "@mui/material/CardActionArea"
 import Skeleton from "@mui/material/Skeleton"
 import Typography from "@mui/material/Typography"
 import { useTheme } from "@mui/material/styles"
@@ -84,9 +83,9 @@ export default function CategoriesSlider() {
                 "&:hover": { borderColor: theme.palette.primary.main },
               }}
             >
-              <CardActionArea
+              <CustomLink
                 href={`/categories/${category.slug}`}
-                sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, p: 1 }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 8, textDecoration: "none" }}
               >
                 <Box
                   sx={{
@@ -131,7 +130,7 @@ export default function CategoriesSlider() {
                       borderRadius: 99,
                       bgcolor: "grey.300",
                       transition: "width 0.3s, background-color 0.3s",
-                      ".MuiCardActionArea-root:hover &": {
+                      ".MuiCard-root:hover &": {
                         width: 36,
                         bgcolor: theme.palette.primary.main,
                       },
@@ -146,13 +145,13 @@ export default function CategoriesSlider() {
                       maxWidth: 130,
                       color: "text.secondary",
                       transition: "color 0.3s",
-                      ".MuiCardActionArea-root:hover &": { color: theme.palette.primary.main },
+                      ".MuiCard-root:hover &": { color: theme.palette.primary.main },
                     }}
                   >
                     {name}
                   </Typography>
                 </Box>
-              </CardActionArea>
+              </CustomLink>
             </Card>
           )
         })}
