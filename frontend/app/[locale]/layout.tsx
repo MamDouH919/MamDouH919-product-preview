@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Cairo } from "next/font/google";
 import "../globals.css";
 import Providers from "@/lib/Providers";
 import config from "@/config.json";
+import { resolveTenantSeo } from "@/lib/tenantSeo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,33 +23,20 @@ const cairo = Cairo({
   variable: "--font-cairo",
 });
 
-const SITE_DEFAULTS = {
-  ar: {
-    title: "جراڤيتي | عطور فاخرة",
-    titleTemplate: "%s | جراڤيتي",
-    description: "اكتشف مجموعة جراڤيتي من العطور الفاخرة. تعرّف على الأسعار والتفاصيل الكاملة لكل منتج.",
-    keywords: "عطور، عطور فاخرة، جراڤيتي، بخور، أسعار عطور، عطر رجالي، عطر نسائي، تشكيلة عطور",
-  },
-  en: {
-    title: "Gravity | Luxury Perfumes",
-    titleTemplate: "%s | Gravity",
-    description: "Explore Gravity's exclusive luxury perfume collection. View prices and full product details for every fragrance.",
-    keywords: "perfumes, luxury perfumes, Gravity, fragrances, scents, cologne, perfume prices, fragrance collection, men perfume, women perfume",
-  },
-} as const;
-
 export async function generateMetadata(
   { params }: { params: Promise<{ locale: string }> }
 ): Promise<Metadata> {
   const { locale } = await params;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const host = (await headers()).get("host");
+  const tenant = resolveTenantSeo(host);
 
   const lang = locale === "ar" ? "ar" : "en";
-  const { title, titleTemplate, description, keywords } = SITE_DEFAULTS[lang];
+  const { title, titleTemplate, description, keywords } = tenant[lang];
 
   return {
-    metadataBase: new URL(siteUrl),
-    applicationName: "Gravity",
+    metadataBase: new URL(tenant.siteUrl),
+    applicationName: tenant.siteName,
 
     title: {
       default: title,
@@ -57,7 +46,7 @@ export async function generateMetadata(
     description,
     keywords,
 
-    authors: [{ name: "Gravity" }],
+    authors: [{ name: tenant.siteName }],
     category: "Perfumes & Fragrances",
 
     robots: {
@@ -66,31 +55,24 @@ export async function generateMetadata(
       googleBot: { index: true, follow: true },
     },
 
-    icons: {
-      shortcut: "/favicon.ico",
-      icon: [
-        { url: "/icon0.svg", type: "image/svg+xml" },
-        { url: "/icon1.png", type: "image/png", sizes: "any" },
-      ],
-      apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
-    },
+    icons: tenant.icons,
 
-    manifest: "/manifest.json",
+    manifest: tenant.manifest,
 
     openGraph: {
       type: "website",
-      siteName: "Gravity",
+      siteName: tenant.siteName,
       title,
       description,
       locale: locale === "ar" ? "ar_SA" : "en_US",
-      images: [{ url: "/logo.webp", width: 1200, height: 630, alt: title }],
+      images: [{ url: tenant.ogImage, width: 1200, height: 630, alt: title }],
     },
 
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/logo.webp"],
+      images: [tenant.ogImage],
     },
   };
 }

@@ -1,20 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { Category } from './schemas/category.schema';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
+import { tenantImageStorage } from '../common/helpers/upload-storage';
 
-export const categoryImageStorage = diskStorage({
-  destination: './uploads/categories',
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
-  },
-});
+export const categoryImageStorage = tenantImageStorage('categories');
 
 function buildSlug(text: string): string {
   return text

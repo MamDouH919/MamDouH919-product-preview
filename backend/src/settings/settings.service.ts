@@ -3,17 +3,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Setting } from './schemas/setting.schema';
 import { UpdateSettingDto } from './dto/update-setting.dto';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
+import { tenantImageStorage } from '../common/helpers/upload-storage';
 
-export const settingImageStorage = diskStorage({
-  destination: './uploads/settings',
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
-  },
-});
+export const settingImageStorage = tenantImageStorage('settings');
 
 @Injectable()
 export class SettingsService {

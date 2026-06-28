@@ -1,20 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { SubCategory } from './schemas/sub-category.schema';
 import { CreateSubCategoryDto } from './dto/create-sub-category.dto';
 import { UpdateSubCategoryDto } from './dto/update-sub-category.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
+import { tenantImageStorage } from '../common/helpers/upload-storage';
 
-export const subCategoryImageStorage = diskStorage({
-  destination: './uploads/sub-categories',
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
-  },
-});
+export const subCategoryImageStorage = tenantImageStorage('sub-categories');
 
 function buildSlug(text: string): string {
   return text

@@ -1,14 +1,22 @@
 import { handleLogout } from "@/actions/cookies";
+import { getBackendUrl } from "@/lib/getBackendUrl";
 import axios from "axios";
 import { toast } from "sonner";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
+    baseURL: getBackendUrl(),
     headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
     },
+});
+
+// Resolve the tenant backend per request so the correct `api.<host>` is used
+// once the browser host is known (the create-time value may be empty on SSR).
+api.interceptors.request.use((config) => {
+    config.baseURL = getBackendUrl();
+    return config;
 });
 
 export const setAuthToken = (token: string | null) => {

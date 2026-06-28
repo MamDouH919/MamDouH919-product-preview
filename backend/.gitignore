@@ -4,6 +4,9 @@
 /build
 /uploads
 
+# tenant DB connection strings (contains credentials) — use TENANT_MAP env in prod
+/src/config.json
+
 # Logs
 logs
 *.log

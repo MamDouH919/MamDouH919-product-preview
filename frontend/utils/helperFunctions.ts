@@ -1,8 +1,10 @@
 import imageCompression from 'browser-image-compression';
+import { getBackendUrl, getTenantKey } from '@/lib/getBackendUrl';
 
 export const getBackendUri = (imgPath: string | undefined | null): string => {
     if (!imgPath) return "/images/placeholder.png";
-    const domain = process.env.NEXT_PUBLIC_BACKEND_URL;
+    const domain = getBackendUrl();
+    const key = getTenantKey()
     if (!domain) return "/images/placeholder.png";
     return `${domain}${imgPath}`;
 };

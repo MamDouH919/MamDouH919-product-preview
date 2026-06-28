@@ -8,8 +8,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { styled, useTheme } from "@mui/material/styles";
-import MenuIcon from "@mui/icons-material/Menu";
+import { styled } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
@@ -43,42 +42,42 @@ const HeaderBar = styled(Box, {
     : "none",
 }));
 
-const NavLink = styled("span", {
-  shouldForwardProp: (p) => p !== "active" && p !== "scrolled",
-})<{ active?: boolean; scrolled: boolean }>(
-  ({ theme, active, scrolled }) => ({
-    position: "relative",
-    fontWeight: 500,
-    fontSize: "0.9375rem",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    textDecoration: "none",
-    color: !scrolled
-      ? "#fff"
-      : active
-        ? theme.palette.primary.main
-        : theme.palette.text.primary,
-    transition: "color 0.25s ease",
-    paddingBottom: 2,
-    "&::after": {
-      content: '""',
-      position: "absolute",
-      bottom: -4,
-      left: 0,
-      width: active ? "100%" : "0%",
-      height: 2,
-      backgroundColor: !scrolled
-        ? "#fff"
-        : theme.palette.primary.main,
-      transition: "width 0.25s ease",
-      borderRadius: 2,
-    },
-    "&:hover": {
-      color: !scrolled ? "rgba(255,255,255,0.8)" : theme.palette.primary.main,
-    },
-    "&:hover::after": { width: "100%" },
-  })
-);
+// const NavLink = styled("span", {
+//   shouldForwardProp: (p) => p !== "active" && p !== "scrolled",
+// })<{ active?: boolean; scrolled: boolean }>(
+//   ({ theme, active, scrolled }) => ({
+//     position: "relative",
+//     fontWeight: 500,
+//     fontSize: "0.9375rem",
+//     cursor: "pointer",
+//     whiteSpace: "nowrap",
+//     textDecoration: "none",
+//     color: !scrolled
+//       ? "#fff"
+//       : active
+//         ? theme.palette.primary.main
+//         : theme.palette.text.primary,
+//     transition: "color 0.25s ease",
+//     paddingBottom: 2,
+//     "&::after": {
+//       content: '""',
+//       position: "absolute",
+//       bottom: -4,
+//       left: 0,
+//       width: active ? "100%" : "0%",
+//       height: 2,
+//       backgroundColor: !scrolled
+//         ? "#fff"
+//         : theme.palette.primary.main,
+//       transition: "width 0.25s ease",
+//       borderRadius: 2,
+//     },
+//     "&:hover": {
+//       color: !scrolled ? "rgba(255,255,255,0.8)" : theme.palette.primary.main,
+//     },
+//     "&:hover::after": { width: "100%" },
+//   })
+// );
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -120,7 +119,7 @@ const Navbar = () => {
             <CustomLink href="/">
               <LogoWrapper>
                 <Image
-                  src={"/logo.webp"}
+                  src={getBackendUri(logo) ?? "/images/placeholder.png"}
                   alt="logo"
                   width={0}
                   height={60}

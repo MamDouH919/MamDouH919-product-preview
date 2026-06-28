@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { DatabaseController } from './database.controller';
 import { DatabaseService } from './database.service';
 import { User, UserSchema } from '../auth/schemas/user.schema';
+import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])],
   controllers: [DatabaseController],
-  providers: [DatabaseService],
+  providers: [DatabaseService, tenantModelProvider(User.name, UserSchema)],
 })
 export class DatabaseModule {}

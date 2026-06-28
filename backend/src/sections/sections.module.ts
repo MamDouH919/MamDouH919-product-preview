@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { SectionsService } from './sections.service';
 import { SectionsController } from './sections.controller';
 import { Section, SectionSchema } from './schemas/section.schema';
 import { AuthModule } from '../auth/auth.module';
+import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: Section.name, schema: SectionSchema }]),
-    AuthModule,
-  ],
+  imports: [AuthModule],
   controllers: [SectionsController],
-  providers: [SectionsService],
+  providers: [
+    SectionsService,
+    tenantModelProvider(Section.name, SectionSchema),
+  ],
 })
 export class SectionsModule {}

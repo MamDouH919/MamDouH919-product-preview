@@ -15,13 +15,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
   @Post('login')
-  async login(@Body() credential: LoginDto) {
-    return this.authService.login(credential);
+  async login(@Body() credential: LoginDto, @Req() req) {
+    return this.authService.login(credential, req.hostname);
   }
 
   @Post('refresh')
-  async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto.token);
+  async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto, @Req() req) {
+    return this.authService.refreshTokens(refreshTokenDto.token, req.hostname);
   }
 
   @UseGuards(AuthenticationGuard)
@@ -38,8 +38,8 @@ export class AuthController {
   }
 
   @Post('forgot-password')
-  async forgetPassword(@Body() forgetPasswordDto: ForgotPasswordDto) {
-    return this.authService.forgetPassword(forgetPasswordDto.email);
+  async forgetPassword(@Body() forgetPasswordDto: ForgotPasswordDto, @Req() req) {
+    return this.authService.forgetPassword(forgetPasswordDto.email, req.hostname);
   }
 
   @Post('reset-password')
