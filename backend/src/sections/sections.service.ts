@@ -4,17 +4,10 @@ import { Model } from 'mongoose';
 import { Section } from './schemas/section.schema';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
+import { tenantImageStorage } from '../common/helpers/upload-storage';
 
-export const sectionImageStorage = diskStorage({
-  destination: './uploads/sections',
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
-  },
-});
+export const sectionImageStorage = tenantImageStorage('sections');
 
 function filesByField(files: Express.Multer.File[]) {
   const image = files.find((f) => f.fieldname === 'image');

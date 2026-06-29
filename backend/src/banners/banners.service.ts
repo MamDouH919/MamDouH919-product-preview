@@ -4,17 +4,10 @@ import { Model } from 'mongoose';
 import { Banner } from './schemas/banner.schema';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
+import { tenantImageStorage } from '../common/helpers/upload-storage';
 
-export const bannerImageStorage = diskStorage({
-  destination: './uploads/banners',
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
-  },
-});
+export const bannerImageStorage = tenantImageStorage('banners');
 
 @Injectable()
 export class BannersService {

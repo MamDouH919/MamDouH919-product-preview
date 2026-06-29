@@ -17,6 +17,7 @@ import { ForgotPasswordDto } from './dtos/forget-password.dto';
 import { nanoid } from 'nanoid';
 import { ResetToken } from './schemas/reset-token.schema';
 import { RolesService } from '../roles/roles.service';
+import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +31,7 @@ export class AuthService {
     private JwtService: JwtService,
     private mailService: MailService,
     private rolesService: RolesService,
+    private tenantConnection: TenantConnectionService,
   ) { }
 
   async create(createAuthDto: SignupDto) {
@@ -112,7 +114,7 @@ export class AuthService {
     return { message: 'New OTP sent to your email' };
   }
 
-  async login(createAuthDto: LoginDto) {
+  async login(createAuthDto: LoginDto, tenant: string) {
     const { email, password } = createAuthDto;
     const user = await this.UserModel.findOne({ email });
     if (!user) {
@@ -130,7 +132,7 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.generateUserTokens(user._id);
+    const tokens = await this.generateUserTokens(user._id, tenant);
 
     return {
       ...tokens,
@@ -138,7 +140,7 @@ export class AuthService {
     };
   }
 
-  async refreshTokens(refreshToken: string) {
+  async refreshTokens(refreshToken: string, tenant: string) {
     const token = await this.RefreshTokenModel.findOne({
       token: refreshToken,
       expiryDate: { $gte: new Date() },
@@ -148,7 +150,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is invalid or has expired');
     }
 
-    return this.generateUserTokens(token._id);
+    return this.generateUserTokens(token._id, tenant);
   }
 
   async changePassword(userId, newPassword: string, oldPassword: string) {
@@ -168,7 +170,7 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
-  async forgetPassword(email: string) {
+  async forgetPassword(email: string, host: string) {
     const user = await this.UserModel.findOne({ email });
     if (user) {
       const resetToken = nanoid(64);
@@ -181,7 +183,10 @@ export class AuthService {
         expiryDate,
       });
 
-      await this.mailService.sendResetPasswordLink(email, resetToken);
+      // Build the reset link against the tenant's own frontend so the email
+      // points users back to the site they signed up on.
+      const frontendUrl = this.tenantConnection.getFrontendUrl(host);
+      await this.mailService.sendResetPasswordLink(email, resetToken, frontendUrl);
     }
 
     return { message: 'If the email exists, a password reset link will be sent' };
@@ -208,11 +213,11 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
-  async generateUserTokens(userId) {
+  async generateUserTokens(userId, tenant: string) {
     const refreshToken = uuidv4();
     await this.storeRefreshToken(refreshToken, userId);
     return {
-      accessToken: this.JwtService.sign({ userId }, { expiresIn: "12h" }),
+      accessToken: this.JwtService.sign({ userId, tenant }, { expiresIn: "12h" }),
       refreshToken,
     };
   }

@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { SubscribeService } from './subscribe.service';
 import { SubscribeController } from './subscribe.controller';
 import { Subscribe, SubscribeSchema } from './schemas/subscribe.schema';
 import { AuthModule } from '../auth/auth.module';
+import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: Subscribe.name, schema: SubscribeSchema }]),
-    AuthModule,
-  ],
+  imports: [AuthModule],
   controllers: [SubscribeController],
-  providers: [SubscribeService],
+  providers: [
+    SubscribeService,
+    tenantModelProvider(Subscribe.name, SubscribeSchema),
+  ],
 })
 export class SubscribeModule {}

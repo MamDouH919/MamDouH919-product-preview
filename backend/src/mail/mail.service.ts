@@ -29,9 +29,14 @@ export class MailService {
     });
   }
 
-  async sendResetPasswordLink(to: string, token: string): Promise<void> {
-    const frontendUrl = this.configService.get<string>('frontendUrl');
-    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+  async sendResetPasswordLink(
+    to: string,
+    token: string,
+    frontendUrl?: string,
+  ): Promise<void> {
+    // Prefer the tenant's frontend origin; fall back to the global env value.
+    const baseUrl = frontendUrl ?? this.configService.get<string>('frontendUrl');
+    const resetLink = `${baseUrl}/reset-password?token=${token}`;
     await this.transporter.sendMail({
       from: this.configService.get<string>('mail.user'),
       to,

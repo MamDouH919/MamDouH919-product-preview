@@ -1,21 +1,32 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { getModelToken } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
-import { User } from './auth/schemas/user.schema';
-import { Role } from './roles/schemas/role.schema';
+import { User, UserSchema } from './auth/schemas/user.schema';
+import { Role, RoleSchema } from './roles/schemas/role.schema';
 import { Resource } from './roles/enums/resource.enum';
 import { Action } from './roles/enums/action.enum';
-import { servicesData } from './seeds/services.seed';
+import { TenantConnectionService } from './common/helpers/dynamic-connection';
 import * as bcrypt from 'bcrypt';
 
 async function seed() {
+  // Tenant to seed: `npm run seed -- <host>` or TENANT_HOST env var.
+  const host = process.argv[2] ?? process.env.TENANT_HOST;
+  if (!host) {
+    throw new Error(
+      'No tenant host provided. Usage: npm run seed -- <host> (must exist in config.json)',
+    );
+  }
+
   const app = await NestFactory.createApplicationContext(AppModule);
 
   const configService = app.get(ConfigService);
-  const userModel = app.get<Model<User>>(getModelToken(User.name));
-  const roleModel = app.get<Model<Role>>(getModelToken(Role.name));
+  const tenantConnection = app.get(TenantConnectionService);
+
+  const connection = await tenantConnection.getConnection(host);
+  const userModel = connection.model(User.name, UserSchema);
+  const roleModel = connection.model(Role.name, RoleSchema);
+
+  console.log(`Seeding tenant "${host}"...`);
 
   const adminName = configService.getOrThrow<string>('seed.adminName');
   const adminEmail = configService.getOrThrow<string>('seed.adminEmail');

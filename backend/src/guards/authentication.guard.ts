@@ -16,6 +16,12 @@ export class AuthenticationGuard implements CanActivate {
     }
     try {
       const payload = this.jwtService.verify(token);
+      // Bind the token to the tenant that issued it. The JWT secret is shared
+      // across tenants, so without this a token from one tenant would pass
+      // signature verification on another (cross-tenant impersonation).
+      if (payload.tenant !== request.hostname) {
+        throw new UnauthorizedException("Invalid token");
+      }
       request.userId = payload.userId;
     } catch (error) {
       Logger.error(error);
