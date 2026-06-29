@@ -14,7 +14,7 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   localhost,
   "app.localhost": appLocalhost,
   "ranosh.localhost": ranosh,
-  "ranosh.com": ranosh,
+  "ranosh.novaslash.com": ranosh,
 };
 
 export const DEFAULT_TENANT = "localhost";

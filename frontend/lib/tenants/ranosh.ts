@@ -1,8 +1,10 @@
 import type { TenantSeo } from "./types";
 
+export const RANOSH_DOMAIN = "https://ranosh.novaslash.com";
+
 const ranosh: TenantSeo = {
   siteName: "Ranosh",
-  siteUrl: "https://ranosh.com",
+  siteUrl: RANOSH_DOMAIN,
   ar: {
     title: "رانوش | تفاصيل يدوية لكل مناسباتك",
     titleTemplate: "%s | رانوش",
