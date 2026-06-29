@@ -8,7 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 const allowedOrigins = [
   'http://localhost:3000',
   'http://demo.localhost:3000',
-  'http://ranosh.novaslash.com',
+  'https://ranosh.novaslash.com',
 ];
 
 async function bootstrap() {
