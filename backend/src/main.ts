@@ -2,27 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { TenantConnectionService } from './common/helpers/dynamic-connection';
+
+// ✅ CORS allowlist — add tenant frontend origins here (scheme + host + port,
+// no trailing slash), e.g. 'https://ranoshka.com'.
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://demo.localhost:3000',
+  'http://ranosh.novaslash.com',
+];
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // ✅ Dynamic CORS: every tenant's frontend origin is allowed automatically,
-  // sourced from the same tenant config used for DB routing. Adding a tenant
-  // (config.json / TENANT_MAP) updates the allowlist with no code change.
-  const tenantService = app.get(TenantConnectionService);
-  const allowedOrigins = new Set(tenantService.getAllowedOrigins());
-  console.log(allowedOrigins);
-  
   app.enableCors({
-    origin: (origin, callback) => {
-      // Allow non-browser clients (curl, server-to-server) that send no Origin.
-      if (!origin || allowedOrigins.has(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origin not allowed by CORS: ${origin}`));
-      }
-    },
+    origin: allowedOrigins,
     credentials: true, // allow cookies or auth headers
   });
 
@@ -30,7 +23,7 @@ async function bootstrap() {
   // schemas aren't publicly browsable on the live server.
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('Gravity API')
+      .setTitle('product preview API')
       .setDescription('API documentation for Gravity application')
       .setVersion('1.0')
       .build();
