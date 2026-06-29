@@ -12,6 +12,8 @@ async function bootstrap() {
   // (config.json / TENANT_MAP) updates the allowlist with no code change.
   const tenantService = app.get(TenantConnectionService);
   const allowedOrigins = new Set(tenantService.getAllowedOrigins());
+  console.log(allowedOrigins);
+  
   app.enableCors({
     origin: (origin, callback) => {
       // Allow non-browser clients (curl, server-to-server) that send no Origin.
