@@ -7,8 +7,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 // no trailing slash), e.g. 'https://ranoshka.com'.
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:3002',
   'http://demo.localhost:3000',
+  'http://demo.localhost:3002',
   'https://ranosh.novaslash.com',
+  'https://gravity.novaslash.com',
 ];
 
 async function bootstrap() {

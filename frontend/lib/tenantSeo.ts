@@ -2,6 +2,7 @@ import type { TenantSeo } from "./tenants/types";
 import localhost from "./tenants/localhost";
 import appLocalhost from "./tenants/appLocalhost";
 import ranosh from "./tenants/ranosh";
+import gravity from "./tenants/gravity";
 
 export type { TenantSeo, LocaleSeo } from "./tenants/types";
 
@@ -15,6 +16,7 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   "app.localhost": appLocalhost,
   "ranosh.localhost": ranosh,
   "ranosh.novaslash.com": ranosh,
+  "gravity.novaslash.com": gravity,
 };
 
 export const DEFAULT_TENANT = "localhost";

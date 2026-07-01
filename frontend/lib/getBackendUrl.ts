@@ -14,6 +14,7 @@ const api: Record<string, string> = {
   "app.localhost": "http://app.localhost:3055",
   "demo.localhost": "http://demo.localhost:3055",
   "ranosh.novaslash.com": "https://api-ranosh.novaslash.com",
+  "gravity.novaslash.com": "https://api-gravity.novaslash.com",
 }
 
 export function getBackendUrl(): string {
