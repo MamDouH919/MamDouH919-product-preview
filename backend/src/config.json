@@ -1,0 +1,10 @@
+{
+  "localhost": {
+    "mongoUri": "mongodb://127.0.0.1:27017/demo",
+    "frontendUrl": "http://localhost:3000"
+  },
+  "demo.localhost": {
+    "mongoUri": "mongodb://127.0.0.1:27017/demo-db",
+    "frontendUrl": "http://demo.localhost:3000"
+  }
+}
