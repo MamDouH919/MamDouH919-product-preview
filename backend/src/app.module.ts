@@ -14,6 +14,7 @@ import { DatabaseModule } from './database/database.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { ProductsModule } from './products/products.module';
+import { InventoryModule } from './inventory/inventory.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -56,6 +57,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     CategoriesModule,
     SubCategoriesModule,
     ProductsModule,
+    InventoryModule,
     TenantModule,
   ],
   controllers: [AppController],

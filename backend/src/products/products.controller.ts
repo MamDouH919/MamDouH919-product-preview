@@ -10,7 +10,9 @@ import {
   UseInterceptors,
   UploadedFiles,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService, productImageStorage } from './products.service';
 import { parseNestedBody } from '../common/helpers/parse-nested-body';
@@ -32,10 +34,11 @@ export class ProductsController {
   @UseInterceptors(AnyFilesInterceptor({ storage: productImageStorage }))
   create(
     @Body() body: any,
+    @Req() req: Request & { userId?: string },
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     const createProductDto = parseNestedBody(body) as CreateProductDto;
-    return this.productsService.create(createProductDto, files ?? []);
+    return this.productsService.create(createProductDto, files ?? [], req.userId);
   }
 
   @Get()
@@ -70,10 +73,11 @@ export class ProductsController {
   update(
     @Param('id') id: string,
     @Body() body: any,
+    @Req() req: Request & { userId?: string },
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     const updateProductDto = parseNestedBody(body) as UpdateProductDto;
-    return this.productsService.update(id, updateProductDto, files ?? []);
+    return this.productsService.update(id, updateProductDto, files ?? [], req.userId);
   }
 
   @UseGuards(AuthenticationGuard, AuthorizationGuard)

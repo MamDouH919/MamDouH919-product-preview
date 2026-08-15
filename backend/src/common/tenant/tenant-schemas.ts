@@ -11,6 +11,7 @@ import { Banner, BannerSchema } from '../../banners/schemas/banner.schema';
 import { Subscribe, SubscribeSchema } from '../../subscribe/schemas/subscribe.schema';
 import { Setting, SettingSchema } from '../../settings/schemas/setting.schema';
 import { Product, ProductSchema } from '../../products/schemas/product.schema';
+import { StockMovement, StockMovementSchema } from '../../inventory/schemas/stock-movement.schema';
 
 /**
  * Every model the app uses. All of these are registered on a tenant
@@ -30,4 +31,5 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: Subscribe.name, schema: SubscribeSchema },
   { name: Setting.name, schema: SettingSchema },
   { name: Product.name, schema: ProductSchema },
+  { name: StockMovement.name, schema: StockMovementSchema },
 ];

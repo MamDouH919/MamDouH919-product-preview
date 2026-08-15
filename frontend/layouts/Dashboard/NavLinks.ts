@@ -12,6 +12,7 @@ import {
     Handshake,
     Gavel,
     StorageOutlined,
+    WarehouseOutlined,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
@@ -59,6 +60,11 @@ export const useLinksList = () => {
             primary: t("products"),
             pathname: "/admin/products",
             icon: Handshake,
+        },
+        {
+            primary: t("inventory"),
+            pathname: "/admin/inventory",
+            icon: WarehouseOutlined,
         },
         {
             primary: t("settings"),

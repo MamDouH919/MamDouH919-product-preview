@@ -8,10 +8,17 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
 export class ProductVariantDto {
+  // Present when editing an existing variant; absent when adding a new one.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsMongoId()
+  _id?: string;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -21,6 +28,19 @@ export class ProductVariantDto {
   @IsOptional()
   @IsNumber()
   price?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
+  // Honoured only for brand-new variants — the stock of an existing variant
+  // can only change through the inventory ledger.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stock?: number;
 }
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 
@@ -96,4 +116,27 @@ export class CreateProductDto {
   @IsOptional()
   @IsNumber()
   order?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  trackStock?: boolean;
+
+  // Opening stock. Accepted on create; ignored on update (use /inventory/adjust).
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stock?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  lowStockThreshold?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  allowBackorder?: boolean;
 }

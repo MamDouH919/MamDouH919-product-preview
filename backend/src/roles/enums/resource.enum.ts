@@ -15,4 +15,5 @@ export enum Resource {
   CATEGORIES = 'categories',
   SUB_CATEGORIES = 'sub-categories',
   PRODUCTS = 'products',
+  INVENTORY = 'inventory',
 }

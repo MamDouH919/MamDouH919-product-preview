@@ -40,7 +40,9 @@ import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 
 type ImageItem = { file: File | string | null };
 
-type VariantItem = { label: string; price: string };
+// `_id` travels back to the server so it can tell an edited variant from a new
+// one — that is what keeps a variant's stock attached to it across an edit.
+type VariantItem = { _id?: string; label: string; price: string; sku: string; stock: string };
 
 type ProductFormValues = {
   name: LocalizedField;
@@ -56,6 +58,10 @@ type ProductFormValues = {
   variants: VariantItem[];
   isActive: boolean;
   order: number;
+  trackStock: boolean;
+  stock: string;
+  lowStockThreshold: string;
+  allowBackorder: boolean;
 };
 
 interface ProductFormProps {
@@ -82,7 +88,13 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         description: { ar: defaultData?.description?.ar ?? "", en: defaultData?.description?.en ?? "" },
         shortDescription: { ar: defaultData?.shortDescription?.ar ?? "", en: defaultData?.shortDescription?.en ?? "" },
         images: (defaultData?.images ?? []).map((src) => ({ file: getBackendUri(src) })),
-        variants: (defaultData?.variants ?? []).map((v) => ({ label: v.label, price: String(v.price) })),
+        variants: (defaultData?.variants ?? []).map((v) => ({
+          _id: v._id,
+          label: v.label,
+          price: v.price !== undefined ? String(v.price) : "",
+          sku: v.sku ?? "",
+          stock: String(v.stock ?? 0),
+        })),
         price: defaultData?.price !== undefined ? String(defaultData.price) : "",
         sku: defaultData?.sku ?? "",
         category: defaultData?.category?._id ?? "",
@@ -91,6 +103,10 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         tags: (defaultData?.tags ?? []).join(", "),
         isActive: defaultData?.isActive ?? true,
         order: defaultData?.order ?? 0,
+        trackStock: defaultData?.trackStock ?? true,
+        stock: String(defaultData?.stock ?? 0),
+        lowStockThreshold: String(defaultData?.lowStockThreshold ?? 0),
+        allowBackorder: defaultData?.allowBackorder ?? false,
       },
     });
 
@@ -133,8 +149,27 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
       if (data.variants?.length) {
         formData.append(
           "variants",
-          JSON.stringify(data.variants.map((v) => ({ label: v.label, price: Number(v.price) }))),
+          JSON.stringify(
+            data.variants.map((v) => ({
+              ...(v._id ? { _id: v._id } : {}),
+              label: v.label,
+              price: Number(v.price) || 0,
+              ...(v.sku ? { sku: v.sku } : {}),
+              // Only meaningful for a new variant. The server ignores it for an
+              // existing one and keeps whatever the ledger says.
+              stock: Number(v.stock) || 0,
+            })),
+          ),
         );
+      }
+
+      formData.append("trackStock", String(data.trackStock));
+      formData.append("allowBackorder", String(data.allowBackorder));
+      formData.append("lowStockThreshold", String(Number(data.lowStockThreshold) || 0));
+      // Opening stock only exists at creation — afterwards stock moves through
+      // the inventory ledger, never through this form.
+      if (!isEditing && !data.variants?.length) {
+        formData.append("stock", String(Number(data.stock) || 0));
       }
 
       if (data.price) formData.append("price", data.price);
@@ -232,6 +267,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
           )}
         </Paper>
 
+
         {/* ── Category & SubCategory ── */}
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -306,7 +342,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               size="small"
               variant="outlined"
               startIcon={<Add />}
-              onClick={() => appendVariant({ label: "", price: "" })}
+              onClick={() => appendVariant({ label: "", price: "", sku: "", stock: "0" })}
             >
               {t("add")}
             </Button>
@@ -333,6 +369,21 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                     control={control}
                     type="number"
                   />
+                  <TextInputComponent
+                    name={`variants.${index}.sku`}
+                    label={t("sku")}
+                    control={control}
+                  />
+                  <TextInputComponent
+                    name={`variants.${index}.stock`}
+                    label={variantFields[index]?._id ? t("currentStock") : t("openingStock")}
+                    control={control}
+                    type="number"
+                    readOnly={!!variantFields[index]?._id}
+                    helperText={
+                      variantFields[index]?._id ? t("stockEditedInInventory") : undefined
+                    }
+                  />
                   <Tooltip title={t("delete")}>
                     <IconButton color="error" onClick={() => removeVariant(index)} sx={{ mt: 0.5 }}>
                       <Delete />
@@ -342,6 +393,74 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               ))}
             </Stack>
           )}
+        </Paper>
+
+        {/* ── Inventory ── */}
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight={700} mb={2}>
+            {t("inventory")}
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Stack spacing={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={watch("trackStock")}
+                  onChange={(e) => setValue("trackStock", e.target.checked)}
+                />
+              }
+              label={t("trackStock")}
+            />
+
+            {watch("trackStock") && (
+              <Grid container spacing={2}>
+                {/* With variants, stock lives per variant — there is nothing
+                    meaningful to type here. */}
+                {!isEditing && variantFields.length === 0 && (
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextInputComponent
+                      name="stock"
+                      label={t("openingStock")}
+                      control={control}
+                      type="number"
+                    />
+                  </Grid>
+                )}
+                {isEditing && variantFields.length === 0 && (
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextInputComponent
+                      name="stock"
+                      label={t("currentStock")}
+                      control={control}
+                      type="number"
+                      readOnly
+                      helperText={t("stockEditedInInventory")}
+                    />
+                  </Grid>
+                )}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <TextInputComponent
+                    name="lowStockThreshold"
+                    label={t("lowStockThreshold")}
+                    control={control}
+                    type="number"
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={watch("allowBackorder")}
+                        onChange={(e) => setValue("allowBackorder", e.target.checked)}
+                      />
+                    }
+                    label={t("allowBackorder")}
+                  />
+                </Grid>
+              </Grid>
+            )}
+          </Stack>
         </Paper>
 
         {/* ── Slug & Tags ── */}

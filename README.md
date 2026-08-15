@@ -19,21 +19,23 @@ mahmoud-feda/
 - Category and sub-category browsing, product listing and product detail pages (`/products/[slug]`, `/categories/[slug]`)
 - Bilingual content (English / Arabic) with full RTL support
 - Per-tenant branding: logo, favicon, colors, currency, contact info and social links
-- Newsletter subscribe form and a floating WhatsApp button
+- Floating WhatsApp button wired to the tenant's `settings`
 
 **Admin dashboard (`/[locale]/admin`)**
 - CRUD for products (with variants, tags, multiple images), categories, sub-categories, banners and content sections
 - Site settings: title, description, logo, favicon, phone/WhatsApp/email/address, social media, primary color, currency
 - Drag-and-drop ordering (`@dnd-kit`) and rich text editing (TipTap)
-- Subscribers list
+- Stock tracking with an append-only movement ledger, low-stock flags and stock takes
 - Database export / import as JSON (super-admin only)
 - Role-based permissions per resource and action
 
 **Platform**
+- Host-based multi-tenancy: one process, one database per tenant, resolved per request
+- `npm run add-tenant` — interactive CLI that registers a host and seeds its database
 - JWT access + refresh tokens, forgot/reset password over email (Nodemailer), OTP support
-- Image upload with automatic compression and format normalization (`sharp`)
-- Swagger API docs at `/api`
-- Seed script for roles, admin and super-admin users
+- Image upload with automatic compression and format normalization (`sharp`), stored per tenant
+- Swagger API docs at `/api` (disabled when `NODE_ENV=production`)
+- Newsletter subscribe endpoints (`/subscribe`) — API only, no UI wired up yet
 
 ---
 
@@ -51,27 +53,46 @@ mahmoud-feda/
 
 ## Multi-Tenancy
 
-Tenants are identified by **host**. Each host gets its own MongoDB database, its own frontend URL, and its own upload directory:
+Tenants are identified by **host**. Each host gets its own MongoDB database, its own frontend URL, and its own upload directory. The tenant map is one entry per host:
 
 ```jsonc
-// backend/src/config.json  (git-ignored — one entry per tenant)
+// backend/src/config.json  (git-ignored — development)
 {
   "localhost":      { "mongoUri": "mongodb://127.0.0.1:27017/demo",    "frontendUrl": "http://localhost:3000" },
   "demo.localhost": { "mongoUri": "mongodb://127.0.0.1:27017/demo-db", "frontendUrl": "http://demo.localhost:3000" }
 }
 ```
 
+In production, put the same JSON in the `TENANT_MAP` env var instead — it takes precedence over the file, so connection strings with credentials never reach source control. If neither exists the app still boots; it just logs a warning and every request 404s until a tenant is registered.
+
+### How a request is routed
+
+1. `TenantMiddleware` (`common/middleware/tenant.middleware.ts`) runs on every route and stashes `req.hostname` as `req.tenant`.
+2. The request-scoped `TENANT_CONNECTION` provider (`common/tenant/tenant.module.ts`, `@Global`) asks `TenantConnectionService` for that host's Mongoose connection.
+3. `TenantConnectionService` (`common/helpers/dynamic-connection.ts`) looks the host up in the tenant map — an unknown host throws `404 Unknown tenant`, and the lookup uses an own-property check so a hostile `Host: __proto__` can't resolve to anything. Connections are opened once and cached per host.
+4. When a connection is opened, **every** schema in `common/tenant/tenant-schemas.ts` is registered on it, so cross-model `.populate()` always finds its target on the same connection.
+5. `tenantModelProvider(name, schema)` registers each model under the same token `@InjectModel(name)` uses — so services and controllers are ordinary Nest code with no tenant awareness at all. Every feature module uses it in place of `MongooseModule.forFeature`.
+
+Uploads are written per tenant by `tenantImageStorage` (`common/helpers/upload-storage.ts`), which sanitizes the host into a filesystem-safe folder name so a crafted `Host` header cannot traverse out of `uploads/`:
+
 ```
 backend/uploads/
-├── localhost/        { settings, banners, categories, products }
-└── demo.localhost/   { settings, banners, categories, products }
+├── localhost/        { settings, banners, categories, products, sections, … }
+└── demo.localhost/   { settings, banners, categories, products, sections, … }
 ```
 
-Because every tenant has a separate database, tenant data is isolated by construction — no `tenantId` column and no risk of a missing `where` clause leaking one store's products into another.
+Because every tenant has a separate database, tenant data is isolated by construction — no `tenantId` column and no risk of a missing `where` clause leaking one store's products into another. Per-tenant `frontendUrl` is also what password-reset emails link to, so a reset requested on one storefront can never point at another.
 
 On the frontend, `frontend/config.json` holds per-deployment app config (languages, default language, RTL languages, theme color), and the `tenant` Redux slice (`frontend/Store/slices/tenant.ts`) carries the active tenant's logo and currency into the UI. Visual identity beyond that — site title, favicon, primary color, contact details — lives in the `settings` collection, so it is per-tenant data rather than code.
 
-> **Current state:** the host → database mapping in `config.json` and the per-host upload folders are in place, but `app.module.ts` still boots a single connection from `MONGO_URL`. To make routing dynamic, resolve the host per request and swap `MongooseModule.forRootAsync` for a request-scoped connection factory keyed on `req.headers.host`, reading `config.json`.
+### Adding a tenant
+
+```bash
+cd backend
+npm run add-tenant
+```
+
+The CLI asks for the hostname (no port), a Mongo URI (or builds a local one from a database name), and the frontend origin. It writes the entry into `src/config.json`, prints the equivalent `TENANT_MAP` line for production, and offers to seed the new database with roles plus admin / super-admin users right away.
 
 ---
 
@@ -81,7 +102,8 @@ All user-facing text uses a shared `LocalizedField` (`{ en, ar }`), so a single 
 
 | Collection | Notable fields |
 |---|---|
-| `Product` | `name`, `description`, `shortDescription`, `images[]`, `price`, `sku`, `category`, `subCategory`, `slug`, `tags[]`, `variants[{ label, price }]`, `isActive`, `order` |
+| `Product` | `name`, `description`, `shortDescription`, `images[]`, `price`, `sku`, `category`, `subCategory`, `slug`, `tags[]`, `variants[{ _id, label, price, sku, stock }]`, `isActive`, `order`, `trackStock`, `stock`, `lowStockThreshold`, `allowBackorder` |
+| `StockMovement` | `product`, `variantId?`, `variantLabel?`, `type`, `quantity` (signed), `balanceAfter`, `reason`, `reference`, `user` |
 | `Category` | `name`, `description`, `image`, `slug`, `isActive`, `order` |
 | `SubCategory` | belongs to a category, same shape |
 | `Banner` | `image`, `title`, `description`, `active`, `weight` |
@@ -95,6 +117,44 @@ Supporting collections: `RefreshToken`, `ResetToken`, `Otp`.
 
 ---
 
+## Inventory
+
+Stock lives in one of two places depending on the product:
+
+- **No variants** → the product's own `stock` field.
+- **Has variants** → each variant's `stock`. The product's `totalStock` virtual sums them.
+
+`trackStock: false` opts a product out entirely — it is never out of stock and orders never check it. `allowBackorder: true` keeps tracking but lets the count go negative instead of rejecting the sale.
+
+### The ledger is the source of truth
+
+Every change is written to `StockMovement` — an append-only log of what happened, when, why, and who did it. The `stock` number on the product is a running total of those rows, never a figure typed in by hand. Nothing in the ledger is ever edited or deleted; a mistake is corrected by writing an opposing `adjustment`.
+
+This has two consequences worth knowing about:
+
+1. **`InventoryService` is the only thing allowed to change stock.** `PATCH /products/:id` strips the product-level `stock` field and re-attaches each existing variant's real stock before saving, because the edit form's copy was read when the page opened and is stale by definition. Only brand-new variants may declare an opening quantity, and even that lands as an `opening` movement.
+2. **Creating a product saves it at zero and fills it through the ledger**, so the stored count always reconciles against its movements.
+
+Movement types and their direction: `opening`, `purchase`, `return`, `order_cancelled` add stock; `sale` and `damage` remove it; `adjustment` carries its own sign and is the only type accepting a negative quantity.
+
+### Overselling
+
+Stock is applied with a conditional `$inc` — `{ stock: { $gte: quantity } }` for products, an `$elemMatch` guard plus `arrayFilters` for variants. Two concurrent sales of the last unit cannot both succeed; the loser gets `400 Not enough stock: N available, M requested`. `bulk-adjust` applies items one by one and reverses whatever already landed if a later one fails, since multi-document transactions would require a replica set.
+
+### Stock takes
+
+`POST /inventory/stock-take` takes what was physically counted and works out the delta itself, writing it as an `adjustment`. The admin never has to compute a difference.
+
+### Migrating existing data
+
+Variants used to be stored with `_id: false`, so products created before this feature have variants with no id for movements to reference:
+
+```bash
+cd backend
+npm run migrate:inventory -- localhost   # per tenant; safe to re-run
+npm run seed -- localhost                # grants the new `inventory` permission
+```
+
 ## Authorization
 
 Two guards run in sequence:
@@ -102,7 +162,7 @@ Two guards run in sequence:
 - `AuthenticationGuard` — verifies the JWT `Bearer` token and attaches `userId` to the request.
 - `AuthorizationGuard` — reads the `@Permissions([{ resource, actions }])` decorator on the route and checks it against the user's role.
 
-Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
+Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
 
 `isSuper` users get the extra database export/import capability. Public storefront reads (`GET /products/active`, `GET /categories/slug/:slug`, …) are unguarded by design.
 
@@ -110,12 +170,15 @@ Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `ca
 
 ## API Overview
 
-Base URL: `http://localhost:3023` · Swagger UI: `http://localhost:3023/api`
+Base URL: `http://localhost:3023` · Swagger UI: `http://localhost:3023/api` (non-production only)
+
+Every request's `Host` header selects the tenant database, so the same endpoints return different data per host — and an unregistered host gets `404 Unknown tenant`.
 
 | Group | Endpoints |
 |---|---|
 | Auth | `POST /auth/login` · `POST /auth/refresh` · `PUT /auth/change-password` · `POST /auth/forgot-password` · `POST /auth/reset-password` · `GET /auth/me` · `DELETE /auth/logout` |
 | Products | `POST /products` · `GET /products?categoryId=&subCategoryId=` · `GET /products/active` · `GET /products/slug/:slug` · `GET /products/:id` · `PATCH /products/:id` · `DELETE /products/:id` |
+| Inventory | `GET /inventory` · `GET /inventory/summary` · `GET /inventory/low-stock` · `GET /inventory/movements` · `POST /inventory/adjust` · `POST /inventory/bulk-adjust` · `POST /inventory/stock-take` |
 | Categories | `POST /categories` · `GET /categories` · `GET /categories/active` · `GET /categories/slug/:slug` · `GET /categories/:id` · `PATCH /categories/:id` · `DELETE /categories/:id` |
 | Sub-categories | same shape as categories |
 | Banners | `POST /banners` · `GET /banners` · `GET /banners/:id` · `PATCH /banners/:id` · `PATCH /banners/:id/weight` · `DELETE /banners/:id` |
@@ -146,12 +209,14 @@ Create `backend/.env`:
 
 ```env
 PORT=3023
-MONGO_URL=mongodb://127.0.0.1:27017/demo
 JWT_SECRET=change-me
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3000   # fallback for email links when a host has no frontendUrl
 
 MAIL_USER=you@example.com
 MAIL_PASS=app-password
+
+# Production: the tenant map lives here instead of src/config.json
+# TENANT_MAP={"example.com":{"mongoUri":"mongodb+srv://…","frontendUrl":"https://example.com"}}
 
 SEED_ADMIN_NAME=Admin
 SEED_ADMIN_EMAIL=admin@example.com
@@ -161,12 +226,14 @@ SEED_SUPER_ADMIN_EMAIL=super@example.com
 SEED_SUPER_ADMIN_PASSWORD=StrongPassword123
 ```
 
-Create `backend/src/config.json` with your tenant map (see [Multi-Tenancy](#multi-tenancy)), then:
+Register your first tenant — this writes `backend/src/config.json` and seeds the database:
 
 ```bash
-npm run seed        # creates roles + admin and super-admin users
+npm run add-tenant  # answer the prompts; use "localhost" as the hostname
 npm run start:dev   # http://localhost:3023  ·  docs at /api
 ```
+
+To seed an already-registered tenant later, pass its host: `npm run seed -- localhost`.
 
 ### Frontend
 
@@ -188,40 +255,48 @@ npm run dev         # http://localhost:3000
 
 Sign in at `/en/login` (or `/ar/login`) with the seeded admin credentials, then head to `/en/admin`.
 
-To exercise multi-tenancy locally, add a second host to your `/etc/hosts` (`127.0.0.1 demo.localhost`), give it an entry in `backend/src/config.json`, and browse `http://demo.localhost:3000`.
+To exercise multi-tenancy locally, add a second host to your `/etc/hosts` (`127.0.0.1 demo.localhost`), run `npm run add-tenant` again for it, add its origin to the CORS allowlist in `backend/src/main.ts`, and browse `http://demo.localhost:3000`.
 
 ---
 
 ## Project Layout
 
 ```
-backend/src/
-├── auth/              login, refresh, reset, OTP, user schemas
-├── roles/             roles + resource/action enums
-├── guards/            AuthenticationGuard, AuthorizationGuard
-├── decorators/        @Permissions
-├── products/  categories/  sub-categories/  banners/  sections/  settings/  subscribe/
-├── database/          JSON export / import (super admin)
-├── common/            LocalizedField schema, image compression, nested-body parsing
-├── config/            env → config mapping
-├── config.json        host → { mongoUri, frontendUrl }   (git-ignored)
-├── seeds/  seeder.ts  bootstrap data
-└── main.ts            CORS, Swagger, global ValidationPipe
+backend/
+├── scripts/add-tenant.ts   interactive tenant registration + seeding CLI
+└── src/
+    ├── auth/              login, refresh, reset, OTP, user schemas
+    ├── mail/              Nodemailer transport, reset-password emails
+    ├── roles/             roles + resource/action enums
+    ├── guards/            AuthenticationGuard, AuthorizationGuard
+    ├── decorators/        @Permissions
+    ├── products/  categories/  sub-categories/  banners/  sections/  settings/  subscribe/
+    ├── inventory/        stock movements ledger, adjustments, stock takes, reports
+    ├── database/          JSON export / import (super admin)
+    ├── common/
+    │   ├── middleware/    TenantMiddleware (host → req.tenant)
+    │   ├── tenant/        TENANT_CONNECTION provider, tenantModelProvider, schema registry
+    │   ├── helpers/       TenantConnectionService, per-tenant upload storage, image compression
+    │   └── schemas/ dto/  LocalizedField
+    ├── config/            env → config mapping
+    ├── config.json        host → { mongoUri, frontendUrl }   (git-ignored)
+    ├── seeder.ts          bootstrap roles + admin users for one host
+    └── main.ts            CORS, Swagger, global ValidationPipe
 
 frontend/
 ├── app/[locale]/
 │   ├── (website)/     storefront: home, products, categories
-│   ├── admin/         dashboard: products, categories, sub-categories, banners, sections, settings, database
+│   ├── admin/         dashboard: products, categories, sub-categories, banners, sections, inventory, settings, database
 │   └── login/  forgot-password/  reset-password/
 ├── sections/          BannerSlider, CategoriesSlider, ProductsGrid
-├── features/          per-entity forms (Product, Category, SubCategory, Banner, Section)
+├── features/          per-entity forms (Product, Category, SubCategory, Banner, Section, Inventory)
 ├── backend-api/       typed queries + mutations per resource (React Query)
 ├── layouts/           Home and Dashboard shells
 ├── components/        shared UI, MUI wrappers, table, TipTap editor
 ├── Store/slices/      auth, settings, tenant, breadcrumbs
 ├── locales/{en,ar}/   translation bundles
 ├── lib/               axios instance, theme, i18n, providers, emotion/RTL cache
-├── proxy.ts           locale detection + admin/login route guards
+├── proxy.ts           locale detection (falls back to `ar`) + admin/login route guards
 └── config.json        languages, default language, RTL languages, theme color
 ```
 
@@ -231,7 +306,9 @@ frontend/
 |---|---|---|
 | backend | `npm run start:dev` | Nest in watch mode |
 | backend | `npm run build` / `npm run start:prod` | compile / run `dist/main` |
-| backend | `npm run seed` | seed roles and admin users |
+| backend | `npm run add-tenant` | register a host in the tenant map, optionally seed it |
+| backend | `npm run seed -- <host>` | seed roles and admin users for one tenant |
+| backend | `npm run migrate:inventory -- <host>` | backfill stock fields + variant ids on pre-inventory data |
 | backend | `npm test` / `npm run test:e2e` | Jest unit / e2e |
 | backend | `npm run lint` / `npm run format` | ESLint / Prettier |
 | frontend | `npm run dev` / `npm run build` / `npm start` | Next.js dev / build / serve |
@@ -239,6 +316,8 @@ frontend/
 
 ## Notes
 
-- `backend/src/config.json` and both env files are git-ignored — every tenant map is deployment-specific.
-- Allowed CORS origins are hard-coded in `backend/src/main.ts`; add each tenant's frontend origin there before deploying.
+- `backend/src/config.json` and both env files are git-ignored — every tenant map is deployment-specific. Prefer `TENANT_MAP` in production.
+- Allowed CORS origins are still hard-coded in `backend/src/main.ts`; add each tenant's frontend origin there before deploying. `TenantConnectionService.getAllowedOrigins()` already derives the list from the tenant map — wiring `main.ts` to it would remove this manual step.
+- `MONGO_URL` is no longer used to open connections (every connection comes from the tenant map); it survives only as an unused entry in `config/config.ts`.
 - Uploaded images are compressed to a max width of 1280px and normalized to jpeg/png/webp/avif; GIF and SVG pass through untouched.
+- `GET /` on `AppController` is an unguarded tenant-debug route that dumps the resolved host and the raw `products` collection — remove it before going live.
