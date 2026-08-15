@@ -33,10 +33,12 @@ export class MailService {
     to: string,
     token: string,
     frontendUrl?: string,
+    // Admins and storefront customers reset their passwords on different pages.
+    path = 'reset-password',
   ): Promise<void> {
     // Prefer the tenant's frontend origin; fall back to the global env value.
     const baseUrl = frontendUrl ?? this.configService.get<string>('frontendUrl');
-    const resetLink = `${baseUrl}/reset-password?token=${token}`;
+    const resetLink = `${baseUrl}/${path}?token=${token}`;
     await this.transporter.sendMail({
       from: this.configService.get<string>('mail.user'),
       to,

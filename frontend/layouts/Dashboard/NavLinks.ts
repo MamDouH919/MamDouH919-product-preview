@@ -13,6 +13,7 @@ import {
     Gavel,
     StorageOutlined,
     WarehouseOutlined,
+    PeopleAltOutlined,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
@@ -65,6 +66,11 @@ export const useLinksList = () => {
             primary: t("inventory"),
             pathname: "/admin/inventory",
             icon: WarehouseOutlined,
+        },
+        {
+            primary: t("customers"),
+            pathname: "/admin/customers",
+            icon: PeopleAltOutlined,
         },
         {
             primary: t("settings"),

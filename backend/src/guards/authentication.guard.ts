@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedExceptio
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
 import { Observable } from "rxjs";
+import { CUSTOMER_TOKEN_TYPE } from "./customer-auth.guard";
 
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
@@ -20,6 +21,12 @@ export class AuthenticationGuard implements CanActivate {
       // across tenants, so without this a token from one tenant would pass
       // signature verification on another (cross-tenant impersonation).
       if (payload.tenant !== request.hostname) {
+        throw new UnauthorizedException("Invalid token");
+      }
+      // Storefront customer tokens are signed with the same secret, so they
+      // must be turned away explicitly — otherwise a customer could reach admin
+      // routes and be judged only by whatever role lookup follows.
+      if (payload.type === CUSTOMER_TOKEN_TYPE) {
         throw new UnauthorizedException("Invalid token");
       }
       request.userId = payload.userId;

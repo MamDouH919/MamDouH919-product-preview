@@ -12,6 +12,13 @@ import { Subscribe, SubscribeSchema } from '../../subscribe/schemas/subscribe.sc
 import { Setting, SettingSchema } from '../../settings/schemas/setting.schema';
 import { Product, ProductSchema } from '../../products/schemas/product.schema';
 import { StockMovement, StockMovementSchema } from '../../inventory/schemas/stock-movement.schema';
+import { Customer, CustomerSchema } from '../../customers/schemas/customer.schema';
+import {
+  CustomerRefreshToken,
+  CustomerRefreshTokenSchema,
+  CustomerResetToken,
+  CustomerResetTokenSchema,
+} from '../../customer-auth/schemas/customer-token.schema';
 
 /**
  * Every model the app uses. All of these are registered on a tenant
@@ -32,4 +39,7 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: Setting.name, schema: SettingSchema },
   { name: Product.name, schema: ProductSchema },
   { name: StockMovement.name, schema: StockMovementSchema },
+  { name: Customer.name, schema: CustomerSchema },
+  { name: CustomerRefreshToken.name, schema: CustomerRefreshTokenSchema },
+  { name: CustomerResetToken.name, schema: CustomerResetTokenSchema },
 ];

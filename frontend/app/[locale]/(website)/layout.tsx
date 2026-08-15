@@ -4,6 +4,7 @@ import Footer from '@/layouts/Home/Footer';
 import Navbar from '@/layouts/Home/Header';
 import SocialIcons from '@/components/SocialIcons';
 import ScrollToTop from '@/components/ScrollToTop';
+import GetCustomerLogged from '@/components/GetCustomerLogged';
 
 export default function Layout({
   children,
@@ -12,6 +13,7 @@ export default function Layout({
 }) {  
 
   return (
+    <GetCustomerLogged>
     <Box
       sx={{
         display: 'flex',
@@ -27,5 +29,6 @@ export default function Layout({
       </Box>
       <Footer />
     </Box>
+    </GetCustomerLogged>
   )
 }

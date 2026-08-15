@@ -19,6 +19,7 @@ import CustomLink from "@/components/CustomLink";
 import { useAppSelector } from "@/Store/store";
 import { getBackendUri } from "@/utils/helperFunctions";
 import LanguageIcon from "@/components/LanguageIcon";
+import AccountMenu from "@/components/AccountMenu";
 
 // ── Styled ───────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ const Navbar = () => {
               <Box sx={{ color: isTransparent ? "#fff" : "inherit" }}>
               </Box>
               <LanguageIcon />
+              <AccountMenu />
               {/* <IconButton
                 onClick={() => setMobileOpen(true)}
                 sx={{

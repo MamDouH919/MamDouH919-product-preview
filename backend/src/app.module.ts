@@ -15,6 +15,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { ProductsModule } from './products/products.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { CustomersModule } from './customers/customers.module';
+import { CustomerAuthModule } from './customer-auth/customer-auth.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -58,6 +60,8 @@ import { TenantModule } from './common/tenant/tenant.module';
     SubCategoriesModule,
     ProductsModule,
     InventoryModule,
+    CustomerAuthModule,
+    CustomersModule,
     TenantModule,
   ],
   controllers: [AppController],

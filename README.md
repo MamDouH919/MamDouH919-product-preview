@@ -20,12 +20,14 @@ mahmoud-feda/
 - Bilingual content (English / Arabic) with full RTL support
 - Per-tenant branding: logo, favicon, colors, currency, contact info and social links
 - Floating WhatsApp button wired to the tenant's `settings`
+- Customer accounts (`/[locale]/account`): register, sign in, profile, password reset and a saved address book
 
 **Admin dashboard (`/[locale]/admin`)**
 - CRUD for products (with variants, tags, multiple images), categories, sub-categories, banners and content sections
 - Site settings: title, description, logo, favicon, phone/WhatsApp/email/address, social media, primary color, currency
 - Drag-and-drop ordering (`@dnd-kit`) and rich text editing (TipTap)
 - Stock tracking with an append-only movement ledger, low-stock flags and stock takes
+- Customer directory with the ability to block an account without losing its history
 - Database export / import as JSON (super-admin only)
 - Role-based permissions per resource and action
 
@@ -104,6 +106,7 @@ All user-facing text uses a shared `LocalizedField` (`{ en, ar }`), so a single 
 |---|---|
 | `Product` | `name`, `description`, `shortDescription`, `images[]`, `price`, `sku`, `category`, `subCategory`, `slug`, `tags[]`, `variants[{ _id, label, price, sku, stock }]`, `isActive`, `order`, `trackStock`, `stock`, `lowStockThreshold`, `allowBackorder` |
 | `StockMovement` | `product`, `variantId?`, `variantLabel?`, `type`, `quantity` (signed), `balanceAfter`, `reason`, `reference`, `user` |
+| `Customer` | `name`, `email`, `password` (bcrypt), `phone`, `isVerified`, `isActive`, `addresses[{ _id, label, fullName, phone, city, area, street, building, notes, isDefault }]` |
 | `Category` | `name`, `description`, `image`, `slug`, `isActive`, `order` |
 | `SubCategory` | belongs to a category, same shape |
 | `Banner` | `image`, `title`, `description`, `active`, `weight` |
@@ -113,7 +116,7 @@ All user-facing text uses a shared `LocalizedField` (`{ en, ar }`), so a single 
 | `Role` | `name`, `permissions[{ resource, actions }]` |
 | `Subscribe` | newsletter signups |
 
-Supporting collections: `RefreshToken`, `ResetToken`, `Otp`.
+Supporting collections: `RefreshToken`, `ResetToken`, `Otp`, `CustomerRefreshToken`, `CustomerResetToken`.
 
 ---
 
@@ -155,6 +158,44 @@ npm run migrate:inventory -- localhost   # per tenant; safe to re-run
 npm run seed -- localhost                # grants the new `inventory` permission
 ```
 
+## Customer Accounts
+
+Storefront customers are a **separate identity from admin users**, not a role on the same one.
+
+`User` carries `roleId` and `isSuper`, and `AuthorizationGuard` decides dashboard access by reading permissions off that role. If customers lived in the same collection, "can this account reach the dashboard?" would depend on a role document being configured correctly. Keeping them apart makes the answer structural.
+
+The separation runs all the way down:
+
+| | Admin | Customer |
+|---|---|---|
+| Collection | `User` | `Customer` |
+| Auth routes | `/auth/*` | `/customer-auth/*` |
+| Guard | `AuthenticationGuard` | `CustomerAuthGuard` |
+| JWT claims | `{ userId, tenant }` | `{ customerId, tenant, type: 'customer' }` |
+| Refresh / reset tokens | `RefreshToken`, `ResetToken` | `CustomerRefreshToken`, `CustomerResetToken` |
+| Cookie | `token` | `customer_token` |
+| Axios instance | `lib/api.ts` | `lib/customerApi.ts` |
+
+Three details are load-bearing:
+
+1. **`AuthenticationGuard` rejects any token carrying `type: 'customer'`.** Both token kinds are signed with the same secret, so without that check a customer token would pass signature verification on admin routes and be judged only by whatever role lookup came next.
+2. **Refresh tokens live in separate collections.** `POST /auth/refresh` looks a token up by its string alone and mints an admin access token for whatever id it finds — a customer token in that collection would be redeemable for admin access.
+3. **Self-service routes take no id.** Everything under `/customers/me` acts on the customer in the token, so one customer cannot address another's profile or addresses. Passing someone else's address id returns `404`, not their data.
+
+### Addresses
+
+Addresses are embedded in the customer document — they are only ever read through their owner, and an order copies the address it shipped to rather than referencing it, so nothing outside the document points at them.
+
+The first address a customer saves becomes their default whether or not they asked, since checkout needs something to preselect. Promoting one clears the rest, and deleting the default promotes another, so a customer with addresses always has exactly one default.
+
+Email is not editable from the profile — it is the sign-in identity and changing it needs a verification round-trip that does not exist yet. Registration signs the customer straight in; email verification is not required to place an order.
+
+### Route guards
+
+`proxy.ts` reads the two cookies independently: `/admin` needs `token`, `/account` needs `customer_token`, and neither substitutes for the other. A customer session opening `/admin` is sent to the dashboard login; a guest opening `/account` is sent to `/account/login?from=…` and returned there afterwards. Pages under `/account/login`, `/register`, `/forgot-password` and `/reset-password` stay open to guests.
+
+---
+
 ## Authorization
 
 Two guards run in sequence:
@@ -162,7 +203,7 @@ Two guards run in sequence:
 - `AuthenticationGuard` — verifies the JWT `Bearer` token and attaches `userId` to the request.
 - `AuthorizationGuard` — reads the `@Permissions([{ resource, actions }])` decorator on the route and checks it against the user's role.
 
-Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
+Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory`, `customers` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
 
 `isSuper` users get the extra database export/import capability. Public storefront reads (`GET /products/active`, `GET /categories/slug/:slug`, …) are unguarded by design.
 
@@ -178,6 +219,9 @@ Every request's `Host` header selects the tenant database, so the same endpoints
 |---|---|
 | Auth | `POST /auth/login` · `POST /auth/refresh` · `PUT /auth/change-password` · `POST /auth/forgot-password` · `POST /auth/reset-password` · `GET /auth/me` · `DELETE /auth/logout` |
 | Products | `POST /products` · `GET /products?categoryId=&subCategoryId=` · `GET /products/active` · `GET /products/slug/:slug` · `GET /products/:id` · `PATCH /products/:id` · `DELETE /products/:id` |
+| Customer auth | `POST /customer-auth/register` · `login` · `refresh` · `forgot-password` · `reset-password` · `GET /customer-auth/me` · `PUT /customer-auth/change-password` · `DELETE /customer-auth/logout` |
+| Customer self-service | `GET|PATCH /customers/me` · `GET|POST /customers/me/addresses` · `PATCH|DELETE /customers/me/addresses/:id` · `PUT /customers/me/addresses/:id/default` |
+| Customers (admin) | `GET /customers` · `GET /customers/:id` · `PATCH /customers/:id/active` |
 | Inventory | `GET /inventory` · `GET /inventory/summary` · `GET /inventory/low-stock` · `GET /inventory/movements` · `POST /inventory/adjust` · `POST /inventory/bulk-adjust` · `POST /inventory/stock-take` |
 | Categories | `POST /categories` · `GET /categories` · `GET /categories/active` · `GET /categories/slug/:slug` · `GET /categories/:id` · `PATCH /categories/:id` · `DELETE /categories/:id` |
 | Sub-categories | same shape as categories |
@@ -272,6 +316,8 @@ backend/
     ├── decorators/        @Permissions
     ├── products/  categories/  sub-categories/  banners/  sections/  settings/  subscribe/
     ├── inventory/        stock movements ledger, adjustments, stock takes, reports
+    ├── customers/        customer profiles + embedded address book
+    ├── customer-auth/    storefront sign-up/sign-in, separate tokens from admin
     ├── database/          JSON export / import (super admin)
     ├── common/
     │   ├── middleware/    TenantMiddleware (host → req.tenant)
@@ -285,18 +331,18 @@ backend/
 
 frontend/
 ├── app/[locale]/
-│   ├── (website)/     storefront: home, products, categories
+│   ├── (website)/     storefront: home, products, categories, account (profile + addresses)
 │   ├── admin/         dashboard: products, categories, sub-categories, banners, sections, inventory, settings, database
 │   └── login/  forgot-password/  reset-password/
 ├── sections/          BannerSlider, CategoriesSlider, ProductsGrid
-├── features/          per-entity forms (Product, Category, SubCategory, Banner, Section, Inventory)
+├── features/          per-entity forms (Product, Category, SubCategory, Banner, Section, Inventory, Customer)
 ├── backend-api/       typed queries + mutations per resource (React Query)
 ├── layouts/           Home and Dashboard shells
 ├── components/        shared UI, MUI wrappers, table, TipTap editor
-├── Store/slices/      auth, settings, tenant, breadcrumbs
+├── Store/slices/      auth, customer, settings, tenant, breadcrumbs
 ├── locales/{en,ar}/   translation bundles
-├── lib/               axios instance, theme, i18n, providers, emotion/RTL cache
-├── proxy.ts           locale detection (falls back to `ar`) + admin/login route guards
+├── lib/               axios instances (admin + customer), theme, i18n, providers, emotion/RTL cache
+├── proxy.ts           locale detection (falls back to `ar`) + separate admin and customer route guards
 └── config.json        languages, default language, RTL languages, theme color
 ```
 
