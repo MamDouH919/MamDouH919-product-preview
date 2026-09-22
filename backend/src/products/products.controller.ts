@@ -58,6 +58,16 @@ export class ProductsController {
     return this.productsService.findBySlug(slug);
   }
 
+  @Post('slug/:slug/view')
+  incrementViews(@Param('slug') slug: string) {
+    return this.productsService.incrementViews(slug);
+  }
+
+  @Post('slug/:slug/whatsapp-click')
+  incrementWhatsappClicks(@Param('slug') slug: string) {
+    return this.productsService.incrementWhatsappClicks(slug);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);

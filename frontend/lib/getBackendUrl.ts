@@ -10,8 +10,8 @@
  * automatically targets its own `api.<host>` backend.
  */
 const api: Record<string, string> = {
-  "localhost": "http://localhost:3055",
-  "app.localhost": "http://app.localhost:3055",
+  "localhost": "http://localhost:3044",
+  "app.localhost": "http://app.localhost:3044",
   "demo.localhost": "http://demo.localhost:3055",
   "ranosh.novaslash.com": "https://api-ranosh.novaslash.com",
   "gravity.novaslash.com": "https://api-gravity.novaslash.com",

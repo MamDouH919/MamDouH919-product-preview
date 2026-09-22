@@ -10,13 +10,15 @@ const CustomLink = ({
   onClick,
   color,
   style,
+  ariaLabel,
 }: {
-  children: React.ReactNode
+  children?: React.ReactNode
   href: string
   className?: string
   onClick?: () => void
   color?: string,
   style?: React.CSSProperties
+  ariaLabel?: string
 }) => {
   const currentPath = usePathname()
   const language = currentPath.split('/')[1]
@@ -27,6 +29,7 @@ const CustomLink = ({
       className={className}
       onClick={onClick}
       style={color ? { color } : style}
+      aria-label={ariaLabel}
     >
       {children}
     </Link>

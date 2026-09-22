@@ -22,4 +22,6 @@ export type Product = {
   variants: ProductVariant[];
   isActive: boolean;
   order: number;
+  views: number;
+  whatsappClicks: number;
 };

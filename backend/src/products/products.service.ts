@@ -128,6 +128,22 @@ export class ProductsService {
       .exec() as Promise<Product>;
   }
 
+  async incrementViews(slug: string): Promise<Product> {
+    const product = await this.productModel
+      .findOneAndUpdate({ slug }, { $inc: { views: 1 } }, { new: true })
+      .exec();
+    if (!product) throw new NotFoundException(`Product "${slug}" not found`);
+    return product;
+  }
+
+  async incrementWhatsappClicks(slug: string): Promise<Product> {
+    const product = await this.productModel
+      .findOneAndUpdate({ slug }, { $inc: { whatsappClicks: 1 } }, { new: true })
+      .exec();
+    if (!product) throw new NotFoundException(`Product "${slug}" not found`);
+    return product;
+  }
+
   async remove(id: string): Promise<Product> {
     const product = await this.productModel.findByIdAndDelete(id).exec();
     if (!product) throw new NotFoundException(`Product with id ${id} not found`);

@@ -61,6 +61,12 @@ export const useLinksList = () => {
             icon: Handshake,
         },
         {
+            primary: t("contactMessages"),
+            pathname: "/admin/contact",
+            icon: ContactMail,
+        },
+
+        {
             primary: t("settings"),
             pathname: "/admin/settings",
             icon: Settings,

@@ -53,6 +53,12 @@ export class Product extends Document {
 
   @Prop({ default: 0 })
   order!: number;
+
+  @Prop({ default: 0 })
+  views!: number;
+
+  @Prop({ default: 0 })
+  whatsappClicks!: number;
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);

@@ -10,6 +10,7 @@ import { BannersModule } from './banners/banners.module';
 import { SettingsModule } from './settings/settings.module';
 import { SectionsModule } from './sections/sections.module';
 import { SubscribeModule } from './subscribe/subscribe.module';
+import { ContactModule } from './contact/contact.module';
 import { DatabaseModule } from './database/database.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
@@ -52,6 +53,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     SettingsModule,
     SectionsModule,
     SubscribeModule,
+    ContactModule,
     DatabaseModule,
     CategoriesModule,
     SubCategoriesModule,

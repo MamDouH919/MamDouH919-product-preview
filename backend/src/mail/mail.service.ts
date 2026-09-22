@@ -29,6 +29,31 @@ export class MailService {
     });
   }
 
+  async sendContactNotification(data: {
+    name: string;
+    email: string;
+    phone?: string;
+    subject?: string;
+    message: string;
+  }): Promise<void> {
+    const to = this.configService.get<string>('mail.user');
+    await this.transporter.sendMail({
+      from: this.configService.get<string>('mail.user'),
+      to,
+      replyTo: data.email,
+      subject: `New Contact Message${data.subject ? `: ${data.subject}` : ''}`,
+      html: `
+        <h2>New Contact Form Submission</h2>
+        <p><strong>Name:</strong> ${data.name}</p>
+        <p><strong>Email:</strong> ${data.email}</p>
+        ${data.phone ? `<p><strong>Phone:</strong> ${data.phone}</p>` : ''}
+        ${data.subject ? `<p><strong>Subject:</strong> ${data.subject}</p>` : ''}
+        <p><strong>Message:</strong></p>
+        <p>${data.message.replace(/\n/g, '<br/>')}</p>
+      `,
+    });
+  }
+
   async sendResetPasswordLink(
     to: string,
     token: string,

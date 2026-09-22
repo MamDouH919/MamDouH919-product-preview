@@ -4,89 +4,17 @@ import { useState } from "react"
 import { useProductsQuery } from "@/backend-api/products/hooks"
 import { useCategoriesQuery } from "@/backend-api/categories/hooks"
 import { useSubCategoriesQuery } from "@/backend-api/sub-categories/hooks"
-import { Product } from "@/backend-api/products/types"
 import { Category } from "@/backend-api/categories/types"
 import { SubCategory } from "@/backend-api/sub-categories/types"
-import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
 import { ShoppingBag, SlidersHorizontal, X, ChevronRight } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
-import Image from "next/image"
+import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard"
 import { useTheme, alpha } from "@mui/material/styles"
-import { useCurrency } from "@/Hooks/useCurrency"
-import WhatsAppButton from "@/components/WhatsAppButton"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
   return field[lang] || field["ar"] || field["en"] || ""
-}
-
-function ProductCard({ product, lang }: { product: Product; lang: string }) {
-  const name = localized(product.name, lang)
-  const categoryName = localized(product.category?.name, lang)
-  const image = product.images?.[0]
-  const currency = useCurrency()
-
-  return (
-    <CustomLink
-      href={`/products/${product.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-(--primary-25) shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-    >
-      <div className="relative overflow-hidden bg-gray-50 aspect-square">
-        {image ? (
-          <Image
-            src={getBackendUri(image)}
-            alt={name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-100">
-            <ShoppingBag className="w-10 h-10 text-gray-300" />
-          </div>
-        )}
-        {categoryName && (
-          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-(--primary) px-2 py-0.5 rounded-full shadow-sm">
-            {categoryName}
-          </span>
-        )}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-black/20 to-transparent pointer-events-none" />
-      </div>
-
-      <div className="flex flex-col flex-1 p-3 gap-2">
-        <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug flex-1">{name}</p>
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-          {product.price != null ? (
-            <span className="text-base font-bold text-(--primary)">{product.price.toLocaleString()} {currency}</span>
-          ) : (
-            <span />
-          )}
-          <div className="flex items-center gap-1.5">
-            <WhatsAppButton slug={product.slug} productName={name} />
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-(--primary-8) group-hover:bg-(--primary) transition-colors duration-300">
-              <ShoppingBag className="w-4 h-4 text-(--primary) group-hover:text-white transition-colors duration-300" />
-            </span>
-          </div>
-        </div>
-      </div>
-    </CustomLink>
-  )
-}
-
-function SkeletonCard() {
-  return (
-    <div className="flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
-      <div className="aspect-square bg-gray-200" />
-      <div className="flex flex-col gap-3 p-3">
-        <div className="h-4 w-4/5 bg-gray-200 rounded-lg" />
-        <div className="h-3 w-3/5 bg-gray-200 rounded-lg" />
-        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-          <div className="h-5 w-1/4 bg-gray-200 rounded-lg" />
-          <div className="w-8 h-8 rounded-full bg-gray-200" />
-        </div>
-      </div>
-    </div>
-  )
 }
 
 interface SidebarProps {
@@ -237,10 +165,8 @@ export default function ProductsPage() {
   const cssVars = {
     "--primary": theme.palette.primary.main,
     "--primary-dark": theme.palette.primary.dark,
-    "--primary-8": alpha(theme.palette.primary.main, 0.08),
     "--primary-10": alpha(theme.palette.primary.main, 0.1),
     "--primary-20": alpha(theme.palette.primary.main, 0.2),
-    "--primary-25": alpha(theme.palette.primary.main, 0.25),
     "--primary-30": alpha(theme.palette.primary.main, 0.3),
   } as React.CSSProperties
 
@@ -319,7 +245,7 @@ export default function ProductsPage() {
             {(productsLoading || products.length > 0) && (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {productsLoading
-                  ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
+                  ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)
                   : products.map((product) => (
                       <ProductCard key={product._id} product={product} lang={lang} />
                     ))}
