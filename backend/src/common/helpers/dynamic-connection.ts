@@ -75,7 +75,7 @@ export class TenantConnectionService {
     getAllowedOrigins(): string[] {
         const tenantMap = this.loadTenantMap();
         return Object.values(tenantMap)
-            .map((cfg) => cfg.frontendUrl)
+            .map((cfg) => cfg.frontendUrl?.replace(/\/+$/, ''))
             .filter((url): url is string => Boolean(url));
     }
 

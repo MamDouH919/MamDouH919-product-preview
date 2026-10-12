@@ -2,21 +2,31 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-
-// ✅ CORS allowlist — add tenant frontend origins here (scheme + host + port,
-// no trailing slash), e.g. 'https://ranoshka.com'.
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'http://demo.localhost:3000',
-  'http://demo.localhost:3002',
-  'https://ranosh.novaslash.com',
-  'https://gravity.novaslash.com',
-];
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { TenantConnectionService } from './common/helpers/dynamic-connection';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Behind a reverse proxy, set TRUST_PROXY to the number of proxy hops (e.g. 1
+  // for nginx) so req.ip is the real client and rate limits are per visitor.
+  if (process.env.TRUST_PROXY) {
+    app.set('trust proxy', Number(process.env.TRUST_PROXY));
+  }
+
+  // ✅ CORS allowlist — every tenant's frontendUrl from the tenant map, so
+  // `npm run add-tenant` is the only step needed to onboard a store. Extra
+  // origins (e.g. a second dev port) go in CORS_ORIGINS, comma-separated.
+  const extraOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const allowedOrigins = [
+    ...new Set([
+      ...app.get(TenantConnectionService).getAllowedOrigins(),
+      ...extraOrigins,
+    ]),
+  ];
 
   app.enableCors({
     origin: allowedOrigins,

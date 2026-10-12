@@ -9,11 +9,14 @@ import { ChangePasswordDto } from './dtos/change-password.dto';
 import { ForgotPasswordDto } from './dtos/forget-password.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
 import { AuthenticationGuard } from '../guards/authentication.guard';
+import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
+  @UseGuards(AuthThrottlerGuard)
   @Post('login')
   async login(@Body() credential: LoginDto, @Req() req) {
     return this.authService.login(credential, req.hostname);
@@ -37,6 +40,8 @@ export class AuthController {
     );
   }
 
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 15 * 60_000, limit: 5 } })
   @Post('forgot-password')
   async forgetPassword(@Body() forgetPasswordDto: ForgotPasswordDto, @Req() req) {
     return this.authService.forgetPassword(forgetPasswordDto.email, req.hostname);

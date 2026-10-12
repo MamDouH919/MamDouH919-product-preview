@@ -1,9 +1,9 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
 import { RolesModule } from './roles/roles.module';
 import { BannersModule } from './banners/banners.module';
@@ -49,6 +49,9 @@ import { TenantModule } from './common/tenant/tenant.module';
       global: true,
       inject: [ConfigService],
     }),
+    // Default limit for routes guarded by AuthThrottlerGuard (credential
+    // endpoints); individual routes tighten it with @Throttle.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
     AuthModule,
     RolesModule,
     BannersModule,
@@ -64,7 +67,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     CustomersModule,
     TenantModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [],
 })
 export class AppModule implements NestModule {

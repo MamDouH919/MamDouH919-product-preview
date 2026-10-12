@@ -259,6 +259,9 @@ FRONTEND_URL=http://localhost:3000   # fallback for email links when a host has 
 MAIL_USER=you@example.com
 MAIL_PASS=app-password
 
+# CORS_ORIGINS=http://localhost:3001     # extra origins beyond each tenant's frontendUrl
+# TRUST_PROXY=1                         # behind nginx etc. — real client IP for rate limits
+
 # Production: the tenant map lives here instead of src/config.json
 # TENANT_MAP={"example.com":{"mongoUri":"mongodb+srv://…","frontendUrl":"https://example.com"}}
 
@@ -299,7 +302,7 @@ npm run dev         # http://localhost:3000
 
 Sign in at `/en/login` (or `/ar/login`) with the seeded admin credentials, then head to `/en/admin`.
 
-To exercise multi-tenancy locally, add a second host to your `/etc/hosts` (`127.0.0.1 demo.localhost`), run `npm run add-tenant` again for it, add its origin to the CORS allowlist in `backend/src/main.ts`, and browse `http://demo.localhost:3000`.
+To exercise multi-tenancy locally, add a second host to your `/etc/hosts` (`127.0.0.1 demo.localhost`), run `npm run add-tenant` again for it, restart the API (CORS picks up the new `frontendUrl`), and browse `http://demo.localhost:3000`.
 
 ---
 
@@ -363,7 +366,7 @@ frontend/
 ## Notes
 
 - `backend/src/config.json` and both env files are git-ignored — every tenant map is deployment-specific. Prefer `TENANT_MAP` in production.
-- Allowed CORS origins are still hard-coded in `backend/src/main.ts`; add each tenant's frontend origin there before deploying. `TenantConnectionService.getAllowedOrigins()` already derives the list from the tenant map — wiring `main.ts` to it would remove this manual step.
+- CORS origins come from each tenant's `frontendUrl` in the tenant map (read at boot — restart after `add-tenant`). Extra origins go in `CORS_ORIGINS`, comma-separated.
+- Credential endpoints are rate-limited (`AuthThrottlerGuard`): login/register/subscribe 10 per minute, forgot-password 5 per 15 minutes, keyed by tenant + IP + submitted email. Behind a reverse proxy set `TRUST_PROXY` (hop count, e.g. `1`) so the real client IP is used. Counters are in memory, so they reset on restart and aren't shared between instances.
 - `MONGO_URL` is no longer used to open connections (every connection comes from the tenant map); it survives only as an unused entry in `config/config.ts`.
 - Uploaded images are compressed to a max width of 1280px and normalized to jpeg/png/webp/avif; GIF and SVG pass through untouched.
-- `GET /` on `AppController` is an unguarded tenant-debug route that dumps the resolved host and the raw `products` collection — remove it before going live.

@@ -13,6 +13,7 @@ import { SubscribeService } from './subscribe.service';
 import { CreateSubscribeDto } from './dto/create-subscribe.dto';
 import { AuthenticationGuard } from '../guards/authentication.guard';
 import { AuthorizationGuard } from '../guards/authorization.guard';
+import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
@@ -22,6 +23,7 @@ export class SubscribeController {
   constructor(private readonly subscribeService: SubscribeService) {}
 
   @Post()
+  @UseGuards(AuthThrottlerGuard)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   create(@Body() dto: CreateSubscribeDto) {
     return this.subscribeService.create(dto);

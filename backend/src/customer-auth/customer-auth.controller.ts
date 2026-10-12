@@ -22,6 +22,8 @@ import {
   CustomerResetPasswordDto,
 } from './dto/customer-auth.dto';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
+import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
+import { Throttle } from '@nestjs/throttler';
 
 type CustomerRequest = Request & { customerId?: string };
 
@@ -29,11 +31,13 @@ type CustomerRequest = Request & { customerId?: string };
 export class CustomerAuthController {
   constructor(private readonly customerAuthService: CustomerAuthService) {}
 
+  @UseGuards(AuthThrottlerGuard)
   @Post('register')
   register(@Body() dto: CustomerRegisterDto, @Req() req: Request) {
     return this.customerAuthService.register(dto, req.hostname);
   }
 
+  @UseGuards(AuthThrottlerGuard)
   @Post('login')
   login(@Body() dto: CustomerLoginDto, @Req() req: Request) {
     return this.customerAuthService.login(dto, req.hostname);
@@ -44,6 +48,8 @@ export class CustomerAuthController {
     return this.customerAuthService.refreshTokens(dto.refreshToken, req.hostname);
   }
 
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 15 * 60_000, limit: 5 } })
   @Post('forgot-password')
   forgotPassword(@Body() dto: CustomerForgotPasswordDto, @Req() req: Request) {
     return this.customerAuthService.forgotPassword(dto.email, req.hostname);
