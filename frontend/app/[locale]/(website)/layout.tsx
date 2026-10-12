@@ -5,6 +5,7 @@ import Navbar from '@/layouts/Home/Header';
 import SocialIcons from '@/components/SocialIcons';
 import ScrollToTop from '@/components/ScrollToTop';
 import GetCustomerLogged from '@/components/GetCustomerLogged';
+import CartSync from '@/components/CartSync';
 
 export default function Layout({
   children,
@@ -22,6 +23,7 @@ export default function Layout({
       }}
     >
       <ScrollToTop />
+      <CartSync />
       <Navbar />
       <SocialIcons />
       <Box component="main" sx={{ flexGrow: 1, pt: 9 }}>

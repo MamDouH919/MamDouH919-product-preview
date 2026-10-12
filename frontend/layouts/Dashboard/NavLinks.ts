@@ -14,6 +14,7 @@ import {
     StorageOutlined,
     WarehouseOutlined,
     PeopleAltOutlined,
+    ReceiptLongOutlined,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
@@ -37,6 +38,11 @@ export const useLinksList = () => {
     const isSuper = useAppSelector((state) => state.auth.isSuper)
 
     const linksList: LinkItem[] = useMemo(() => [
+        {
+            primary: t("orders"),
+            pathname: "/admin/orders",
+            icon: ReceiptLongOutlined,
+        },
         {
             primary: t("banners"),
             pathname: "/admin/banners",

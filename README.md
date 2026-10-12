@@ -21,12 +21,14 @@ mahmoud-feda/
 - Per-tenant branding: logo, favicon, colors, currency, contact info and social links
 - Floating WhatsApp button wired to the tenant's `settings`
 - Customer accounts (`/[locale]/account`): register, sign in, profile, password reset and a saved address book
+- Cart (`/cart`), checkout (`/checkout`) with cash on delivery, and order history with self-service cancellation (`/account/orders`)
 
 **Admin dashboard (`/[locale]/admin`)**
 - CRUD for products (with variants, tags, multiple images), categories, sub-categories, banners and content sections
 - Site settings: title, description, logo, favicon, phone/WhatsApp/email/address, social media, primary color, currency
 - Drag-and-drop ordering (`@dnd-kit`) and rich text editing (TipTap)
 - Stock tracking with an append-only movement ledger, low-stock flags and stock takes
+- Orders: list with status filter and search, order detail, status changes (confirm → ship → deliver, or cancel) with an audit trail
 - Customer directory with the ability to block an account without losing its history
 - Database export / import as JSON (super-admin only)
 - Role-based permissions per resource and action
@@ -115,8 +117,11 @@ All user-facing text uses a shared `LocalizedField` (`{ en, ar }`), so a single 
 | `User` | `name`, `email`, `password` (bcrypt), `isVerified`, `roleId`, `isSuper` |
 | `Role` | `name`, `permissions[{ resource, actions }]` |
 | `Subscribe` | newsletter signups |
+| `Order` | `orderNumber`, `customer`, `items[{ product, variantId, name, variantLabel, sku, image, unitPrice, quantity, lineTotal, stockDeducted }]`, `shippingAddress`, `subtotal`, `shippingFee`, `total`, `currency`, `paymentMethod`, `status`, `statusHistory[]`, `notes` |
 
-Supporting collections: `RefreshToken`, `ResetToken`, `Otp`, `CustomerRefreshToken`, `CustomerResetToken`.
+`Setting` also carries `shippingFee` — a flat delivery charge added to every order.
+
+Supporting collections: `RefreshToken`, `ResetToken`, `Otp`, `CustomerRefreshToken`, `CustomerResetToken`, `Counter` (per-tenant order number sequence).
 
 ---
 
@@ -157,6 +162,37 @@ cd backend
 npm run migrate:inventory -- localhost   # per tenant; safe to re-run
 npm run seed -- localhost                # grants the new `inventory` permission
 ```
+
+## Orders
+
+Checkout requires a customer account; browsing and filling a cart do not. The cart lives in the browser (`localStorage`, which is per host and therefore per tenant) and holds only *what* and *how many* — every price shown in the cart and every price charged comes from the server.
+
+### Pricing
+
+`POST /orders/quote` prices a basket against the live catalogue and reports, per line, why it can't be bought if it can't: `unavailable` (deleted, hidden, or a variant that no longer exists), `no_price`, or `insufficient_stock` (with how many are available). The cart page calls it on every change; placing an order runs the same check. The order DTO has no price field, and the global `forbidNonWhitelisted` pipe rejects one if sent.
+
+### Placing an order
+
+1. Customer must be active (blocking an account stops new orders even with a live token) and the address must be one of theirs.
+2. Lines are re-priced; any issue rejects the order with the problem lines.
+3. The order is written as `pending` with a snapshot of names, prices and the shipping address — later catalogue edits never rewrite a receipt.
+4. Stock is taken through `InventoryService.adjustMany` as `sale` movements referencing `Order #N`. If a concurrent checkout got there first, the movements roll back, the order is deleted, and the customer gets `409` and is sent back to the cart.
+
+Order numbers come from an atomic `$inc` on a `Counter` document, starting at 1001 per tenant.
+
+### Status
+
+```
+pending ──► confirmed ──► shipped ──► delivered
+   │            │            │
+   └────────────┴────────────┴──► cancelled
+```
+
+Transitions outside this graph are refused (`ORDER_TRANSITIONS`). Each change is a conditional update on the status that was read, so two admins acting at once can't both succeed — which matters because **cancelling returns stock** as `order_cancelled` movements, only for lines that actually deducted it. Restocking is best-effort per line: a product deleted since the sale is logged and skipped rather than blocking the cancellation.
+
+Existing tenants need their admin roles re-seeded to get the new `orders` permission: `npm run seed -- <host>`.
+
+Customers may cancel their own order only while it is `pending`; after the store confirms it, cancellation is an admin action. Every change is appended to `statusHistory` with the admin who made it and an optional note (e.g. a tracking number).
 
 ## Customer Accounts
 
@@ -203,7 +239,7 @@ Two guards run in sequence:
 - `AuthenticationGuard` — verifies the JWT `Bearer` token and attaches `userId` to the request.
 - `AuthorizationGuard` — reads the `@Permissions([{ resource, actions }])` decorator on the route and checks it against the user's role.
 
-Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory`, `customers` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
+Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory`, `customers`, `orders` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
 
 `isSuper` users get the extra database export/import capability. Public storefront reads (`GET /products/active`, `GET /categories/slug/:slug`, …) are unguarded by design.
 
@@ -222,6 +258,9 @@ Every request's `Host` header selects the tenant database, so the same endpoints
 | Customer auth | `POST /customer-auth/register` · `login` · `refresh` · `forgot-password` · `reset-password` · `GET /customer-auth/me` · `PUT /customer-auth/change-password` · `DELETE /customer-auth/logout` |
 | Customer self-service | `GET|PATCH /customers/me` · `GET|POST /customers/me/addresses` · `PATCH|DELETE /customers/me/addresses/:id` · `PUT /customers/me/addresses/:id/default` |
 | Customers (admin) | `GET /customers` · `GET /customers/:id` · `PATCH /customers/:id/active` |
+| Orders (public) | `POST /orders/quote` |
+| Orders (customer) | `POST /orders/me` · `GET /orders/me` · `GET /orders/me/:id` · `POST /orders/me/:id/cancel` |
+| Orders (admin) | `GET /orders?status=&search=&from=&to=` · `GET /orders/:id` · `PATCH /orders/:id/status` |
 | Inventory | `GET /inventory` · `GET /inventory/summary` · `GET /inventory/low-stock` · `GET /inventory/movements` · `POST /inventory/adjust` · `POST /inventory/bulk-adjust` · `POST /inventory/stock-take` |
 | Categories | `POST /categories` · `GET /categories` · `GET /categories/active` · `GET /categories/slug/:slug` · `GET /categories/:id` · `PATCH /categories/:id` · `DELETE /categories/:id` |
 | Sub-categories | same shape as categories |
@@ -321,6 +360,7 @@ backend/
     ├── inventory/        stock movements ledger, adjustments, stock takes, reports
     ├── customers/        customer profiles + embedded address book
     ├── customer-auth/    storefront sign-up/sign-in, separate tokens from admin
+    ├── orders/           quote, checkout, order history, status workflow, order number counter
     ├── database/          JSON export / import (super admin)
     ├── common/
     │   ├── middleware/    TenantMiddleware (host → req.tenant)
@@ -334,15 +374,15 @@ backend/
 
 frontend/
 ├── app/[locale]/
-│   ├── (website)/     storefront: home, products, categories, account (profile + addresses)
-│   ├── admin/         dashboard: products, categories, sub-categories, banners, sections, inventory, settings, database
+│   ├── (website)/     storefront: home, products, categories, cart, checkout, account (profile, orders, addresses)
+│   ├── admin/         dashboard: orders, products, categories, sub-categories, banners, sections, inventory, customers, settings, database
 │   └── login/  forgot-password/  reset-password/
 ├── sections/          BannerSlider, CategoriesSlider, ProductsGrid
 ├── features/          per-entity forms (Product, Category, SubCategory, Banner, Section, Inventory, Customer)
 ├── backend-api/       typed queries + mutations per resource (React Query)
 ├── layouts/           Home and Dashboard shells
 ├── components/        shared UI, MUI wrappers, table, TipTap editor
-├── Store/slices/      auth, customer, settings, tenant, breadcrumbs
+├── Store/slices/      auth, customer, cart, settings, tenant, breadcrumbs
 ├── locales/{en,ar}/   translation bundles
 ├── lib/               axios instances (admin + customer), theme, i18n, providers, emotion/RTL cache
 ├── proxy.ts           locale detection (falls back to `ar`) + separate admin and customer route guards

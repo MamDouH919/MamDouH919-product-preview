@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import PersonOutline from "@mui/icons-material/PersonOutline";
 import LocationOnOutlined from "@mui/icons-material/LocationOnOutlined";
+import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
 import LoginOutlined from "@mui/icons-material/LoginOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
@@ -94,6 +95,13 @@ const AccountMenu = () => {
             <PersonOutline fontSize="small" />
           </ListItemIcon>
           {t("myProfile")}
+        </MenuItem>
+
+        <MenuItem onClick={() => go("/account/orders")}>
+          <ListItemIcon>
+            <ReceiptLongOutlined fontSize="small" />
+          </ListItemIcon>
+          {t("myOrders")}
         </MenuItem>
 
         <MenuItem onClick={() => go("/account/addresses")}>

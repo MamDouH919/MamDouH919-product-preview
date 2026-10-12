@@ -13,6 +13,8 @@ import { Setting, SettingSchema } from '../../settings/schemas/setting.schema';
 import { Product, ProductSchema } from '../../products/schemas/product.schema';
 import { StockMovement, StockMovementSchema } from '../../inventory/schemas/stock-movement.schema';
 import { Customer, CustomerSchema } from '../../customers/schemas/customer.schema';
+import { Order, OrderSchema } from '../../orders/schemas/order.schema';
+import { Counter, CounterSchema } from '../../orders/schemas/counter.schema';
 import {
   CustomerRefreshToken,
   CustomerRefreshTokenSchema,
@@ -42,4 +44,6 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: Customer.name, schema: CustomerSchema },
   { name: CustomerRefreshToken.name, schema: CustomerRefreshTokenSchema },
   { name: CustomerResetToken.name, schema: CustomerResetTokenSchema },
+  { name: Order.name, schema: OrderSchema },
+  { name: Counter.name, schema: CounterSchema },
 ];

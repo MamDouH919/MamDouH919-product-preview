@@ -10,6 +10,7 @@ import CustomLink from "@/components/CustomLink"
 import Image from "next/image"
 import { useCurrency } from "@/Hooks/useCurrency"
 import WhatsAppButton from "@/components/WhatsAppButton"
+import AddToCart from "@/features/Cart/AddToCart"
 import { useTheme, alpha } from "@mui/material/styles"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
@@ -332,6 +333,7 @@ export default function ProductDetailClient({ params }: Props) {
             </div>
 
             <div className="mt-auto pt-4 flex flex-col gap-3">
+              <AddToCart product={product} variantIndex={activeVariant} />
               <WhatsAppButton
                 slug={product.slug}
                 productName={name}

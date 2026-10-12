@@ -19,4 +19,5 @@ export type Setting = {
   socialMedia?: SocialMediaItem[];
   primaryColor?: string;
   currency?: LocalizedField;
+  shippingFee?: number;
 };

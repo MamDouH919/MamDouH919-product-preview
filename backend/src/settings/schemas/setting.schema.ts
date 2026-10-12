@@ -47,6 +47,10 @@ export class Setting extends Document {
 
   @Prop({ type: LocalizedFieldSchema, required: false })
   currency?: LocalizedField;
+
+  /** Flat delivery charge added to every order. */
+  @Prop({ default: 0, min: 0 })
+  shippingFee!: number;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

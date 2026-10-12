@@ -20,6 +20,7 @@ import { useAppSelector } from "@/Store/store";
 import { getBackendUri } from "@/utils/helperFunctions";
 import LanguageIcon from "@/components/LanguageIcon";
 import AccountMenu from "@/components/AccountMenu";
+import CartButton from "@/components/CartButton";
 
 // ── Styled ───────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ const Navbar = () => {
               <Box sx={{ color: isTransparent ? "#fff" : "inherit" }}>
               </Box>
               <LanguageIcon />
+              <CartButton />
               <AccountMenu />
               {/* <IconButton
                 onClick={() => setMobileOpen(true)}

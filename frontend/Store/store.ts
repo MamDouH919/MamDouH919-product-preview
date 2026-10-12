@@ -5,6 +5,7 @@ import { tenantSlice } from "./slices/tenant";
 import breadCrumbState from "./slices/bread-crumb";
 import settingsReducer from "./slices/settings";
 import { customerSlice } from "./slices/customer";
+import { cartSlice } from "./slices/cart";
 
 export const store = configureStore({
     reducer: {
@@ -13,6 +14,7 @@ export const store = configureStore({
         breadCrumb: breadCrumbState,
         settings: settingsReducer,
         customer: customerSlice.reducer,
+        cart: cartSlice.reducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

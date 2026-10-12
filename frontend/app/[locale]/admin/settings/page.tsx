@@ -51,6 +51,7 @@ type SettingsFormValues = {
   address: string;
   socialMedia: SocialItem[];
   primaryColor?: string;
+  shippingFee: string;
 };
 
 const LANGS = config.app.languages as string[];
@@ -77,6 +78,7 @@ const SettingsPage = () => {
       address: "",
       socialMedia: [],
       primaryColor: "#1976d2",
+      shippingFee: "0",
     },
   });
 
@@ -109,6 +111,7 @@ const SettingsPage = () => {
         address: settings.address ?? "",
         socialMedia: settings.socialMedia ?? [],
         primaryColor: settings.primaryColor ?? "#1976d2",
+        shippingFee: String(settings.shippingFee ?? 0),
       });
     }
   }, [settings, reset]);
@@ -135,6 +138,8 @@ const SettingsPage = () => {
       if (data.email) formData.append("email", data.email);
       if (data.address) formData.append("address", data.address);
       if (data.primaryColor) formData.append("primaryColor", data.primaryColor);
+      // Always sent, so clearing the field really sets delivery back to free.
+      formData.append("shippingFee", String(Math.max(0, Number(data.shippingFee) || 0)));
       (data.socialMedia ?? []).forEach((item, i) => {
         formData.append(`socialMedia[${i}][key]`, item.key);
         formData.append(`socialMedia[${i}][value]`, item.value);
@@ -315,6 +320,23 @@ const SettingsPage = () => {
             </Paper>
           </>
         )}
+
+        {/* Checkout — visible to all admins */}
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight={700} mb={2}>
+            {t("checkoutSettings")}
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <TextField
+            size="small"
+            type="number"
+            label={t("shippingFee")}
+            helperText={t("shippingFeeHint")}
+            slotProps={{ htmlInput: { min: 0, step: "any" } }}
+            sx={{ maxWidth: 260 }}
+            {...register("shippingFee")}
+          />
+        </Paper>
 
         {/* Contact Info — visible to all admins */}
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
