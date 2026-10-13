@@ -49,6 +49,21 @@ export class CustomerProfileController {
     return this.customersService.updateProfile(req.customerId!, dto);
   }
 
+  @Get('wishlist')
+  getWishlist(@Req() req: CustomerRequest) {
+    return this.customersService.getWishlist(req.customerId!);
+  }
+
+  @Put('wishlist/:productId')
+  addToWishlist(@Param('productId') productId: string, @Req() req: CustomerRequest) {
+    return this.customersService.addToWishlist(req.customerId!, productId);
+  }
+
+  @Delete('wishlist/:productId')
+  removeFromWishlist(@Param('productId') productId: string, @Req() req: CustomerRequest) {
+    return this.customersService.removeFromWishlist(req.customerId!, productId);
+  }
+
   @Get('addresses')
   getAddresses(@Req() req: CustomerRequest) {
     return this.customersService.getAddresses(req.customerId!);

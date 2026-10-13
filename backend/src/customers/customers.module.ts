@@ -5,6 +5,7 @@ import {
   CustomersController,
 } from './customers.controller';
 import { Customer, CustomerSchema } from './schemas/customer.schema';
+import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { AuthModule } from '../auth/auth.module';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
@@ -19,6 +20,7 @@ import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
     CustomersService,
     CustomerAuthGuard,
     tenantModelProvider(Customer.name, CustomerSchema),
+    tenantModelProvider(Product.name, ProductSchema),
   ],
   exports: [CustomersService],
 })

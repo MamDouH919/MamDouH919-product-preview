@@ -72,6 +72,10 @@ export class Customer extends Document {
 
   @Prop({ type: [AddressSchema], default: [] })
   addresses!: Address[];
+
+  /** Saved products, most recent last. */
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }], default: [] })
+  wishlist!: Types.ObjectId[];
 }
 
 export const CustomerSchema = SchemaFactory.createForClass(Customer);

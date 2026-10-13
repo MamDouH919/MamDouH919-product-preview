@@ -22,7 +22,7 @@ import {
 import Add from "@mui/icons-material/Add";
 import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
-import { clearCart } from "@/Store/slices/cart";
+import { clearCart, setCouponCode } from "@/Store/slices/cart";
 import { useCustomerAddressesQuery } from "@/backend-api/customers/hooks";
 import { MY_ORDERS_QUERY_KEY, QUOTE_QUERY_KEY, useQuoteQuery } from "@/backend-api/orders/hooks";
 import { placeOrder } from "@/backend-api/orders/mutations";
@@ -40,7 +40,7 @@ const CheckoutPage = () => {
   const fallbackCurrency = useCurrency();
 
   const { isLoggedIn, isInitialized } = useAppSelector((state) => state.customer);
-  const { items, hydrated } = useAppSelector((state) => state.cart);
+  const { items, couponCode, hydrated } = useAppSelector((state) => state.cart);
 
   const [pickedAddressId, setAddressId] = useState<string>("");
   const [notes, setNotes] = useState("");
@@ -53,7 +53,7 @@ const CheckoutPage = () => {
     () => items.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })),
     [items]
   );
-  const { data: quote, isLoading: quoteLoading } = useQuoteQuery(inputs);
+  const { data: quote, isLoading: quoteLoading } = useQuoteQuery(inputs, couponCode);
   const { data: addresses, isLoading: addressesLoading } = useCustomerAddressesQuery();
 
   const currency = localized(quote?.currency, lang) || fallbackCurrency;
@@ -84,6 +84,13 @@ const CheckoutPage = () => {
     },
     onError: (error: any) => {
       const data = error?.response?.data;
+      // The coupon stopped applying (used up, or a per-customer limit) — re-price
+      // here; the summary explains it and offers to drop the code.
+      if (data?.couponError) {
+        queryClient.invalidateQueries({ queryKey: [QUOTE_QUERY_KEY] });
+        toast.error(t(`couponError.${data.couponError.code}`));
+        return;
+      }
       // Stock or prices moved under the shopper — re-price and send them to
       // the cart, where each problem line is explained.
       if (data?.issues || error?.response?.status === 409) {
@@ -106,6 +113,9 @@ const CheckoutPage = () => {
       addressId,
       paymentMethod: "cash_on_delivery",
       notes: notes.trim() || undefined,
+      // Only a code the quote accepted; a refused one is ignored, not sent.
+      couponCode: quote?.coupon?.code,
+      locale: lang,
     });
   };
 
@@ -239,10 +249,27 @@ const CheckoutPage = () => {
                   ...line,
                 }))}
                 subtotal={quote.subtotal}
+                discount={quote.discount}
+                couponCode={quote.coupon?.code}
                 shippingFee={quote.shippingFee}
                 total={quote.total}
                 currency={currency}
               />
+
+              {couponCode && quote.couponError && (
+                <Alert
+                  severity="warning"
+                  action={
+                    <Button color="inherit" size="small" onClick={() => dispatch(setCouponCode(undefined))}>
+                      {t("remove")}
+                    </Button>
+                  }
+                >
+                  {quote.couponError.code === "min_subtotal" && quote.couponError.minSubtotal != null
+                    ? t("couponError.min_subtotal", { amount: `${quote.couponError.minSubtotal.toLocaleString()} ${currency}` })
+                    : t(`couponError.${quote.couponError.code}`)}
+                </Alert>
+              )}
 
               {!quote.valid && (
                 <Alert

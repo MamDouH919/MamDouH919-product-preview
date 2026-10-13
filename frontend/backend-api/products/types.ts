@@ -32,4 +32,34 @@ export type Product = {
   allowBackorder: boolean;
   /** Virtual: product stock, or the sum of its variants. */
   totalStock?: number;
+  views: number;
+  whatsappClicks: number;
+};
+
+export type ProductSort = "featured" | "newest" | "price_asc" | "price_desc";
+
+export type ProductSearchParams = {
+  q?: string;
+  categoryId?: string;
+  subCategoryId?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  sort?: ProductSort;
+  page?: number;
+  limit?: number;
+};
+
+/** A search hit: a product plus what the server derived for filtering. */
+export type ProductSearchItem = Product & {
+  /** Cheapest variant price, or the product price. */
+  effectivePrice?: number | null;
+  inStock?: boolean;
+};
+
+export type ProductSearchResponse = {
+  data: ProductSearchItem[];
+  total: number;
+  page: number;
+  limit: number;
 };

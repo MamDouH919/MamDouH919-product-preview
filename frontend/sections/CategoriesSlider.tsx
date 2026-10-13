@@ -59,7 +59,7 @@ export default function CategoriesSlider() {
           gap: 2,
           px: 2,
           overflowX: "auto",
-          justifyContent: { xs: "flex-start", sm: "center" },
+          justifyContent: { xs: "flex-start", md: categories.length > 5 ? "flex-start" : "center" },
           scrollbarWidth: "none",
           "&::-webkit-scrollbar": { display: "none" },
         }}

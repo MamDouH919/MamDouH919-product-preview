@@ -122,6 +122,20 @@ const ProductsPage = () => {
         ),
       },
       {
+        id: "views",
+        header: t("views"),
+        render: (row: Product) => (
+          <Chip label={row.views ?? 0} size="small" variant="outlined" color="info" />
+        ),
+      },
+      {
+        id: "whatsappClicks",
+        header: t("whatsappClicks"),
+        render: (row: Product) => (
+          <Chip label={row.whatsappClicks ?? 0} size="small" variant="outlined" color="success" />
+        ),
+      },
+      {
         id: "isActive",
         header: t("active"),
         render: (row: Product) => (

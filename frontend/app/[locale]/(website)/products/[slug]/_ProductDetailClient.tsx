@@ -1,72 +1,23 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useEffect, useState } from "react"
 import { useProductBySlugQuery, useProductsQuery } from "@/backend-api/products/hooks"
-import { Product } from "@/backend-api/products/types"
+import { incrementProductView } from "@/backend-api/products/mutations"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
 import { ChevronRight, ShoppingBag, Tag, Package, ArrowLeft } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
+import ProductCard from "@/components/ProductCard"
 import Image from "next/image"
 import { useCurrency } from "@/Hooks/useCurrency"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import AddToCart from "@/features/Cart/AddToCart"
+import WishlistButton from "@/features/Wishlist/WishlistButton"
 import { useTheme, alpha } from "@mui/material/styles"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
   return field[lang] || field["ar"] || field["en"] || ""
-}
-
-function ProductCard({ product, lang }: { product: Product; lang: string }) {
-  const name = localized(product.name, lang)
-  const categoryName = localized(product.category?.name, lang)
-  const image = product.images?.[0]
-  const currency = useCurrency()
-
-  return (
-    <CustomLink
-      href={`/products/${product.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-(--primary-25) shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-    >
-      <div className="relative overflow-hidden bg-gray-50 aspect-square">
-        {image ? (
-          <Image
-            src={getBackendUri(image)}
-            alt={name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-100">
-            <ShoppingBag className="w-10 h-10 text-gray-300" />
-          </div>
-        )}
-        {categoryName && (
-          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-(--primary) px-2 py-0.5 rounded-full shadow-sm">
-            {categoryName}
-          </span>
-        )}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-black/20 to-transparent pointer-events-none" />
-      </div>
-      <div className="flex flex-col flex-1 p-3 gap-2">
-        <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug flex-1">{name}</p>
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-          {product.price != null ? (
-            <span className="text-base font-bold text-(--primary)">{product.price.toLocaleString()} {currency}</span>
-          ) : (
-            <span />
-          )}
-          <div className="flex items-center gap-1.5">
-            <WhatsAppButton slug={product.slug} productName={name} />
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-(--primary-8) group-hover:bg-(--primary) transition-colors duration-300">
-              <ShoppingBag className="w-4 h-4 text-(--primary) group-hover:text-white transition-colors duration-300" />
-            </span>
-          </div>
-        </div>
-      </div>
-    </CustomLink>
-  )
 }
 
 function DetailSkeleton() {
@@ -112,9 +63,7 @@ export default function ProductDetailClient({ params }: Props) {
   const cssVars = {
     "--primary": theme.palette.primary.main,
     "--primary-dark": theme.palette.primary.dark,
-    "--primary-8": alpha(theme.palette.primary.main, 0.08),
     "--primary-10": alpha(theme.palette.primary.main, 0.1),
-    "--primary-25": alpha(theme.palette.primary.main, 0.25),
     "--primary-50": alpha(theme.palette.primary.main, 0.5),
   } as React.CSSProperties
 
@@ -129,6 +78,19 @@ export default function ProductDetailClient({ params }: Props) {
     .filter((p) => p.isActive && p.slug !== slug)
     .sort((a, b) => a.order - b.order)
     .slice(0, 4)
+
+  useEffect(() => {
+    if (!product?.slug) return
+    const today = new Date().toISOString().slice(0, 10)
+    const storageKey = `product_view_${product.slug}`
+    try {
+      if (localStorage.getItem(storageKey) === today) return
+      localStorage.setItem(storageKey, today)
+    } catch {
+      // localStorage unavailable (private mode, etc.) — skip dedup, don't block the view
+    }
+    incrementProductView(product.slug).catch(() => {})
+  }, [product?.slug])
 
   if (isLoading) {
     return (
@@ -217,10 +179,10 @@ export default function ProductDetailClient({ params }: Props) {
                   <button
                     key={idx}
                     onClick={() => setActiveImage(idx)}
-                    className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                    className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors duration-200 ${
                       activeImage === idx
-                        ? "border-(--primary) shadow-md scale-105"
-                        : "border-transparent opacity-60 hover:opacity-100"
+                        ? "border-(--primary) shadow-md"
+                        : "border-gray-200 opacity-70 hover:opacity-100 hover:border-gray-300"
                     }`}
                   >
                     <div className="relative w-full h-full">
@@ -334,6 +296,7 @@ export default function ProductDetailClient({ params }: Props) {
 
             <div className="mt-auto pt-4 flex flex-col gap-3">
               <AddToCart product={product} variantIndex={activeVariant} />
+              <WishlistButton productId={product._id} variant="full" />
               <WhatsAppButton
                 slug={product.slug}
                 productName={name}

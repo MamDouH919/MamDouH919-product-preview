@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage, Types } from 'mongoose';
 import { Product } from './schemas/product.schema';
 import { CreateProductDto, ProductVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductSort, SearchProductsDto } from './dto/search-products.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
 import { InventoryService } from '../inventory/inventory.service';
@@ -89,6 +90,112 @@ export class ProductsService {
       .populate('subCategory', 'name slug')
       .sort({ order: 1, createdAt: -1 })
       .exec();
+  }
+
+  /**
+   * The storefront catalogue: active products only, filtered and sorted on the
+   * server, one page at a time.
+   *
+   * Search is a case-insensitive substring match rather than a text index —
+   * Mongo's text index matches whole words and has no Arabic stemming, so
+   * typing part of an Arabic name would find nothing.
+   */
+  async search(query: SearchProductsDto): Promise<{
+    data: Product[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    // Coerced here as well: the global ValidationPipe validates the
+    // transformed DTO but hands the controller the raw query strings.
+    const num = (v: unknown) => (v === undefined || v === '' ? undefined : Number(v));
+    const page = num(query.page) ?? 1;
+    const limit = num(query.limit) ?? 24;
+    const minPrice = num(query.minPrice);
+    const maxPrice = num(query.maxPrice);
+    const inStock = String(query.inStock) === 'true';
+
+    const match: Record<string, unknown> = { isActive: true };
+    if (query.categoryId) match.category = new Types.ObjectId(query.categoryId);
+    if (query.subCategoryId) match.subCategory = new Types.ObjectId(query.subCategoryId);
+
+    const term = query.q?.trim();
+    if (term) {
+      const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      match.$or = [
+        { 'name.en': pattern },
+        { 'name.ar': pattern },
+        { tags: pattern },
+        { sku: pattern },
+        { 'variants.sku': pattern },
+      ];
+    }
+
+    const derived: PipelineStage[] = [
+      { $match: match },
+      {
+        $addFields: {
+          // What the card shows: the cheapest variant, or the product price.
+          effectivePrice: { $ifNull: [{ $min: '$variants.price' }, '$price'] },
+          inStock: {
+            $or: [
+              { $eq: ['$trackStock', false] },
+              { $eq: ['$allowBackorder', true] },
+              { $gt: ['$stock', 0] },
+              { $gt: [{ $max: '$variants.stock' }, 0] },
+            ],
+          },
+        },
+      },
+    ];
+
+    const filters: Record<string, unknown> = {};
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      const range: Record<string, number> = {};
+      if (minPrice !== undefined) range.$gte = minPrice;
+      if (maxPrice !== undefined) range.$lte = maxPrice;
+      filters.effectivePrice = range;
+    }
+    if (inStock) filters.inStock = true;
+    if (Object.keys(filters).length) derived.push({ $match: filters });
+
+    const sorts: Record<ProductSort, Record<string, 1 | -1>> = {
+      [ProductSort.FEATURED]: { order: 1, createdAt: -1 },
+      [ProductSort.NEWEST]: { createdAt: -1 },
+      // `hasPrice` first so unpriced products sink to the end either way.
+      [ProductSort.PRICE_ASC]: { hasPrice: -1, effectivePrice: 1, createdAt: -1 },
+      [ProductSort.PRICE_DESC]: { hasPrice: -1, effectivePrice: -1, createdAt: -1 },
+    };
+
+    const [result] = await this.productModel
+      .aggregate<{ data: Product[]; total: { count: number }[] }>([
+        ...derived,
+        {
+          $facet: {
+            data: [
+              { $addFields: { hasPrice: { $ne: [{ $ifNull: ['$effectivePrice', null] }, null] } } },
+              { $sort: { ...sorts[query.sort ?? ProductSort.FEATURED], _id: 1 } },
+              { $skip: (page - 1) * limit },
+              { $limit: limit },
+              {
+                $lookup: {
+                  from: 'categories',
+                  localField: 'category',
+                  foreignField: '_id',
+                  as: 'category',
+                  pipeline: [{ $project: { name: 1, slug: 1 } }],
+                },
+              },
+              { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
+              { $project: { description: 0, hasPrice: 0, views: 0, whatsappClicks: 0 } },
+            ],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ])
+      .exec();
+
+    return { data: result.data, total: result.total[0]?.count ?? 0, page, limit };
   }
 
   async findByCategory(categoryId: string): Promise<Product[]> {
@@ -187,6 +294,22 @@ export class ProductsService {
     }
 
     return updated;
+  }
+
+  async incrementViews(slug: string): Promise<Product> {
+    const product = await this.productModel
+      .findOneAndUpdate({ slug }, { $inc: { views: 1 } }, { new: true })
+      .exec();
+    if (!product) throw new NotFoundException(`Product "${slug}" not found`);
+    return product;
+  }
+
+  async incrementWhatsappClicks(slug: string): Promise<Product> {
+    const product = await this.productModel
+      .findOneAndUpdate({ slug }, { $inc: { whatsappClicks: 1 } }, { new: true })
+      .exec();
+    if (!product) throw new NotFoundException(`Product "${slug}" not found`);
+    return product;
   }
 
   async remove(id: string): Promise<Product> {

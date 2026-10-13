@@ -113,6 +113,8 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
             <OrderLines
               lines={order.items.map((item, i) => ({ key: String(i), ...item }))}
               subtotal={order.subtotal}
+              discount={order.discount}
+              couponCode={order.coupon?.code}
               shippingFee={order.shippingFee}
               total={order.total}
               currency={currency}

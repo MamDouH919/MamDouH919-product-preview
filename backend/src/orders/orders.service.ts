@@ -17,6 +17,8 @@ import { InventoryService } from '../inventory/inventory.service';
 import { MovementType } from '../inventory/enums/movement-type.enum';
 import { AdjustStockDto } from '../inventory/dto/adjust-stock.dto';
 import { CustomersService } from '../customers/customers.service';
+import { CouponError, CouponsService } from '../coupons/coupons.service';
+import { OrderNotificationsService } from './order-notifications.service';
 import {
   ORDER_TRANSITIONS,
   OrderStatus,
@@ -51,12 +53,28 @@ export interface QuoteLine {
 export interface Quote {
   items: QuoteLine[];
   subtotal: number;
+  discount: number;
+  /** The coupon that was applied, when one was asked for and it applies. */
+  coupon?: { code: string; type: string; value: number };
+  /** Why the requested coupon doesn't apply. Doesn't make the quote invalid. */
+  couponError?: { code: CouponError; minSubtotal?: number };
   shippingFee: number;
   total: number;
   currency?: LocalizedField;
   /** True when every line can be ordered exactly as requested. */
   valid: boolean;
 }
+
+const COUPON_MESSAGES: Record<CouponError, string> = {
+  not_found: 'This coupon code is not valid.',
+  not_started: 'This coupon is not active yet.',
+  expired: 'This coupon has expired.',
+  usage_limit: 'This coupon has been fully used.',
+  customer_limit: 'You have already used this coupon.',
+  min_subtotal: 'Your order is below the minimum for this coupon.',
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** A priced line plus what placing it will do to stock. */
 interface ResolvedLine extends QuoteLine {
@@ -78,6 +96,8 @@ export class OrdersService {
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
     private readonly inventoryService: InventoryService,
     private readonly customersService: CustomersService,
+    private readonly couponsService: CouponsService,
+    private readonly notifications: OrderNotificationsService,
   ) {}
 
   // ── Pricing ─────────────────────────────────────────────────────────────────
@@ -87,18 +107,34 @@ export class OrdersService {
    * calls this to show real prices and flag problems before checkout, and
    * placing an order runs the same check — the client never supplies a price.
    */
-  async quote(items: OrderItemInputDto[]): Promise<Quote> {
+  async quote(items: OrderItemInputDto[], couponCode?: string): Promise<Quote> {
     const lines = await this.resolveLines(items);
     const { shippingFee, currency } = await this.getCheckoutSettings();
 
-    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const subtotal = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
     const valid = lines.every((line) => !line.issue);
+
+    let discount = 0;
+    let coupon: Quote['coupon'];
+    let couponError: Quote['couponError'];
+    if (couponCode?.trim()) {
+      const check = await this.couponsService.check(couponCode, subtotal);
+      if (check.ok) {
+        discount = check.discount;
+        coupon = { code: check.coupon.code, type: check.coupon.type, value: check.coupon.value };
+      } else {
+        couponError = { code: check.error, minSubtotal: check.minSubtotal };
+      }
+    }
 
     return {
       items: lines.map(({ tracksStock, ...line }) => line),
       subtotal,
+      discount,
+      coupon,
+      couponError,
       shippingFee,
-      total: subtotal + shippingFee,
+      total: round2(subtotal - discount + shippingFee),
       currency,
       valid,
     };
@@ -106,7 +142,7 @@ export class OrdersService {
 
   // ── Placing an order ────────────────────────────────────────────────────────
 
-  async create(customerId: string, dto: CreateOrderDto): Promise<Order> {
+  async create(customerId: string, dto: CreateOrderDto, host: string): Promise<Order> {
     const customer = await this.customersService.getProfile(customerId);
     // The customer guard only checks the token, which stays valid after an
     // admin blocks the account — so check here too.
@@ -125,8 +161,19 @@ export class OrdersService {
       });
     }
 
-    const { shippingFee, currency } = await this.getCheckoutSettings();
-    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const settings = await this.getCheckoutSettings();
+    const { shippingFee, currency } = settings;
+    const subtotal = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
+
+    // Checked again here with the customer, so per-customer limits apply.
+    let coupon: Awaited<ReturnType<CouponsService['check']>> | undefined;
+    if (dto.couponCode?.trim()) {
+      coupon = await this.couponsService.check(dto.couponCode, subtotal, customerId);
+      if (!coupon.ok) this.rejectCoupon(coupon.error, coupon.minSubtotal);
+    }
+    const applied = coupon?.ok ? coupon : undefined;
+    const discount = applied?.discount ?? 0;
+
     const orderNumber = await this.nextOrderNumber();
 
     const order = await this.orderModel.create({
@@ -155,14 +202,26 @@ export class OrdersService {
         notes: address.notes,
       },
       subtotal,
+      discount,
+      coupon: applied
+        ? { code: applied.coupon.code, type: applied.coupon.type, value: applied.coupon.value }
+        : undefined,
       shippingFee,
-      total: subtotal + shippingFee,
+      total: round2(subtotal - discount + shippingFee),
       currency,
       paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH_ON_DELIVERY,
       status: OrderStatus.PENDING,
       statusHistory: [{ status: OrderStatus.PENDING, at: new Date() }],
       notes: dto.notes,
+      locale: dto.locale,
     });
+
+    // Claim the coupon use atomically — the check above can lose a race for
+    // the last redemption, and this is where that's decided.
+    if (applied && !(await this.couponsService.redeem(applied.coupon._id as Types.ObjectId))) {
+      await this.orderModel.deleteOne({ _id: order._id }).exec();
+      this.rejectCoupon('usage_limit');
+    }
 
     // Stock moves after the order exists so each sale can point at its order
     // number. The availability check above can be beaten by a concurrent
@@ -182,6 +241,7 @@ export class OrdersService {
       await this.inventoryService.adjustMany(sales);
     } catch (error) {
       await this.orderModel.deleteOne({ _id: order._id }).exec();
+      if (applied) await this.couponsService.release(applied.coupon.code);
       // The inventory message quotes the stock it read before losing the race
       // ("2 available, 2 requested"), which reads as nonsense to a shopper.
       if (error instanceof BadRequestException) {
@@ -192,7 +252,22 @@ export class OrdersService {
       throw error;
     }
 
+    this.notifications.orderPlaced(order, {
+      host,
+      customerEmail: customer.email,
+      storeName: settings.storeName,
+      storeEmail: settings.storeEmail,
+      currency,
+    });
+
     return order;
+  }
+
+  private rejectCoupon(code: CouponError, minSubtotal?: number): never {
+    throw new BadRequestException({
+      message: COUPON_MESSAGES[code],
+      couponError: { code, minSubtotal },
+    });
   }
 
   // ── Status changes ──────────────────────────────────────────────────────────
@@ -202,10 +277,15 @@ export class OrdersService {
     orderId: string,
     status: OrderStatus,
     note: string | undefined,
-    userId?: string,
+    userId: string | undefined,
+    host: string,
   ): Promise<Order> {
     const order = await this.findOne(orderId);
-    return this.transition(order, status, { note, by: userId });
+    const updated = await this.transition(order, status, { note, by: userId });
+
+    const customer = order.customer as unknown as { email?: string } | undefined;
+    await this.notifyStatus(updated, host, customer?.email, { note });
+    return updated;
   }
 
   /**
@@ -215,7 +295,8 @@ export class OrdersService {
   async cancelByCustomer(
     customerId: string,
     orderId: string,
-    reason?: string,
+    reason: string | undefined,
+    host: string,
   ): Promise<Order> {
     const order = await this.findMine(customerId, orderId);
     if (order.status === OrderStatus.CANCELLED) {
@@ -226,7 +307,31 @@ export class OrdersService {
         'This order is already being prepared and can no longer be cancelled here. Please contact the store.',
       );
     }
-    return this.transition(order, OrderStatus.CANCELLED, { note: reason });
+    const updated = await this.transition(order, OrderStatus.CANCELLED, { note: reason });
+
+    const customer = await this.customersService.getProfile(customerId);
+    await this.notifyStatus(updated, host, customer.email, { note: reason, byCustomer: true });
+    return updated;
+  }
+
+  private async notifyStatus(
+    order: Order,
+    host: string,
+    customerEmail: string | undefined,
+    change: { note?: string; byCustomer?: boolean },
+  ): Promise<void> {
+    const settings = await this.getCheckoutSettings();
+    this.notifications.statusChanged(
+      order,
+      {
+        host,
+        customerEmail,
+        storeName: settings.storeName,
+        storeEmail: settings.storeEmail,
+        currency: order.currency,
+      },
+      change,
+    );
   }
 
   private async transition(
@@ -270,6 +375,8 @@ export class OrdersService {
 
     if (to === OrderStatus.CANCELLED) {
       await this.restock(updated, change.by);
+      // A cancelled order no longer counts against the coupon's limits.
+      if (updated.coupon) await this.couponsService.release(updated.coupon.code);
     }
 
     return updated;
@@ -417,11 +524,18 @@ export class OrdersService {
   private async getCheckoutSettings(): Promise<{
     shippingFee: number;
     currency?: LocalizedField;
+    storeName?: LocalizedField;
+    storeEmail?: string;
   }> {
-    const settings = await this.settingModel.findOne().select('shippingFee currency').exec();
+    const settings = await this.settingModel
+      .findOne()
+      .select('shippingFee currency siteTitle email')
+      .exec();
     return {
       shippingFee: settings?.shippingFee ?? 0,
       currency: settings?.currency,
+      storeName: settings?.siteTitle,
+      storeEmail: settings?.email,
     };
   }
 

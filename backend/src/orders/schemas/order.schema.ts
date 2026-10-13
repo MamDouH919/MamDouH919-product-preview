@@ -96,6 +96,21 @@ export class OrderStatusChange {
 
 export const OrderStatusChangeSchema = SchemaFactory.createForClass(OrderStatusChange);
 
+/** The coupon as it stood when the order was placed. */
+@Schema({ _id: false })
+export class AppliedCoupon {
+  @Prop({ required: true })
+  code!: string;
+
+  @Prop({ required: true })
+  type!: string;
+
+  @Prop({ required: true })
+  value!: number;
+}
+
+export const AppliedCouponSchema = SchemaFactory.createForClass(AppliedCoupon);
+
 @Schema({ timestamps: true })
 export class Order extends Document {
   /** Human-facing, sequential per tenant — what a customer reads out on the phone. */
@@ -113,6 +128,13 @@ export class Order extends Document {
 
   @Prop({ required: true })
   subtotal!: number;
+
+  /** Coupon discount taken off the subtotal. */
+  @Prop({ default: 0 })
+  discount!: number;
+
+  @Prop({ type: AppliedCouponSchema, required: false })
+  coupon?: AppliedCoupon;
 
   @Prop({ default: 0 })
   shippingFee!: number;
@@ -136,9 +158,14 @@ export class Order extends Document {
   /** What the customer wrote at checkout. */
   @Prop({ required: false })
   notes?: string;
+
+  /** Storefront language at checkout — the language order emails are sent in. */
+  @Prop({ required: false })
+  locale?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ customer: 1, createdAt: -1 });
+OrderSchema.index({ 'coupon.code': 1, customer: 1 });

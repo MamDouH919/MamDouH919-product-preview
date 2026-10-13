@@ -80,6 +80,11 @@ export class Product extends Document {
   // Lets stock go negative instead of rejecting the sale.
   @Prop({ default: false })
   allowBackorder!: boolean;
+  @Prop({ default: 0 })
+  views!: number;
+
+  @Prop({ default: 0 })
+  whatsappClicks!: number;
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);

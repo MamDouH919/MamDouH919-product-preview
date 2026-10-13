@@ -93,6 +93,19 @@ export const deleteAddress = async (addressId: string): Promise<Address[]> => {
   return response.data;
 };
 
+// ── Wishlist ──────────────────────────────────────────────────────────────────
+// Both return the full list of saved product ids.
+
+export const addToWishlist = async (productId: string): Promise<string[]> => {
+  const response = await customerApi.put(`/customers/me/wishlist/${productId}`);
+  return response.data;
+};
+
+export const removeFromWishlist = async (productId: string): Promise<string[]> => {
+  const response = await customerApi.delete(`/customers/me/wishlist/${productId}`);
+  return response.data;
+};
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 export const setCustomerActive = async ({

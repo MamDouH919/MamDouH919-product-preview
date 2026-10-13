@@ -18,6 +18,7 @@ import { ProductsService, productImageStorage } from './products.service';
 import { parseNestedBody } from '../common/helpers/parse-nested-body';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { SearchProductsDto } from './dto/search-products.dto';
 import { AuthenticationGuard } from '../guards/authentication.guard';
 import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
@@ -56,9 +57,25 @@ export class ProductsController {
     return this.productsService.findActive();
   }
 
+  /** Public catalogue search — active products only, paged. */
+  @Get('search')
+  search(@Query() query: SearchProductsDto) {
+    return this.productsService.search(query);
+  }
+
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlug(slug);
+  }
+
+  @Post('slug/:slug/view')
+  incrementViews(@Param('slug') slug: string) {
+    return this.productsService.incrementViews(slug);
+  }
+
+  @Post('slug/:slug/whatsapp-click')
+  incrementWhatsappClicks(@Param('slug') slug: string) {
+    return this.productsService.incrementWhatsappClicks(slug);
   }
 
   @Get(':id')

@@ -5,16 +5,15 @@ import {
     MiscellaneousServices,
     Settings,
     ViewCarousel,
-    FormatQuote,
     ContactMail,
-    Newspaper,
-    MarkEmailRead,
     Handshake,
     Gavel,
     StorageOutlined,
     WarehouseOutlined,
     PeopleAltOutlined,
     ReceiptLongOutlined,
+    LocalOfferOutlined,
+    MarkEmailReadOutlined,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
@@ -42,6 +41,11 @@ export const useLinksList = () => {
             primary: t("orders"),
             pathname: "/admin/orders",
             icon: ReceiptLongOutlined,
+        },
+        {
+            primary: t("coupons"),
+            pathname: "/admin/coupons",
+            icon: LocalOfferOutlined,
         },
         {
             primary: t("banners"),
@@ -78,6 +82,17 @@ export const useLinksList = () => {
             pathname: "/admin/customers",
             icon: PeopleAltOutlined,
         },
+        {
+            primary: t("contactMessages"),
+            pathname: "/admin/contact",
+            icon: ContactMail,
+        },
+        {
+            primary: t("subscribers"),
+            pathname: "/admin/subscribers",
+            icon: MarkEmailReadOutlined,
+        },
+
         {
             primary: t("settings"),
             pathname: "/admin/settings",

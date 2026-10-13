@@ -17,11 +17,15 @@ mahmoud-feda/
 **Storefront (public)**
 - Home page composed of a banner slider, categories slider and products grid
 - Category and sub-category browsing, product listing and product detail pages (`/products/[slug]`, `/categories/[slug]`)
+- Product search (English and Arabic, partial words), price range, in-stock filter and sorting — all kept in the URL, so a filtered view can be shared
+- Wishlist (`/account/wishlist`) with a heart on every product card
+- Newsletter sign-up in the footer
 - Bilingual content (English / Arabic) with full RTL support
 - Per-tenant branding: logo, favicon, colors, currency, contact info and social links
 - Floating WhatsApp button wired to the tenant's `settings`
 - Customer accounts (`/[locale]/account`): register, sign in, profile, password reset and a saved address book
-- Cart (`/cart`), checkout (`/checkout`) with cash on delivery, and order history with self-service cancellation (`/account/orders`)
+- Cart (`/cart`) with coupon codes, checkout (`/checkout`) with cash on delivery, and order history with self-service cancellation (`/account/orders`)
+- Order emails to the customer (placed, confirmed, shipped, delivered, cancelled) and a new-order alert to the store
 
 **Admin dashboard (`/[locale]/admin`)**
 - CRUD for products (with variants, tags, multiple images), categories, sub-categories, banners and content sections
@@ -29,6 +33,8 @@ mahmoud-feda/
 - Drag-and-drop ordering (`@dnd-kit`) and rich text editing (TipTap)
 - Stock tracking with an append-only movement ledger, low-stock flags and stock takes
 - Orders: list with status filter and search, order detail, status changes (confirm → ship → deliver, or cancel) with an audit trail
+- Coupons: percentage or fixed, minimum order, cap, start/end dates, total and per-customer limits
+- Newsletter subscribers list with CSV export
 - Customer directory with the ability to block an account without losing its history
 - Database export / import as JSON (super-admin only)
 - Role-based permissions per resource and action
@@ -39,7 +45,6 @@ mahmoud-feda/
 - JWT access + refresh tokens, forgot/reset password over email (Nodemailer), OTP support
 - Image upload with automatic compression and format normalization (`sharp`), stored per tenant
 - Swagger API docs at `/api` (disabled when `NODE_ENV=production`)
-- Newsletter subscribe endpoints (`/subscribe`) — API only, no UI wired up yet
 
 ---
 
@@ -108,7 +113,7 @@ All user-facing text uses a shared `LocalizedField` (`{ en, ar }`), so a single 
 |---|---|
 | `Product` | `name`, `description`, `shortDescription`, `images[]`, `price`, `sku`, `category`, `subCategory`, `slug`, `tags[]`, `variants[{ _id, label, price, sku, stock }]`, `isActive`, `order`, `trackStock`, `stock`, `lowStockThreshold`, `allowBackorder` |
 | `StockMovement` | `product`, `variantId?`, `variantLabel?`, `type`, `quantity` (signed), `balanceAfter`, `reason`, `reference`, `user` |
-| `Customer` | `name`, `email`, `password` (bcrypt), `phone`, `isVerified`, `isActive`, `addresses[{ _id, label, fullName, phone, city, area, street, building, notes, isDefault }]` |
+| `Customer` | `name`, `email`, `password` (bcrypt), `phone`, `isVerified`, `isActive`, `addresses[{ _id, label, fullName, phone, city, area, street, building, notes, isDefault }]`, `wishlist[]` (product ids) |
 | `Category` | `name`, `description`, `image`, `slug`, `isActive`, `order` |
 | `SubCategory` | belongs to a category, same shape |
 | `Banner` | `image`, `title`, `description`, `active`, `weight` |
@@ -116,8 +121,9 @@ All user-facing text uses a shared `LocalizedField` (`{ en, ar }`), so a single 
 | `Setting` | site title/description, logo, favicon, phone, whatsapp, landline, email, address, `socialMedia[]`, `primaryColor`, `currency` |
 | `User` | `name`, `email`, `password` (bcrypt), `isVerified`, `roleId`, `isSuper` |
 | `Role` | `name`, `permissions[{ resource, actions }]` |
-| `Subscribe` | newsletter signups |
-| `Order` | `orderNumber`, `customer`, `items[{ product, variantId, name, variantLabel, sku, image, unitPrice, quantity, lineTotal, stockDeducted }]`, `shippingAddress`, `subtotal`, `shippingFee`, `total`, `currency`, `paymentMethod`, `status`, `statusHistory[]`, `notes` |
+| `Subscribe` | newsletter signups (`email` required and de-duplicated; names optional) |
+| `Coupon` | `code` (upper-case, unique), `type` (`percentage` / `fixed`), `value`, `minSubtotal`, `maxDiscount`, `startsAt`, `expiresAt`, `usageLimit`, `perCustomerLimit`, `usedCount`, `isActive` |
+| `Order` | `orderNumber`, `customer`, `items[{ product, variantId, name, variantLabel, sku, image, unitPrice, quantity, lineTotal, stockDeducted }]`, `shippingAddress`, `subtotal`, `discount`, `coupon{ code, type, value }`, `shippingFee`, `total`, `currency`, `paymentMethod`, `status`, `statusHistory[]`, `notes`, `locale` |
 
 `Setting` also carries `shippingFee` — a flat delivery charge added to every order.
 
@@ -180,6 +186,21 @@ Checkout requires a customer account; browsing and filling a cart do not. The ca
 
 Order numbers come from an atomic `$inc` on a `Counter` document, starting at 1001 per tenant.
 
+### Coupons
+
+The cart sends the code with `POST /orders/quote`; the reply carries `discount` and `coupon`, or a `couponError` (`not_found`, `not_started`, `expired`, `usage_limit`, `customer_limit`, `min_subtotal`) that leaves the rest of the quote valid. There is deliberately no public endpoint for looking a code up.
+
+Placing the order re-checks the code with the customer known (so per-customer limits apply), then claims a use with a conditional `$inc` on `usedCount` — two checkouts racing for a single-use code can't both get it. If stock then fails, the use is given back. Cancelling an order gives its use back too, and cancelled orders don't count toward a customer's limit. Orders keep their own copy of the coupon, so editing or deleting one never rewrites a past order.
+
+### Emails
+
+Sent in the language the customer checked out in (`locale`), with links built from the tenant's `frontendUrl`:
+
+- **Customer:** order received, then each status change (a note such as a tracking number is included).
+- **Store:** every new order, and orders the customer cancels. Sent to the `email` in Settings, or the sending mailbox if that's empty.
+
+Sending is fire-and-forget: a mail failure is logged and never fails or delays checkout. Everything a customer typed is HTML-escaped (`common/helpers/escape-html.ts`).
+
 ### Status
 
 ```
@@ -190,7 +211,7 @@ pending ──► confirmed ──► shipped ──► delivered
 
 Transitions outside this graph are refused (`ORDER_TRANSITIONS`). Each change is a conditional update on the status that was read, so two admins acting at once can't both succeed — which matters because **cancelling returns stock** as `order_cancelled` movements, only for lines that actually deducted it. Restocking is best-effort per line: a product deleted since the sale is logged and skipped rather than blocking the cancellation.
 
-Existing tenants need their admin roles re-seeded to get the new `orders` permission: `npm run seed -- <host>`.
+Existing tenants need their admin roles re-seeded to get the `orders` and `coupons` permissions: `npm run seed -- <host>`.
 
 Customers may cancel their own order only while it is `pending`; after the store confirms it, cancellation is an admin action. Every change is appended to `statusHistory` with the admin who made it and an optional note (e.g. a tracking number).
 
@@ -239,7 +260,7 @@ Two guards run in sequence:
 - `AuthenticationGuard` — verifies the JWT `Bearer` token and attaches `userId` to the request.
 - `AuthorizationGuard` — reads the `@Permissions([{ resource, actions }])` decorator on the route and checks it against the user's role.
 
-Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory`, `customers`, `orders` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
+Resources: `users`, `roles`, `banners`, `settings`, `sections`, `subscribe`, `categories`, `sub-categories`, `products`, `inventory`, `customers`, `orders`, `coupons` (and legacy entries). Actions: `create`, `read`, `update`, `delete`.
 
 `isSuper` users get the extra database export/import capability. Public storefront reads (`GET /products/active`, `GET /categories/slug/:slug`, …) are unguarded by design.
 
@@ -254,11 +275,11 @@ Every request's `Host` header selects the tenant database, so the same endpoints
 | Group | Endpoints |
 |---|---|
 | Auth | `POST /auth/login` · `POST /auth/refresh` · `PUT /auth/change-password` · `POST /auth/forgot-password` · `POST /auth/reset-password` · `GET /auth/me` · `DELETE /auth/logout` |
-| Products | `POST /products` · `GET /products?categoryId=&subCategoryId=` · `GET /products/active` · `GET /products/slug/:slug` · `GET /products/:id` · `PATCH /products/:id` · `DELETE /products/:id` |
+| Products | `POST /products` · `GET /products?categoryId=&subCategoryId=` · `GET /products/search?q=&categoryId=&subCategoryId=&minPrice=&maxPrice=&inStock=&sort=&page=&limit=` · `GET /products/active` · `GET /products/slug/:slug` · `GET /products/:id` · `PATCH /products/:id` · `DELETE /products/:id` |
 | Customer auth | `POST /customer-auth/register` · `login` · `refresh` · `forgot-password` · `reset-password` · `GET /customer-auth/me` · `PUT /customer-auth/change-password` · `DELETE /customer-auth/logout` |
-| Customer self-service | `GET|PATCH /customers/me` · `GET|POST /customers/me/addresses` · `PATCH|DELETE /customers/me/addresses/:id` · `PUT /customers/me/addresses/:id/default` |
+| Customer self-service | `GET|PATCH /customers/me` · `GET|POST /customers/me/addresses` · `PATCH|DELETE /customers/me/addresses/:id` · `PUT /customers/me/addresses/:id/default` · `GET /customers/me/wishlist` · `PUT|DELETE /customers/me/wishlist/:productId` |
 | Customers (admin) | `GET /customers` · `GET /customers/:id` · `PATCH /customers/:id/active` |
-| Orders (public) | `POST /orders/quote` |
+| Orders (public) | `POST /orders/quote` (`{ items, couponCode? }`) |
 | Orders (customer) | `POST /orders/me` · `GET /orders/me` · `GET /orders/me/:id` · `POST /orders/me/:id/cancel` |
 | Orders (admin) | `GET /orders?status=&search=&from=&to=` · `GET /orders/:id` · `PATCH /orders/:id/status` |
 | Inventory | `GET /inventory` · `GET /inventory/summary` · `GET /inventory/low-stock` · `GET /inventory/movements` · `POST /inventory/adjust` · `POST /inventory/bulk-adjust` · `POST /inventory/stock-take` |
@@ -268,6 +289,7 @@ Every request's `Host` header selects the tenant database, so the same endpoints
 | Sections | `POST /sections` · `GET /sections` · `GET /sections/name/:sectionName` · `GET /sections/:id` · `PATCH /sections/:id` · `DELETE /sections/:id` |
 | Settings | `GET /settings` · `PATCH /settings` |
 | Subscribe | `POST /subscribe` · `GET /subscribe` · `GET /subscribe/:id` · `DELETE /subscribe/:id` |
+| Coupons | `POST /coupons` · `GET /coupons?search=` · `GET /coupons/:id` · `PATCH /coupons/:id` · `DELETE /coupons/:id` |
 | Roles | `POST /roles` · `GET /roles` · `GET /roles/:id` · `PUT /roles/:id` · `DELETE /roles/:id` |
 | Database | `GET /database/export` · `POST /database/import` *(super admin)* |
 
@@ -360,7 +382,8 @@ backend/
     ├── inventory/        stock movements ledger, adjustments, stock takes, reports
     ├── customers/        customer profiles + embedded address book
     ├── customer-auth/    storefront sign-up/sign-in, separate tokens from admin
-    ├── orders/           quote, checkout, order history, status workflow, order number counter
+    ├── orders/           quote, checkout, order history, status workflow, order emails, order number counter
+    ├── coupons/          coupon rules, redemption counting, admin CRUD
     ├── database/          JSON export / import (super admin)
     ├── common/
     │   ├── middleware/    TenantMiddleware (host → req.tenant)

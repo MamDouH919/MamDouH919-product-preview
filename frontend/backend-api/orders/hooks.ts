@@ -14,10 +14,10 @@ export const MY_ORDERS_QUERY_KEY = "my-orders";
 export const ORDERS_QUERY_KEY = "orders";
 
 /** Live prices and stock for the basket; refetches whenever its lines change. */
-export const useQuoteQuery = (items: OrderItemInput[]) => {
+export const useQuoteQuery = (items: OrderItemInput[], couponCode?: string) => {
   return useQuery({
-    queryKey: [QUOTE_QUERY_KEY, items],
-    queryFn: () => fetchQuote(items),
+    queryKey: [QUOTE_QUERY_KEY, items, couponCode],
+    queryFn: () => fetchQuote(items, couponCode),
     enabled: items.length > 0,
     // Keep showing the last totals while a quantity change re-prices.
     placeholderData: keepPreviousData,

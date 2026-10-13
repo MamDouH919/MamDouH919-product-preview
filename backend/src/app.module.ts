@@ -10,6 +10,7 @@ import { BannersModule } from './banners/banners.module';
 import { SettingsModule } from './settings/settings.module';
 import { SectionsModule } from './sections/sections.module';
 import { SubscribeModule } from './subscribe/subscribe.module';
+import { ContactModule } from './contact/contact.module';
 import { DatabaseModule } from './database/database.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
@@ -18,6 +19,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { CustomersModule } from './customers/customers.module';
 import { CustomerAuthModule } from './customer-auth/customer-auth.module';
 import { OrdersModule } from './orders/orders.module';
+import { CouponsModule } from './coupons/coupons.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -59,6 +61,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     SettingsModule,
     SectionsModule,
     SubscribeModule,
+    ContactModule,
     DatabaseModule,
     CategoriesModule,
     SubCategoriesModule,
@@ -67,6 +70,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     CustomerAuthModule,
     CustomersModule,
     OrdersModule,
+    CouponsModule,
     TenantModule,
   ],
   controllers: [],

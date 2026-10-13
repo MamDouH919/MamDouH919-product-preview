@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsMongoId,
   IsOptional,
@@ -45,6 +46,12 @@ export class QuoteOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemInputDto)
   items!: OrderItemInputDto[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  couponCode?: string;
 }
 
 export class CreateOrderDto extends QuoteOrderDto {
@@ -62,6 +69,11 @@ export class CreateOrderDto extends QuoteOrderDto {
   @IsString()
   @MaxLength(1000)
   notes?: string;
+
+  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for order emails' })
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  locale?: string;
 }
 
 export class UpdateOrderStatusDto {

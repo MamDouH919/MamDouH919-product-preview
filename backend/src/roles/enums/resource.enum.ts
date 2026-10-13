@@ -18,4 +18,5 @@ export enum Resource {
   INVENTORY = 'inventory',
   CUSTOMERS = 'customers',
   ORDERS = 'orders',
+  COUPONS = 'coupons',
 }

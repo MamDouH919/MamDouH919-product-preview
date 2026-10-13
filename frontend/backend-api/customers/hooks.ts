@@ -5,12 +5,14 @@ import {
   fetchCustomerById,
   fetchCustomerProfile,
   fetchCustomers,
+  fetchWishlist,
 } from "./queries";
 import { CustomerFilters } from "./types";
 
 export const CUSTOMERS_QUERY_KEY = "customers";
 export const CUSTOMER_ME_QUERY_KEY = "customer-me";
 export const CUSTOMER_ADDRESSES_QUERY_KEY = "customer-addresses";
+export const WISHLIST_QUERY_KEY = "wishlist";
 
 /** Only runs once a customer session exists, so guests don't fire a 401. */
 export const useCustomerProfileQuery = () => {
@@ -29,6 +31,16 @@ export const useCustomerAddressesQuery = () => {
   return useQuery({
     queryKey: [CUSTOMER_ADDRESSES_QUERY_KEY],
     queryFn: fetchCustomerAddresses,
+    enabled: isLoggedIn,
+  });
+};
+
+export const useWishlistQuery = () => {
+  const isLoggedIn = useAppSelector((state) => state.customer.isLoggedIn);
+
+  return useQuery({
+    queryKey: [WISHLIST_QUERY_KEY],
+    queryFn: fetchWishlist,
     enabled: isLoggedIn,
   });
 };

@@ -17,6 +17,7 @@ import {
 import PersonOutline from "@mui/icons-material/PersonOutline";
 import LocationOnOutlined from "@mui/icons-material/LocationOnOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
+import FavoriteBorder from "@mui/icons-material/FavoriteBorder";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -73,6 +74,7 @@ const AccountLayout = ({ children }: { children: React.ReactNode }) => {
   const navItems = [
     { href: "/account", label: t("myProfile"), icon: PersonOutline, exact: true },
     { href: "/account/orders", label: t("myOrders"), icon: ReceiptLongOutlined },
+    { href: "/account/wishlist", label: t("wishlist"), icon: FavoriteBorder },
     { href: "/account/addresses", label: t("addresses"), icon: LocationOnOutlined },
   ];
 

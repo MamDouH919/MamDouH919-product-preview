@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation"
 import { useAppSelector } from "@/Store/store"
 import { useTranslation } from "react-i18next"
+import { incrementProductWhatsappClick } from "@/backend-api/products/mutations"
 
 function WhatsAppIcon({ size = 18 }: { size?: number }) {
   return (
@@ -43,13 +44,18 @@ export default function WhatsAppButton({ slug, productName, variant = "icon", cl
   const phone = whatsapp.replace(/\D/g, "")
   const href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
 
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.stopPropagation()
+    incrementProductWhatsappClick(slug).catch(() => {})
+  }
+
   if (variant === "full") {
     return (
       <a
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
+        onClick={handleClick}
         className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#25d366] hover:bg-[#1ebe5d] text-white font-semibold text-sm transition-colors duration-200 ${className ?? ""}`}
       >
         <WhatsAppIcon size={20} />
@@ -63,7 +69,7 @@ export default function WhatsAppButton({ slug, productName, variant = "icon", cl
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
+      onClick={handleClick}
       title={t("whatsappMoreDetails")}
       className={`inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#25d366] hover:bg-[#1ebe5d] text-white transition-colors duration-200 shrink-0 ${className ?? ""}`}
     >

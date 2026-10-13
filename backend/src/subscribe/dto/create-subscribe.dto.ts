@@ -6,22 +6,29 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateSubscribeDto {
-  @ApiProperty()
-  @IsNotEmpty()
+  // Names are optional: the storefront footer form asks for an email only.
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  firstName!: string;
+  @MaxLength(100)
+  firstName?: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  lastName!: string;
+  @MaxLength(100)
+  lastName?: string;
 
   @ApiProperty()
   @IsEmail()
   @IsNotEmpty()
+  @MaxLength(254)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   email!: string;
 
   @ApiProperty({ required: false })

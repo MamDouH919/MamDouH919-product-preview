@@ -10,9 +10,18 @@ export class SubscribeService {
     @InjectModel(Subscribe.name) private subscribeModel: Model<Subscribe>,
   ) {}
 
-  async create(dto: CreateSubscribeDto): Promise<Subscribe> {
-    const subscriber = new this.subscribeModel(dto);
-    return subscriber.save();
+  /**
+   * Idempotent: subscribing an address that's already on the list changes
+   * nothing, and the reply is the same either way — so the form can't be used
+   * to find out who is subscribed.
+   */
+  async create(dto: CreateSubscribeDto): Promise<{ message: string }> {
+    // Normalized here: the controller's ValidationPipe doesn't run transforms.
+    const email = dto.email.trim().toLowerCase();
+    await this.subscribeModel
+      .updateOne({ email }, { $setOnInsert: { ...dto, email } }, { upsert: true })
+      .exec();
+    return { message: 'Subscribed' };
   }
 
   async findAll(): Promise<Subscribe[]> {

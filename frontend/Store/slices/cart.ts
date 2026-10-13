@@ -21,6 +21,8 @@ export type CartItem = {
 
 export interface CartState {
   items: CartItem[];
+  /** Applied at checkout; the server decides whether it's still valid. */
+  couponCode?: string;
   /** False until the saved cart has been read, so it isn't overwritten with []. */
   hydrated: boolean;
 }
@@ -34,9 +36,13 @@ export const cartSlice = createSlice({
   name: "cart",
   initialState,
   reducers: {
-    hydrateCart: (state, action: PayloadAction<CartItem[]>) => {
-      state.items = action.payload;
+    hydrateCart: (state, action: PayloadAction<{ items: CartItem[]; couponCode?: string }>) => {
+      state.items = action.payload.items;
+      state.couponCode = action.payload.couponCode;
       state.hydrated = true;
+    },
+    setCouponCode: (state, action: PayloadAction<string | undefined>) => {
+      state.couponCode = action.payload?.trim().toUpperCase() || undefined;
     },
     addToCart: (state, action: PayloadAction<CartItem>) => {
       const existing = state.items.find((i) => sameLine(i, action.payload));
@@ -65,11 +71,12 @@ export const cartSlice = createSlice({
     },
     clearCart: (state) => {
       state.items = [];
+      state.couponCode = undefined;
     },
   },
 });
 
-export const { hydrateCart, addToCart, setCartQuantity, removeFromCart, clearCart } =
+export const { hydrateCart, addToCart, setCartQuantity, removeFromCart, clearCart, setCouponCode } =
   cartSlice.actions;
 
 export const selectCartCount = (state: RootState) =>

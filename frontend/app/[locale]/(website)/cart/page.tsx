@@ -27,6 +27,7 @@ import { getBackendUri } from "@/utils/helperFunctions";
 import { useCurrency } from "@/Hooks/useCurrency";
 import CustomLink from "@/components/CustomLink";
 import { formatMoney, localized } from "@/features/Order/format";
+import CouponField from "@/features/Cart/CouponField";
 
 const lineKey = (l: { productId: string; variantId?: string }) => `${l.productId}:${l.variantId ?? ""}`;
 
@@ -35,7 +36,7 @@ const CartPage = () => {
   const lang = i18n.language;
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { items, hydrated } = useAppSelector((state) => state.cart);
+  const { items, couponCode, hydrated } = useAppSelector((state) => state.cart);
   const isLoggedIn = useAppSelector((state) => state.customer.isLoggedIn);
   const fallbackCurrency = useCurrency();
 
@@ -43,7 +44,7 @@ const CartPage = () => {
     () => items.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })),
     [items]
   );
-  const { data: quote, isLoading, isError } = useQuoteQuery(inputs);
+  const { data: quote, isLoading, isError } = useQuoteQuery(inputs, couponCode);
 
   const quoteByKey = useMemo(
     () => new Map((quote?.items ?? []).map((line) => [lineKey(line), line])),
@@ -123,11 +124,21 @@ const CartPage = () => {
           ) : (
             <Stack spacing={1.25}>
               <SummaryRow label={t("subtotal")} value={formatMoney(quote.subtotal, currency)} />
+              {quote.discount > 0 && (
+                <SummaryRow
+                  label={`${t("discount")} (${quote.coupon?.code})`}
+                  value={`− ${formatMoney(quote.discount, currency)}`}
+                />
+              )}
               <SummaryRow
                 label={t("delivery")}
                 value={quote.shippingFee > 0 ? formatMoney(quote.shippingFee, currency) : t("free")}
               />
               <SummaryRow label={t("total")} value={formatMoney(quote.total, currency)} strong />
+
+              <Box pt={1}>
+                <CouponField quote={quote} currency={currency} />
+              </Box>
 
               {!quote.valid && (
                 <Alert severity="warning" sx={{ mt: 1 }}>

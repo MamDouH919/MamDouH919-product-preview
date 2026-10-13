@@ -4,155 +4,22 @@ import { use, useState } from "react"
 import { useCategoryBySlugQuery } from "@/backend-api/categories/hooks"
 import { useSubCategoriesQuery } from "@/backend-api/sub-categories/hooks"
 import { useProductsQuery } from "@/backend-api/products/hooks"
-import { Product } from "@/backend-api/products/types"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
 import Image from "next/image"
 import CustomLink from "@/components/CustomLink"
+import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard"
 import Box from "@mui/material/Box"
 import Chip from "@mui/material/Chip"
 import Divider from "@mui/material/Divider"
 import Skeleton from "@mui/material/Skeleton"
 import Typography from "@mui/material/Typography"
-import Card from "@mui/material/Card"
-import { useTheme, alpha } from "@mui/material/styles"
-import { useCurrency } from "@/Hooks/useCurrency"
+import { useTheme } from "@mui/material/styles"
 import { ShoppingBag, ArrowLeft, ChevronRight } from "lucide-react"
-import WhatsAppButton from "@/components/WhatsAppButton"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
   return field[lang] || field["ar"] || field["en"] || ""
-}
-
-function ProductCard({ product, lang }: { product: Product; lang: string }) {
-  const theme = useTheme()
-  const name = localized(product.name, lang)
-  const image = product.images?.[0]
-  const currency = useCurrency()
-
-  const variantPrices = (product.variants ?? [])
-    .map((v) => v.price)
-    .filter((p): p is number => p != null)
-  const minPrice = variantPrices.length ? Math.min(...variantPrices) : null
-  const displayPrice = product.variants?.length ? minPrice : product.price
-
-  return (
-    <CustomLink href={`/products/${product.slug}`} style={{ textDecoration: "none", display: "block" }}>
-      <Card
-        elevation={0}
-        sx={{
-          border: "1px solid",
-          borderColor: "grey.100",
-          borderRadius: 1,
-          overflow: "hidden",
-          height: "100%",
-          transition: "all 0.3s",
-          "&:hover": {
-            borderColor: alpha(theme.palette.primary.main, 0.3),
-            boxShadow: 4,
-            transform: "translateY(-3px)",
-          },
-        }}
-      >
-        {/* Image */}
-        <Box sx={{ position: "relative", width: "100%", paddingTop: "100%", bgcolor: "grey.50" }}>
-          {image ? (
-            <Image src={getBackendUri(image)} alt={name} fill style={{ objectFit: "cover" }} />
-          ) : (
-            <Box
-              sx={{
-                position: "absolute", inset: 0, display: "flex",
-                alignItems: "center", justifyContent: "center", bgcolor: "grey.100",
-              }}
-            >
-              <ShoppingBag size={40} color={theme.palette.grey[300]} />
-            </Box>
-          )}
-        </Box>
-
-        <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
-          {/* Name */}
-          <Typography
-            variant="body2"
-            fontWeight={600}
-            sx={{
-              lineHeight: 1.3,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {name}
-          </Typography>
-
-          {/* Variants */}
-          {product.variants?.length > 0 && (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {product.variants.map((v, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    px: 1,
-                    py: 0.25,
-                    borderRadius: 99,
-                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                    color: "primary.main",
-                  }}
-                >
-                  {v.label}
-                  {v.price != null && (
-                    <Box component="span" sx={{ opacity: 0.7 }}>
-                      · {v.price.toLocaleString()} {currency}
-                    </Box>
-                  )}
-                </Box>
-              ))}
-            </Box>
-          )}
-
-          {/* Price + actions */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              pt: 0.5,
-              borderTop: "1px solid",
-              borderColor: "grey.100",
-            }}
-          >
-            {displayPrice != null ? (
-              <Typography variant="subtitle2" fontWeight={700} color="primary">
-                {displayPrice.toLocaleString()} {currency}
-                {product.variants?.length ? "+" : ""}
-              </Typography>
-            ) : (
-              <Box />
-            )}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <WhatsAppButton slug={product.slug} productName={name} />
-              <Box
-                sx={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >
-                <ShoppingBag size={16} color={theme.palette.primary.main} />
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      </Card>
-    </CustomLink>
-  )
 }
 
 function PageSkeleton() {
@@ -380,16 +247,16 @@ export default function CategoryPage({ params }: PageProps) {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                  gridTemplateColumns: {
+                    xs: "repeat(2, 1fr)",
+                    sm: "repeat(2, 1fr)",
+                    md: "repeat(3, 1fr)",
+                  },
                   gap: 2,
                 }}
               >
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <Box key={i}>
-                    <Skeleton variant="rectangular" width="100%" height={180} sx={{ borderRadius: 2, mb: 1 }} />
-                    <Skeleton variant="text" width="70%" />
-                    <Skeleton variant="text" width="40%" />
-                  </Box>
+                  <ProductCardSkeleton key={i} />
                 ))}
               </Box>
             ) : products.length === 0 ? (

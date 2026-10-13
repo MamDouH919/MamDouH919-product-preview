@@ -1,6 +1,7 @@
 import api from "@/lib/api";
 import customerApi from "@/lib/customerApi";
 import { Address, Customer, CustomerFilters, CustomersResponse } from "./types";
+import { Product } from "../products/types";
 
 // ── Customer self-service ─────────────────────────────────────────────────────
 
@@ -23,6 +24,11 @@ export const fetchCustomerProfileSilent = async (): Promise<Customer> => {
 
 export const fetchCustomerAddresses = async (): Promise<Address[]> => {
   const response = await customerApi.get("/customers/me/addresses");
+  return response.data;
+};
+
+export const fetchWishlist = async (): Promise<Product[]> => {
+  const response = await customerApi.get("/customers/me/wishlist");
   return response.data;
 };
 

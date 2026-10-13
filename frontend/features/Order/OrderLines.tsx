@@ -22,12 +22,16 @@ export type OrderLine = {
 const OrderLines = ({
   lines,
   subtotal,
+  discount = 0,
+  couponCode,
   shippingFee,
   total,
   currency,
 }: {
   lines: OrderLine[];
   subtotal: number;
+  discount?: number;
+  couponCode?: string;
   shippingFee: number;
   total: number;
   currency: string;
@@ -78,6 +82,13 @@ const OrderLines = ({
 
       <Stack spacing={1}>
         <Row label={t("subtotal")} value={formatMoney(subtotal, currency)} />
+        {discount > 0 && (
+          <Row
+            label={couponCode ? `${t("discount")} (${couponCode})` : t("discount")}
+            value={`− ${formatMoney(discount, currency)}`}
+            accent
+          />
+        )}
         <Row
           label={t("delivery")}
           value={shippingFee > 0 ? formatMoney(shippingFee, currency) : t("free")}
@@ -88,12 +99,27 @@ const OrderLines = ({
   );
 };
 
-const Row = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
+const Row = ({
+  label,
+  value,
+  strong,
+  accent,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  accent?: boolean;
+}) => (
   <Stack direction="row" justifyContent="space-between">
     <Typography variant={strong ? "subtitle1" : "body2"} fontWeight={strong ? 700 : 400} color={strong ? "text.primary" : "text.secondary"}>
       {label}
     </Typography>
-    <Typography variant={strong ? "subtitle1" : "body2"} fontWeight={strong ? 700 : 500}>
+    <Typography
+      variant={strong ? "subtitle1" : "body2"}
+      fontWeight={strong ? 700 : 500}
+      color={accent ? "success.main" : undefined}
+      whiteSpace="nowrap"
+    >
       {value}
     </Typography>
   </Stack>

@@ -1,4 +1,7 @@
 import { LocalizedField } from "../globalTypes";
+import { CouponErrorCode, CouponType } from "../coupons/types";
+
+export type AppliedCoupon = { code: string; type: CouponType; value: number };
 
 export type OrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
 
@@ -47,6 +50,10 @@ export type QuoteLine = {
 export type Quote = {
   items: QuoteLine[];
   subtotal: number;
+  discount: number;
+  coupon?: AppliedCoupon;
+  /** Why the requested coupon doesn't apply; the rest of the quote still stands. */
+  couponError?: { code: CouponErrorCode; minSubtotal?: number };
   shippingFee: number;
   total: number;
   currency?: LocalizedField;
@@ -90,6 +97,8 @@ export type Order = {
   items: OrderItem[];
   shippingAddress: ShippingAddress;
   subtotal: number;
+  discount?: number;
+  coupon?: AppliedCoupon;
   shippingFee: number;
   total: number;
   currency?: LocalizedField;
@@ -121,4 +130,7 @@ export type CreateOrderPayload = {
   addressId: string;
   paymentMethod?: PaymentMethod;
   notes?: string;
+  couponCode?: string;
+  /** Language the order emails are written in. */
+  locale?: string;
 };

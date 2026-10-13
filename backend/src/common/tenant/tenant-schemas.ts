@@ -15,6 +15,7 @@ import { StockMovement, StockMovementSchema } from '../../inventory/schemas/stoc
 import { Customer, CustomerSchema } from '../../customers/schemas/customer.schema';
 import { Order, OrderSchema } from '../../orders/schemas/order.schema';
 import { Counter, CounterSchema } from '../../orders/schemas/counter.schema';
+import { Coupon, CouponSchema } from '../../coupons/schemas/coupon.schema';
 import {
   CustomerRefreshToken,
   CustomerRefreshTokenSchema,
@@ -46,4 +47,5 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: CustomerResetToken.name, schema: CustomerResetTokenSchema },
   { name: Order.name, schema: OrderSchema },
   { name: Counter.name, schema: CounterSchema },
+  { name: Coupon.name, schema: CouponSchema },
 ];

@@ -1,92 +1,22 @@
 "use client"
 
-import { useState } from "react"
-import { useProductsQuery } from "@/backend-api/products/hooks"
+import { Suspense, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useProductSearchQuery } from "@/backend-api/products/hooks"
+import { ProductSort } from "@/backend-api/products/types"
 import { useCategoriesQuery } from "@/backend-api/categories/hooks"
 import { useSubCategoriesQuery } from "@/backend-api/sub-categories/hooks"
-import { Product } from "@/backend-api/products/types"
 import { Category } from "@/backend-api/categories/types"
 import { SubCategory } from "@/backend-api/sub-categories/types"
-import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
-import { ShoppingBag, SlidersHorizontal, X, ChevronRight } from "lucide-react"
+import { ShoppingBag, SlidersHorizontal, X, ChevronRight, Search } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
-import Image from "next/image"
+import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard"
 import { useTheme, alpha } from "@mui/material/styles"
-import { useCurrency } from "@/Hooks/useCurrency"
-import WhatsAppButton from "@/components/WhatsAppButton"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
   return field[lang] || field["ar"] || field["en"] || ""
-}
-
-function ProductCard({ product, lang }: { product: Product; lang: string }) {
-  const name = localized(product.name, lang)
-  const categoryName = localized(product.category?.name, lang)
-  const image = product.images?.[0]
-  const currency = useCurrency()
-
-  return (
-    <CustomLink
-      href={`/products/${product.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-(--primary-25) shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-    >
-      <div className="relative overflow-hidden bg-gray-50 aspect-square">
-        {image ? (
-          <Image
-            src={getBackendUri(image)}
-            alt={name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-100">
-            <ShoppingBag className="w-10 h-10 text-gray-300" />
-          </div>
-        )}
-        {categoryName && (
-          <span className="absolute top-2.5 inset-s-2.5 text-[10px] font-semibold uppercase tracking-wide bg-white/90 backdrop-blur-sm text-(--primary) px-2 py-0.5 rounded-full shadow-sm">
-            {categoryName}
-          </span>
-        )}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-black/20 to-transparent pointer-events-none" />
-      </div>
-
-      <div className="flex flex-col flex-1 p-3 gap-2">
-        <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug flex-1">{name}</p>
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-          {product.price != null ? (
-            <span className="text-base font-bold text-(--primary)">{product.price.toLocaleString()} {currency}</span>
-          ) : (
-            <span />
-          )}
-          <div className="flex items-center gap-1.5">
-            <WhatsAppButton slug={product.slug} productName={name} />
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-(--primary-8) group-hover:bg-(--primary) transition-colors duration-300">
-              <ShoppingBag className="w-4 h-4 text-(--primary) group-hover:text-white transition-colors duration-300" />
-            </span>
-          </div>
-        </div>
-      </div>
-    </CustomLink>
-  )
-}
-
-function SkeletonCard() {
-  return (
-    <div className="flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
-      <div className="aspect-square bg-gray-200" />
-      <div className="flex flex-col gap-3 p-3">
-        <div className="h-4 w-4/5 bg-gray-200 rounded-lg" />
-        <div className="h-3 w-3/5 bg-gray-200 rounded-lg" />
-        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-          <div className="h-5 w-1/4 bg-gray-200 rounded-lg" />
-          <div className="w-8 h-8 rounded-full bg-gray-200" />
-        </div>
-      </div>
-    </div>
-  )
 }
 
 interface SidebarProps {
@@ -99,7 +29,75 @@ interface SidebarProps {
   onCategorySelect: (id: string | undefined) => void
   onSubCategorySelect: (id: string | undefined) => void
   onClearFilters: () => void
+  hasFilters: boolean
+  minPrice: string
+  maxPrice: string
+  onPriceChange: (min: string, max: string) => void
+  inStock: boolean
+  onInStockChange: (value: boolean) => void
   t: (key: string) => string
+}
+
+/** Typed values stay local until applied, so each keystroke isn't a new search. */
+function PriceFilter({
+  minPrice,
+  maxPrice,
+  onApply,
+  t,
+}: {
+  minPrice: string
+  maxPrice: string
+  onApply: (min: string, max: string) => void
+  t: (key: string) => string
+}) {
+  const [min, setMin] = useState(minPrice)
+  const [max, setMax] = useState(maxPrice)
+  const [synced, setSynced] = useState({ minPrice, maxPrice })
+
+  // Follow the URL when it changes from outside (e.g. "clear filters").
+  if (synced.minPrice !== minPrice || synced.maxPrice !== maxPrice) {
+    setSynced({ minPrice, maxPrice })
+    setMin(minPrice)
+    setMax(maxPrice)
+  }
+
+  const apply = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    onApply(min, max)
+  }
+
+  const input =
+    "w-full min-w-0 rounded-lg border border-gray-200 px-2.5 py-2 text-sm outline-none focus:border-(--primary)"
+
+  return (
+    <form onSubmit={apply} className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={min}
+          onChange={(e) => setMin(e.target.value)}
+          onBlur={() => apply()}
+          placeholder={t("min")}
+          aria-label={t("minPrice")}
+          className={input}
+        />
+        <span className="text-gray-400">–</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={max}
+          onChange={(e) => setMax(e.target.value)}
+          onBlur={() => apply()}
+          placeholder={t("max")}
+          aria-label={t("maxPrice")}
+          className={input}
+        />
+      </div>
+    </form>
+  )
 }
 
 function SidebarContent({
@@ -112,6 +110,12 @@ function SidebarContent({
   onCategorySelect,
   onSubCategorySelect,
   onClearFilters,
+  hasFilters,
+  minPrice,
+  maxPrice,
+  onPriceChange,
+  inStock,
+  onInStockChange,
   t,
 }: SidebarProps) {
   return (
@@ -179,7 +183,24 @@ function SidebarContent({
             </div>
           ))}
 
-      {(selectedCategoryId || selectedSubCategoryId) && (
+      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mt-6 mb-3 px-2">
+        {t("price")}
+      </p>
+      <div className="px-1">
+        <PriceFilter minPrice={minPrice} maxPrice={maxPrice} onApply={onPriceChange} t={t} />
+      </div>
+
+      <label className="mt-5 flex items-center gap-2.5 px-2 text-sm text-gray-700 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={inStock}
+          onChange={(e) => onInStockChange(e.target.checked)}
+          className="h-4 w-4 accent-(--primary)"
+        />
+        {t("inStockOnly")}
+      </label>
+
+      {hasFilters && (
         <button
           onClick={onClearFilters}
           className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors text-start w-full"
@@ -192,33 +213,88 @@ function SidebarContent({
   )
 }
 
-export default function ProductsPage() {
+const SORTS: ProductSort[] = ["featured", "newest", "price_asc", "price_desc"]
+
+function ProductsPageContent() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
   const theme = useTheme()
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>()
-  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string | undefined>()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+
+  // The URL is the source of truth, so a filtered view can be shared or bookmarked.
+  const q = searchParams.get("q") ?? ""
+  const selectedCategoryId = searchParams.get("category") ?? undefined
+  const selectedSubCategoryId = searchParams.get("sub") ?? undefined
+  const minPrice = searchParams.get("min") ?? ""
+  const maxPrice = searchParams.get("max") ?? ""
+  const inStock = searchParams.get("stock") === "1"
+  const sortParam = searchParams.get("sort") as ProductSort | null
+  const sort: ProductSort = sortParam && SORTS.includes(sortParam) ? sortParam : "featured"
+
+  const setParams = (changes: Record<string, string | undefined>) => {
+    const next = new URLSearchParams(searchParams.toString())
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
+    const query = next.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
+
+  // The box updates instantly; the URL (and the search) follows after a pause.
+  const [searchInput, setSearchInput] = useState(q)
+  const [syncedQ, setSyncedQ] = useState(q)
+  if (syncedQ !== q) {
+    setSyncedQ(q)
+    setSearchInput(q)
+  }
+  useEffect(() => {
+    if (searchInput.trim() === q) return
+    const timer = setTimeout(() => setParams({ q: searchInput.trim() || undefined }), 350)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput])
+
+  const num = (v: string) => (v !== "" && !Number.isNaN(Number(v)) ? Number(v) : undefined)
+  const searchQuery = useMemo(
+    () => ({
+      q: q || undefined,
+      categoryId: selectedCategoryId,
+      subCategoryId: selectedSubCategoryId,
+      minPrice: num(minPrice),
+      maxPrice: num(maxPrice),
+      inStock: inStock || undefined,
+      sort,
+      limit: 24,
+    }),
+    [q, selectedCategoryId, selectedSubCategoryId, minPrice, maxPrice, inStock, sort]
+  )
 
   const { data: categories, isLoading: catsLoading } = useCategoriesQuery()
   const { data: subCategories } = useSubCategoriesQuery(selectedCategoryId)
-  const { data: rawProducts, isLoading: productsLoading } = useProductsQuery({
-    categoryId: selectedCategoryId,
-    subCategoryId: selectedSubCategoryId,
-  })
+  const {
+    data,
+    isLoading: productsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useProductSearchQuery(searchQuery)
 
-  const products = (rawProducts ?? []).filter((p) => p.isActive).sort((a, b) => a.order - b.order)
+  const products = data?.pages.flatMap((p) => p.data) ?? []
+  const total = data?.pages[0]?.total ?? 0
   const activeCategories = (categories ?? []).filter((c) => c.isActive).sort((a, b) => a.order - b.order)
   const activeSubCategories = subCategories ?? []
 
-  const handleCategorySelect = (id: string | undefined) => {
-    setSelectedCategoryId(id)
-    setSelectedSubCategoryId(undefined)
-  }
+  const hasFilters = !!(selectedCategoryId || selectedSubCategoryId || minPrice || maxPrice || inStock || q)
+
+  const handleCategorySelect = (id: string | undefined) => setParams({ category: id, sub: undefined })
 
   const handleClearFilters = () => {
-    setSelectedCategoryId(undefined)
-    setSelectedSubCategoryId(undefined)
+    setSearchInput("")
+    router.replace(sort !== "featured" ? `${pathname}?sort=${sort}` : pathname, { scroll: false })
   }
 
   const sidebarProps: SidebarProps = {
@@ -229,18 +305,25 @@ export default function ProductsPage() {
     selectedCategoryId,
     selectedSubCategoryId,
     onCategorySelect: handleCategorySelect,
-    onSubCategorySelect: setSelectedSubCategoryId,
+    onSubCategorySelect: (id) => setParams({ sub: id }),
     onClearFilters: handleClearFilters,
+    hasFilters,
+    minPrice,
+    maxPrice,
+    onPriceChange: (min, max) => {
+      if (min === minPrice && max === maxPrice) return
+      setParams({ min: min || undefined, max: max || undefined })
+    },
+    inStock,
+    onInStockChange: (value) => setParams({ stock: value ? "1" : undefined }),
     t,
   }
 
   const cssVars = {
     "--primary": theme.palette.primary.main,
     "--primary-dark": theme.palette.primary.dark,
-    "--primary-8": alpha(theme.palette.primary.main, 0.08),
     "--primary-10": alpha(theme.palette.primary.main, 0.1),
     "--primary-20": alpha(theme.palette.primary.main, 0.2),
-    "--primary-25": alpha(theme.palette.primary.main, 0.25),
     "--primary-30": alpha(theme.palette.primary.main, 0.3),
   } as React.CSSProperties
 
@@ -272,11 +355,39 @@ export default function ProductsPage() {
 
           {/* Main content */}
           <div className="flex-1 min-w-0">
+            {/* Search + sort */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <label className="relative flex-1">
+                <Search className="absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder={t("searchProductsPlaceholder")}
+                  aria-label={t("search")}
+                  maxLength={100}
+                  className="w-full rounded-xl border border-gray-200 bg-white ps-10 pe-3 py-2.5 text-sm shadow-sm outline-none focus:border-(--primary)"
+                />
+              </label>
+              <select
+                value={sort}
+                onChange={(e) => setParams({ sort: e.target.value === "featured" ? undefined : e.target.value })}
+                aria-label={t("sortBy")}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-(--primary)"
+              >
+                {SORTS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`sort.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Top bar */}
             <div className="flex items-center justify-between mb-6">
               {!productsLoading ? (
                 <p className="text-sm text-gray-500">
-                  {products.length} {t("products")}
+                  {t("productsCount", { count: total })}
                 </p>
               ) : (
                 <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
@@ -289,9 +400,7 @@ export default function ProductsPage() {
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 {t("filters")}
-                {(selectedCategoryId || selectedSubCategoryId) && (
-                  <span className="w-2 h-2 rounded-full bg-(--primary)" />
-                )}
+                {hasFilters && <span className="w-2 h-2 rounded-full bg-(--primary)" />}
               </button>
             </div>
 
@@ -303,7 +412,7 @@ export default function ProductsPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-semibold text-gray-600">{t("noProductsFound")}</p>
-                  {(selectedCategoryId || selectedSubCategoryId) && (
+                  {hasFilters && (
                     <button
                       onClick={handleClearFilters}
                       className="mt-2 text-sm text-(--primary) underline underline-offset-4"
@@ -319,10 +428,22 @@ export default function ProductsPage() {
             {(productsLoading || products.length > 0) && (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {productsLoading
-                  ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
+                  ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)
                   : products.map((product) => (
                       <ProductCard key={product._id} product={product} lang={lang} />
                     ))}
+              </div>
+            )}
+
+            {hasNextPage && (
+              <div className="flex justify-center mt-8">
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="px-6 py-3 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:border-(--primary) hover:text-(--primary) transition-colors disabled:opacity-60"
+                >
+                  {isFetchingNextPage ? t("loading") : t("loadMore")}
+                </button>
               </div>
             )}
           </div>
@@ -361,5 +482,13 @@ export default function ProductsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense>
+      <ProductsPageContent />
+    </Suspense>
   )
 }

@@ -19,6 +19,8 @@ export type Customer = {
   isVerified: boolean;
   isActive: boolean;
   addresses: Address[];
+  /** Saved product ids. */
+  wishlist?: string[];
   createdAt: string;
 };
 

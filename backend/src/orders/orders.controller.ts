@@ -35,7 +35,7 @@ export class OrderQuoteController {
 
   @Post()
   quote(@Body() dto: QuoteOrderDto) {
-    return this.ordersService.quote(dto.items);
+    return this.ordersService.quote(dto.items, dto.couponCode);
   }
 }
 
@@ -50,7 +50,7 @@ export class CustomerOrdersController {
 
   @Post()
   create(@Body() dto: CreateOrderDto, @Req() req: CustomerRequest) {
-    return this.ordersService.create(req.customerId!, dto);
+    return this.ordersService.create(req.customerId!, dto, req.hostname);
   }
 
   @Get()
@@ -69,7 +69,7 @@ export class CustomerOrdersController {
     @Body() dto: CancelOrderDto,
     @Req() req: CustomerRequest,
   ) {
-    return this.ordersService.cancelByCustomer(req.customerId!, id, dto.reason);
+    return this.ordersService.cancelByCustomer(req.customerId!, id, dto.reason, req.hostname);
   }
 }
 
@@ -98,6 +98,6 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
     @Req() req: Request & { userId?: string },
   ) {
-    return this.ordersService.updateStatus(id, dto.status, dto.note, req.userId);
+    return this.ordersService.updateStatus(id, dto.status, dto.note, req.userId, req.hostname);
   }
 }

@@ -22,7 +22,7 @@ export default function getTheme({
   return createTheme({
     direction: dir,
     shape: {
-      borderRadius: 15,
+      borderRadius: 7,
     },
     components: {
       MuiInputBase: {

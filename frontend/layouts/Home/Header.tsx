@@ -21,6 +21,7 @@ import { getBackendUri } from "@/utils/helperFunctions";
 import LanguageIcon from "@/components/LanguageIcon";
 import AccountMenu from "@/components/AccountMenu";
 import CartButton from "@/components/CartButton";
+import SearchButton from "@/components/SearchButton";
 
 // ── Styled ───────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ const Navbar = () => {
             <Stack direction="row" alignItems="center" spacing={1}>
               <Box sx={{ color: isTransparent ? "#fff" : "inherit" }}>
               </Box>
+              <SearchButton />
               <LanguageIcon />
               <CartButton />
               <AccountMenu />

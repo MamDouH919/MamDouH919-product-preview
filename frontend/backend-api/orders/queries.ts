@@ -3,8 +3,14 @@ import customerApi from "@/lib/customerApi";
 import { Order, OrderFilters, OrderItemInput, OrdersResponse, Quote } from "./types";
 
 /** Prices a basket against the live catalogue. Public — works for guests. */
-export const fetchQuote = async (items: OrderItemInput[]): Promise<Quote> => {
-  const response = await customerApi.post("/orders/quote", { items });
+export const fetchQuote = async (
+  items: OrderItemInput[],
+  couponCode?: string
+): Promise<Quote> => {
+  const response = await customerApi.post("/orders/quote", {
+    items,
+    couponCode: couponCode || undefined,
+  });
   return response.data;
 };
 

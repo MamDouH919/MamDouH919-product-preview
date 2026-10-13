@@ -18,6 +18,7 @@ import {
 import PersonOutline from "@mui/icons-material/PersonOutline";
 import LocationOnOutlined from "@mui/icons-material/LocationOnOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
+import FavoriteBorder from "@mui/icons-material/FavoriteBorder";
 import LoginOutlined from "@mui/icons-material/LoginOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
@@ -102,6 +103,13 @@ const AccountMenu = () => {
             <ReceiptLongOutlined fontSize="small" />
           </ListItemIcon>
           {t("myOrders")}
+        </MenuItem>
+
+        <MenuItem onClick={() => go("/account/wishlist")}>
+          <ListItemIcon>
+            <FavoriteBorder fontSize="small" />
+          </ListItemIcon>
+          {t("wishlist")}
         </MenuItem>
 
         <MenuItem onClick={() => go("/account/addresses")}>

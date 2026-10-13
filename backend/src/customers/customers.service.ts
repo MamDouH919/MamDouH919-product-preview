@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
 import { Address, Customer } from './schemas/customer.schema';
+import { Product } from '../products/schemas/product.schema';
 import {
   AddressDto,
   QueryCustomersDto,
@@ -9,10 +10,13 @@ import {
   UpdateProfileDto,
 } from './dto/customer.dto';
 
+const WISHLIST_LIMIT = 200;
+
 @Injectable()
 export class CustomersService {
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<Customer>,
+    @InjectModel(Product.name) private productModel: Model<Product>,
   ) {}
 
   // ── Self-service ────────────────────────────────────────────────────────────
@@ -112,6 +116,69 @@ export class CustomersService {
 
     await customer.save();
     return customer.addresses;
+  }
+
+  // ── Wishlist ────────────────────────────────────────────────────────────────
+
+  /**
+   * Saved products that can still be shown. Hidden or deleted products drop
+   * out of the list rather than appearing as broken cards; their ids stay, so
+   * a product that comes back reappears.
+   */
+  async getWishlist(customerId: string): Promise<Product[]> {
+    const customer = await this.customerModel.findById(customerId).select('wishlist').exec();
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const saved = customer.wishlist ?? [];
+    const products = await this.productModel
+      .find({ _id: { $in: saved }, isActive: true })
+      .select('-description')
+      .populate('category', 'name slug')
+      .exec();
+
+    // Newest saves first.
+    const position = new Map(saved.map((id, i) => [id.toString(), i]));
+    return products.sort(
+      (a, b) => position.get(b._id!.toString())! - position.get(a._id!.toString())!,
+    );
+  }
+
+  async addToWishlist(customerId: string, productId: string): Promise<string[]> {
+    if (!Types.ObjectId.isValid(productId)) throw new NotFoundException('Product not found');
+    const exists = await this.productModel.exists({ _id: productId, isActive: true });
+    if (!exists) throw new NotFoundException('Product not found');
+
+    // Conditional on size so a script can't grow the document without bound.
+    const customer = await this.customerModel
+      .findOneAndUpdate(
+        {
+          _id: customerId,
+          // `$ifNull`: customers created before wishlists have no field yet.
+          $expr: { $lt: [{ $size: { $ifNull: ['$wishlist', []] } }, WISHLIST_LIMIT] },
+        },
+        { $addToSet: { wishlist: new Types.ObjectId(productId) } },
+        { returnDocument: 'after' },
+      )
+      .select('wishlist')
+      .exec();
+    if (!customer) {
+      throw new BadRequestException(`Your wishlist is full (${WISHLIST_LIMIT} items).`);
+    }
+    return customer.wishlist.map(String);
+  }
+
+  async removeFromWishlist(customerId: string, productId: string): Promise<string[]> {
+    if (!Types.ObjectId.isValid(productId)) throw new NotFoundException('Product not found');
+    const customer = await this.customerModel
+      .findByIdAndUpdate(
+        customerId,
+        { $pull: { wishlist: new Types.ObjectId(productId) } },
+        { returnDocument: 'after' },
+      )
+      .select('wishlist')
+      .exec();
+    if (!customer) throw new NotFoundException('Customer not found');
+    return customer.wishlist.map(String);
   }
 
   // ── Admin ───────────────────────────────────────────────────────────────────
