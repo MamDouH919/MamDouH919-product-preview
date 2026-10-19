@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 import { SUPPORTED_COUNTRIES } from '../../price-list/data';
 
@@ -68,4 +68,12 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsIn(SUPPORTED_COUNTRIES)
   country?: string;
+
+  // Arrives as a form-data string; validated as a number, stored by Mongoose's cast.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  returnWindowDays?: number;
 }

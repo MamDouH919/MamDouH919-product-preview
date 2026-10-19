@@ -21,6 +21,8 @@ export type Setting = {
   currency?: LocalizedField;
   /** ISO country code the store delivers in; set by a super admin. */
   country?: string;
+  /** Days after delivery a customer may request a return; 0 turns customer requests off. */
+  returnWindowDays?: number;
 };
 
 export type MailEncryption = "ssl" | "starttls" | "none";
@@ -32,6 +34,7 @@ export type MailNotifications = {
   storeOrderCancelled: boolean;
   contactForm: boolean;
   customerAbandonedCart: boolean;
+  storeReturnRequest: boolean;
 };
 
 /** The store's outgoing mail server. The password is never sent back. */

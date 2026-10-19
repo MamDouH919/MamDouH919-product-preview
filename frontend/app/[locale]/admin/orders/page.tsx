@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
+import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
+import { exportOrdersCsv } from "@/backend-api/orders/queries";
+import { datedFilename, downloadFile } from "@/utils/downloadFile";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,6 +45,14 @@ const OrdersPage = () => {
   }, [search]);
 
   const { data, isLoading } = useOrdersQuery(filters);
+
+  // Everything matching the current filters, not just this page.
+  const exportMutation = useMutation({
+    mutationFn: () =>
+      exportOrdersCsv({ status: filters.status, search: filters.search, from: filters.from, to: filters.to }, lang),
+    onSuccess: (blob) => downloadFile(blob, datedFilename("orders")),
+    onError: () => toast.error(t("somethingWentWrong")),
+  });
 
   useEffect(() => {
     dispatch(
@@ -162,6 +175,15 @@ const OrdersPage = () => {
             </MenuItem>
           ))}
         </TextField>
+        <Box flex={1} />
+        <Button
+          startIcon={<FileDownloadOutlined />}
+          disabled={exportMutation.isPending || !data?.total}
+          onClick={() => exportMutation.mutate()}
+          sx={{ alignSelf: "center" }}
+        >
+          {t("exportCsv")}
+        </Button>
       </Stack>
 
       <Box flex={1} minHeight={0}>

@@ -171,6 +171,10 @@ export class Order extends Document {
   @Prop({ required: true })
   total!: number;
 
+  /** Money given back through refunded returns. Never more than `total`. */
+  @Prop({ default: 0 })
+  refundedTotal!: number;
+
   /** The store's currency when the order was placed. */
   @Prop({ type: LocalizedFieldSchema, required: false })
   currency?: LocalizedField;

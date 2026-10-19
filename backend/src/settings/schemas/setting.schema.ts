@@ -54,6 +54,10 @@ export class Setting extends Document {
    */
   @Prop({ required: false })
   country?: string;
+
+  /** Days after delivery a customer may ask for a return from their account. 0 turns that off. */
+  @Prop({ default: 14, min: 0, max: 365 })
+  returnWindowDays!: number;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

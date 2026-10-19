@@ -29,6 +29,7 @@ import OrderLines from "@/features/Order/OrderLines";
 import ShippingAddressBlock from "@/features/Order/ShippingAddressBlock";
 import StatusTimeline from "@/features/Order/StatusTimeline";
 import { formatDateTime, localized } from "@/features/Order/format";
+import MyOrderReturns from "@/features/Return/MyOrderReturns";
 
 const OrderDetail = ({ id }: { id: string }) => {
   const { t, i18n } = useTranslation();
@@ -153,6 +154,8 @@ const OrderDetail = ({ id }: { id: string }) => {
           <StatusTimeline history={order.statusHistory ?? []} />
         </Paper>
       </Stack>
+
+      {order.status === "delivered" && <MyOrderReturns orderId={order._id} currency={currency} />}
 
       {order.status === "pending" && (
         <Stack direction="row" justifyContent="flex-end">

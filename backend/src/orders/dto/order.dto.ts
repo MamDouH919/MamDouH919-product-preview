@@ -207,6 +207,33 @@ export class CancelOrderDto {
   reason?: string;
 }
 
+export class ExportOrdersDto {
+  @ApiProperty({ required: false, enum: OrderStatus })
+  @IsOptional()
+  @IsEnum(OrderStatus)
+  status?: OrderStatus;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ required: false, description: 'ISO date, inclusive' })
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @ApiProperty({ required: false, description: 'ISO date, inclusive' })
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for product and area names' })
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  lang?: 'en' | 'ar';
+}
+
 export class QueryOrdersDto {
   @ApiProperty({ required: false, enum: OrderStatus })
   @IsOptional()

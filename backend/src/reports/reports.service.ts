@@ -64,8 +64,11 @@ function startOfDay(date: Date, tz: string): Date {
 const notCancelled = { $ne: ['$status', OrderStatus.CANCELLED] };
 
 /** `$group` fields shared by every totals bucket. Cancelled orders count separately, never as sales. */
+/** What the store kept: the order total less anything refunded through returns. */
+const netTotal = { $subtract: ['$total', { $ifNull: ['$refundedTotal', 0] }] };
+
 const totalsGroup = {
-  revenue: { $sum: { $cond: [notCancelled, '$total', 0] } },
+  revenue: { $sum: { $cond: [notCancelled, netTotal, 0] } },
   orders: { $sum: { $cond: [notCancelled, 1, 0] } },
   cancelled: { $sum: { $cond: [notCancelled, 0, 1] } },
 };
@@ -126,7 +129,7 @@ export class ReportsService {
             {
               $group: {
                 _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: tz } },
-                revenue: { $sum: '$total' },
+                revenue: { $sum: netTotal },
                 orders: { $sum: 1 },
               },
             },

@@ -39,6 +39,7 @@ export const useLinksList = () => {
             icon: ShoppingCart,
             children: [
                 { primary: t("orders"), pathname: "/admin/orders" },
+                { primary: t("returns"), pathname: "/admin/returns" },
                 { primary: t("coupons"), pathname: "/admin/coupons" },
                 { primary: t("priceList"), pathname: "/admin/price-list" },
                 { primary: t("customers"), pathname: "/admin/customers" },
@@ -78,6 +79,7 @@ export const useLinksList = () => {
             children: [
                 { primary: t("generalSettings"), pathname: "/admin/settings", exact: true },
                 { primary: t("mailSettings"), pathname: "/admin/settings/mail" },
+                { primary: t("activityLog"), pathname: "/admin/activity" },
             ],
         },
         ...(isSuper ? [{

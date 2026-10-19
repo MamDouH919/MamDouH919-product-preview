@@ -26,6 +26,8 @@ import { ReportsModule } from './reports/reports.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SitemapModule } from './sitemap/sitemap.module';
 import { CartModule } from './cart/cart.module';
+import { ReturnsModule } from './returns/returns.module';
+import { ActivityLogModule } from './activity-log/activity-log.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -83,6 +85,8 @@ import { TenantModule } from './common/tenant/tenant.module';
     ReviewsModule,
     SitemapModule,
     CartModule,
+    ReturnsModule,
+    ActivityLogModule,
     TenantModule,
   ],
   controllers: [],

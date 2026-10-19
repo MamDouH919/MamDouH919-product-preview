@@ -29,7 +29,15 @@ import OrderStatusChip from "@/features/Order/OrderStatusChip";
 import OrderLines from "@/features/Order/OrderLines";
 import ShippingAddressBlock from "@/features/Order/ShippingAddressBlock";
 import StatusTimeline from "@/features/Order/StatusTimeline";
-import { formatDateTime, localized } from "@/features/Order/format";
+import { formatDateTime, formatMoney, localized } from "@/features/Order/format";
+import PrintOutlined from "@mui/icons-material/PrintOutlined";
+import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
+import CustomLink from "@/components/CustomLink";
+import { RETURNS_QUERY_KEY, useOrderReturnsQuery } from "@/backend-api/returns/hooks";
+import { createStoreReturn } from "@/backend-api/returns/mutations";
+import ReturnStatusChip from "@/features/Return/ReturnStatusChip";
+import ReturnRequestDialog from "@/features/Return/ReturnRequestDialog";
+import { returnableLines } from "@/features/Return/returnableLines";
 
 const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = use(params);
@@ -43,6 +51,8 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const [note, setNote] = useState("");
 
   const { data: order, isLoading } = useOrderByIdQuery(id);
+  const { data: returns } = useOrderReturnsQuery(id);
+  const [returnDialog, setReturnDialog] = useState(0);
 
   useEffect(() => {
     dispatch(
@@ -77,6 +87,16 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
     },
   });
 
+  const returnMutation = useMutation({
+    mutationFn: createStoreReturn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RETURNS_QUERY_KEY] });
+      setReturnDialog(0);
+      toast.success(t("returnCreated"));
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
+  });
+
   if (isLoading) {
     return (
       <Stack alignItems="center" justifyContent="center" height="60vh">
@@ -92,6 +112,10 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const currency = localized(order.currency, lang) || fallbackCurrency;
   const customer = typeof order.customer === "object" ? order.customer : undefined;
   const next = NEXT_STATUSES[order.status];
+  const lines = returnableLines(order, returns ?? []);
+  const canReturn = order.status === "delivered" && lines.some((l) => l.returnable > 0);
+  // Opened in a new tab: the print page has no dashboard chrome, so only the document prints.
+  const printLink = (doc: string) => `/${lang}/admin-print/orders/${order._id}?doc=${doc}`;
 
   return (
     <Box py={3}>
@@ -107,7 +131,15 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
                   {formatDateTime(order.createdAt, lang)}
                 </Typography>
               </Stack>
-              <OrderStatusChip status={order.status} size="medium" />
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button size="small" startIcon={<PrintOutlined />} href={printLink("invoice")} target="_blank">
+                  {t("invoice")}
+                </Button>
+                <Button size="small" startIcon={<LocalShippingOutlined />} href={printLink("packing-slip")} target="_blank">
+                  {t("packingSlip")}
+                </Button>
+                <OrderStatusChip status={order.status} size="medium" />
+              </Stack>
             </Stack>
 
             <OrderLines
@@ -119,6 +151,16 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
               total={order.total}
               currency={currency}
             />
+            {!!order.refundedTotal && (
+              <Stack direction="row" justifyContent="space-between" mt={1}>
+                <Typography variant="body2" color="error.main">
+                  {t("refunded")}
+                </Typography>
+                <Typography variant="body2" color="error.main" fontWeight={600}>
+                  − {formatMoney(order.refundedTotal, currency)}
+                </Typography>
+              </Stack>
+            )}
           </Paper>
 
           {next.length > 0 && (
@@ -187,6 +229,39 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
+          {(order.status === "delivered" || !!returns?.length) && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={returns?.length ? 1.5 : 0}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {t("returns")}
+                </Typography>
+                {canReturn && (
+                  <Button size="small" onClick={() => setReturnDialog((n) => n + 1)}>
+                    {t("createReturn")}
+                  </Button>
+                )}
+              </Stack>
+              <Stack spacing={1.25}>
+                {(returns ?? []).map((r) => (
+                  <CustomLink key={r._id} href={`/admin/returns/${r._id}`}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>
+                          {t("returnNumber", { number: r.returnNumber })}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDateTime(r.createdAt, lang)}
+                          {r.refundAmount != null ? ` · ${formatMoney(r.refundAmount, currency)}` : ""}
+                        </Typography>
+                      </Box>
+                      <ReturnStatusChip status={r.status} />
+                    </Stack>
+                  </CustomLink>
+                ))}
+              </Stack>
+            </Paper>
+          )}
+
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="subtitle2" fontWeight={700} mb={2}>
               {t("history")}
@@ -195,6 +270,18 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
           </Paper>
         </Stack>
       </Stack>
+
+      <ReturnRequestDialog
+        key={returnDialog}
+        open={returnDialog > 0}
+        orderId={order._id}
+        lines={lines}
+        pending={returnMutation.isPending}
+        title={t("createReturn")}
+        hint={t("storeReturnHint")}
+        onClose={() => setReturnDialog(0)}
+        onSubmit={(payload) => returnMutation.mutate(payload)}
+      />
 
       <Dialog open={!!target} onClose={() => setTarget(null)} fullWidth maxWidth="xs">
         <DialogTitle>{target && t(`orderAction.${target}`)}</DialogTitle>

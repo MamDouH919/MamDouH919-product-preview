@@ -18,6 +18,7 @@ export const MAIL_NOTIFICATIONS = [
   'storeOrderCancelled',
   'contactForm',
   'customerAbandonedCart',
+  'storeReturnRequest',
 ] as const;
 export type MailNotification = (typeof MAIL_NOTIFICATIONS)[number];
 
@@ -30,6 +31,7 @@ export class MailNotifications {
   @Prop({ default: true }) contactForm!: boolean;
   /** Marketing, unlike the rest — so off until the store opts in. */
   @Prop({ default: false }) customerAbandonedCart!: boolean;
+  @Prop({ default: true }) storeReturnRequest!: boolean;
 }
 const MailNotificationsSchema = SchemaFactory.createForClass(MailNotifications);
 

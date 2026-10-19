@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -18,6 +19,7 @@ import {
   CreateGuestOrderDto,
   CreateOrderDto,
   GuestOrderAccountDto,
+  ExportOrdersDto,
   GuestOrderTokenDto,
   TrackOrderDto,
   QueryOrdersDto,
@@ -139,6 +141,14 @@ export class OrdersController {
   @Get()
   findAll(@Query() query: QueryOrdersDto) {
     return this.ordersService.findAll(query);
+  }
+
+  /** Declared before `:id`, which would otherwise read "export" as an order id. */
+  @Permissions([{ resource: Resource.ORDERS, actions: [Action.READ] }])
+  @Get('export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  exportCsv(@Query() query: ExportOrdersDto) {
+    return this.ordersService.exportCsv(query);
   }
 
   @Permissions([{ resource: Resource.ORDERS, actions: [Action.READ] }])

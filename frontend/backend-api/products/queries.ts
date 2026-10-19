@@ -38,3 +38,30 @@ export const fetchProductsByIds = async (ids: string[]): Promise<Product[]> => {
   const response = await api.get("/products/by-ids", { params: { ids: ids.join(",") } });
   return response.data;
 };
+
+export const exportProductsCsv = async (): Promise<Blob> => {
+  const response = await api.get("/products/export", { responseType: "blob" });
+  return response.data;
+};
+
+export type ProductImportRow = {
+  line: number;
+  product: string;
+  action: "create" | "update" | "unchanged" | "error";
+  changes: string[];
+  errors: string[];
+};
+
+export type ProductImportReport = {
+  applied: boolean;
+  summary: { create: number; update: number; unchanged: number; error: number };
+  rows: ProductImportRow[];
+};
+
+/** Without `apply` the server only reports what would change. */
+export const importProductsCsv = async ({ file, apply }: { file: File; apply: boolean }): Promise<ProductImportReport> => {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await api.post("/products/import", form, { params: { apply: apply ? "true" : undefined } });
+  return response.data;
+};

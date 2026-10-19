@@ -22,4 +22,5 @@ export enum Resource {
   PAGES = 'pages',
   PRICE_LIST = 'price-list',
   REVIEWS = 'reviews',
+  ACTIVITY_LOG = 'activity-log',
 }

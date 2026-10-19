@@ -11,9 +11,14 @@ import {
   UploadedFiles,
   Query,
   Req,
+  Header,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { ProductCsvService } from './product-csv.service';
+import { LogActivity } from '../activity-log/activity-log.decorator';
 import { ProductsService, productImageStorage } from './products.service';
 import { parseNestedBody } from '../common/helpers/parse-nested-body';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -27,7 +32,10 @@ import { Action } from '../roles/enums/action.enum';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly productCsvService: ProductCsvService,
+  ) {}
 
   @UseGuards(AuthenticationGuard, AuthorizationGuard)
   @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.CREATE] }])
@@ -61,6 +69,35 @@ export class ProductsController {
   @Get('search')
   search(@Query() query: SearchProductsDto) {
     return this.productsService.search(query);
+  }
+
+  /** Every product as a spreadsheet; the same layout `import` reads back. */
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.READ] }])
+  @Get('export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  exportCsv() {
+    return this.productCsvService.exportCsv();
+  }
+
+  /**
+   * Creates and updates products from a CSV. Without `apply=true` it only
+   * reports what would change, which is how the dashboard previews a file.
+   */
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.CREATE, Action.UPDATE] }])
+  @Post('import')
+  // A preview changes nothing, so only the real run is logged.
+  @LogActivity({ when: (req) => req.query.apply === 'true' })
+  // No storage option: the file stays in memory — it's parsed, never saved.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024 } }))
+  importCsv(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Query('apply') apply: string | undefined,
+    @Req() req: Request & { userId?: string },
+  ) {
+    if (!file) throw new BadRequestException('Attach a CSV file as "file"');
+    return this.productCsvService.importCsv(file.buffer.toString('utf8'), apply === 'true', req.userId);
   }
 
   /** Public: active products by comma-separated ids, kept in the order given. */

@@ -54,6 +54,7 @@ type SettingsFormValues = {
   socialMedia: SocialItem[];
   primaryColor?: string;
   country: string;
+  returnWindowDays: string;
 };
 
 const LANGS = config.app.languages as string[];
@@ -81,6 +82,7 @@ const SettingsPage = () => {
       socialMedia: [],
       primaryColor: "#1976d2",
       country: "",
+      returnWindowDays: "14",
     },
   });
 
@@ -114,6 +116,7 @@ const SettingsPage = () => {
         socialMedia: settings.socialMedia ?? [],
         primaryColor: settings.primaryColor ?? "#1976d2",
         country: settings.country ?? "",
+        returnWindowDays: String(settings.returnWindowDays ?? 14),
       });
     }
   }, [settings, reset]);
@@ -142,6 +145,7 @@ const SettingsPage = () => {
       if (data.primaryColor) formData.append("primaryColor", data.primaryColor);
       // Only a super admin may set it; the server seeds the country's zones.
       if (isSuper && data.country) formData.append("country", data.country);
+      if (data.returnWindowDays !== "") formData.append("returnWindowDays", data.returnWindowDays);
       (data.socialMedia ?? []).forEach((item, i) => {
         formData.append(`socialMedia[${i}][key]`, item.key);
         formData.append(`socialMedia[${i}][value]`, item.value);
@@ -290,6 +294,32 @@ const SettingsPage = () => {
                       </MenuItem>
                     ))}
                   </TextField>
+                )}
+              />
+            </Paper>
+
+            {/* Returns */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("returns")}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Controller
+                name="returnWindowDays"
+                control={control}
+                rules={{ validate: (v) => v === "" || (/^\d+$/.test(v) && Number(v) <= 365) }}
+                render={({ field, fieldState }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    size="small"
+                    label={t("returnWindowDays")}
+                    error={!!fieldState.error}
+                    helperText={t("returnWindowDaysHint")}
+                    slotProps={{ htmlInput: { min: 0, max: 365 } }}
+                    sx={{ maxWidth: 360 }}
+                    fullWidth
+                  />
                 )}
               />
             </Paper>

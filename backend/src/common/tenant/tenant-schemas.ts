@@ -19,6 +19,8 @@ import { Coupon, CouponSchema } from '../../coupons/schemas/coupon.schema';
 import { Page, PageSchema } from '../../pages/schemas/page.schema';
 import { Zone, ZoneSchema, SubZone, SubZoneSchema } from '../../price-list/schemas/zone.schema';
 import { DeliveryPrice, DeliveryPriceSchema } from '../../price-list/schemas/delivery-price.schema';
+import { ReturnRequest, ReturnRequestSchema } from '../../returns/schemas/return-request.schema';
+import { ActivityLog, ActivityLogSchema } from '../../activity-log/schemas/activity-log.schema';
 import { Review, ReviewSchema } from '../../reviews/schemas/review.schema';
 import { MailSetting, MailSettingSchema } from '../../mail/schemas/mail-setting.schema';
 import {
@@ -59,4 +61,6 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: SubZone.name, schema: SubZoneSchema },
   { name: DeliveryPrice.name, schema: DeliveryPriceSchema },
   { name: Review.name, schema: ReviewSchema },
+  { name: ReturnRequest.name, schema: ReturnRequestSchema },
+  { name: ActivityLog.name, schema: ActivityLogSchema },
 ];

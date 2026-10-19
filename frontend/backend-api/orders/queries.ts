@@ -45,3 +45,15 @@ export const fetchOrderById = async (id: string): Promise<Order> => {
   const response = await api.get(`/orders/${id}`);
   return response.data;
 };
+
+/** Every order matching the filters as CSV (not just the page on screen). */
+export const exportOrdersCsv = async (
+  filters: Pick<OrderFilters, "status" | "search" | "from" | "to">,
+  lang: string
+): Promise<Blob> => {
+  const response = await api.get("/orders/export", {
+    params: { ...filters, lang: lang === "ar" ? "ar" : "en" },
+    responseType: "blob",
+  });
+  return response.data;
+};

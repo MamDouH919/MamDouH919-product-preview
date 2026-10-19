@@ -106,6 +106,8 @@ export type Order = {
   coupon?: AppliedCoupon;
   shippingFee: number;
   total: number;
+  /** Given back through refunded returns. */
+  refundedTotal?: number;
   currency?: LocalizedField;
   paymentMethod: PaymentMethod;
   status: OrderStatus;

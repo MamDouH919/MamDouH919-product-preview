@@ -1,3 +1,4 @@
+import { toCsv } from '../common/helpers/csv';
 import {
   BadRequestException,
   ConflictException,
@@ -32,6 +33,7 @@ import {
 } from './enums/order-status.enum';
 import {
   CreateGuestOrderDto,
+  ExportOrdersDto,
   CreateOrderDto,
   OrderItemInputDto,
   QueryOrdersDto,
@@ -109,6 +111,8 @@ interface ResolvedLine extends QuoteLine {
 }
 
 const ORDER_COUNTER = 'order';
+/** Most orders one CSV export will hold. */
+const EXPORT_LIMIT = 20_000;
 /** Order numbers start here so the first order isn't "#1". */
 const ORDER_NUMBER_BASE = 1000;
 
@@ -701,6 +705,56 @@ export class OrdersService {
     return order;
   }
 
+  /**
+   * Every order matching the list filters as CSV, one row per order — for
+   * accounting and delivery spreadsheets. Capped so a careless "all time"
+   * export can't take the server down.
+   */
+  async exportCsv(query: ExportOrdersDto): Promise<string> {
+    const lang = query.lang ?? 'en';
+    const name = (field?: LocalizedField) => field?.[lang] || field?.en || field?.ar || '';
+    const orders = await this.orderModel
+      .find(this.buildFilter(query))
+      .sort({ createdAt: -1 })
+      .limit(EXPORT_LIMIT)
+      .populate<{ customer: Customer }>('customer', 'name email')
+      .lean()
+      .exec();
+
+    const header = [
+      'order_number', 'date', 'status', 'customer_name', 'customer_email', 'phone',
+      'zone', 'sub_zone', 'address', 'items', 'item_count', 'subtotal', 'discount',
+      'coupon', 'shipping_fee', 'total', 'refunded', 'payment_method', 'notes',
+    ];
+    const rows = orders.map((o) => {
+      const a = o.shippingAddress;
+      return [
+        o.orderNumber,
+        (o as unknown as { createdAt: Date }).createdAt,
+        o.status,
+        a.fullName,
+        o.customer?.email ?? '',
+        a.phone,
+        name(a.zoneName) || a.city || '',
+        name(a.subZoneName) || a.area || '',
+        [a.street, a.building, a.notes].filter(Boolean).join(', '),
+        o.items
+          .map((i) => `${i.quantity} × ${name(i.name)}${i.variantLabel ? ` (${i.variantLabel})` : ''}`)
+          .join('; '),
+        o.items.reduce((sum, i) => sum + i.quantity, 0),
+        o.subtotal,
+        o.discount ?? 0,
+        o.coupon?.code ?? '',
+        o.shippingFee,
+        o.total,
+        o.refundedTotal ?? 0,
+        o.paymentMethod,
+        o.notes ?? '',
+      ];
+    });
+    return toCsv(header, rows);
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   /**
@@ -798,7 +852,7 @@ export class OrdersService {
     return `Order #${orderNumber}`;
   }
 
-  private buildFilter(query: QueryOrdersDto): QueryFilter<Order> {
+  private buildFilter(query: Pick<QueryOrdersDto, 'status' | 'search' | 'from' | 'to'>): QueryFilter<Order> {
     const filter: QueryFilter<Order> = {};
     if (query.status) filter.status = query.status;
 

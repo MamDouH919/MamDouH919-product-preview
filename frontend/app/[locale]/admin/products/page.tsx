@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Chip, IconButton, Stack, Switch } from "@mui/material";
+import { Box, Button, Chip, IconButton, Stack, Switch } from "@mui/material";
+import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
+import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
+import { exportProductsCsv } from "@/backend-api/products/queries";
+import ProductCsvDialog from "@/features/Product/ProductCsvDialog";
+import { datedFilename, downloadFile } from "@/utils/downloadFile";
 import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import Image from "next/image";
@@ -48,6 +53,13 @@ const ProductsPage = () => {
     onError: () => {
       toast.error(t("somethingWentWrong"));
     },
+  });
+
+  const [importOpen, setImportOpen] = useState(false);
+  const exportMutation = useMutation({
+    mutationFn: exportProductsCsv,
+    onSuccess: (blob) => downloadFile(blob, datedFilename("products")),
+    onError: () => toast.error(t("somethingWentWrong")),
   });
 
   useEffect(() => {
@@ -174,13 +186,31 @@ const ProductsPage = () => {
   );
 
   return (
-    <SimpleTable
-      columns={columns}
-      data={products ?? []}
-      borderRadius={0}
-      height="100%"
-      loading={isLoading}
-    />
+    <Stack spacing={2} height="100%">
+      <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Button
+          size="small"
+          startIcon={<FileDownloadOutlined />}
+          disabled={exportMutation.isPending}
+          onClick={() => exportMutation.mutate()}
+        >
+          {t("exportCsv")}
+        </Button>
+        <Button size="small" startIcon={<FileUploadOutlined />} onClick={() => setImportOpen(true)}>
+          {t("importCsv")}
+        </Button>
+      </Stack>
+      <Box flex={1} minHeight={0}>
+        <SimpleTable
+          columns={columns}
+          data={products ?? []}
+          borderRadius={0}
+          height="100%"
+          loading={isLoading}
+        />
+      </Box>
+      <ProductCsvDialog open={importOpen} onClose={() => setImportOpen(false)} />
+    </Stack>
   );
 };
 
