@@ -25,6 +25,7 @@ const OrderLines = ({
   discount = 0,
   couponCode,
   shippingFee,
+  shippingPending = false,
   total,
   currency,
 }: {
@@ -33,6 +34,8 @@ const OrderLines = ({
   discount?: number;
   couponCode?: string;
   shippingFee: number;
+  /** No delivery area chosen yet, so the fee isn't known. */
+  shippingPending?: boolean;
   total: number;
   currency: string;
 }) => {
@@ -91,7 +94,13 @@ const OrderLines = ({
         )}
         <Row
           label={t("delivery")}
-          value={shippingFee > 0 ? formatMoney(shippingFee, currency) : t("free")}
+          value={
+            shippingPending
+              ? t("chooseAreaForDelivery")
+              : shippingFee > 0
+                ? formatMoney(shippingFee, currency)
+                : t("free")
+          }
         />
         <Row label={t("total")} value={formatMoney(total, currency)} strong />
       </Stack>

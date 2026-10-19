@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsInt,
+  IsMongoId,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -38,12 +39,11 @@ export class AddressDto {
   @IsNotEmpty()
   phone!: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  city!: string;
+  @ApiProperty({ description: 'A subzone the store delivers to (see GET /delivery-areas)' })
+  @IsMongoId()
+  subZoneId!: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Neighbourhood / district' })
   @IsOptional()
   @IsString()
   area?: string;

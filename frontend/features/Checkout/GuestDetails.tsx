@@ -6,12 +6,14 @@ import { Paper, Stack, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
 import CustomLink from "@/components/CustomLink";
+import DeliveryAreaFields from "./DeliveryAreaFields";
 
 export type GuestDetailsValues = {
   email: string;
   fullName: string;
   phone: string;
-  city: string;
+  zoneId: string;
+  subZoneId: string;
   area: string;
   street: string;
   building: string;
@@ -22,7 +24,8 @@ export const EMPTY_GUEST_DETAILS: GuestDetailsValues = {
   email: "",
   fullName: "",
   phone: "",
-  city: "",
+  zoneId: "",
+  subZoneId: "",
   area: "",
   street: "",
   building: "",
@@ -80,9 +83,7 @@ const GuestDetails = ({ control }: { control: Control<GuestDetailsValues> }) => 
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextInputComponent name="phone" label={t("phone")} control={control} required rules={{ required: true }} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextInputComponent name="city" label={t("city")} control={control} required rules={{ required: true }} />
-          </Grid>
+          <DeliveryAreaFields control={control} />
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextInputComponent name="area" label={t("area")} control={control} />
           </Grid>

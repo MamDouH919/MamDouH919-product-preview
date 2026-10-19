@@ -20,12 +20,14 @@ import TextInputComponent from "@/components/MUI/ControlMUItextField";
 import { addAddress, updateAddress } from "@/backend-api/customers/mutations";
 import { CUSTOMER_ADDRESSES_QUERY_KEY } from "@/backend-api/customers/hooks";
 import { Address } from "@/backend-api/customers/types";
+import DeliveryAreaFields from "@/features/Checkout/DeliveryAreaFields";
 
 type FormValues = {
   label: string;
   fullName: string;
   phone: string;
-  city: string;
+  zoneId: string;
+  subZoneId: string;
   area: string;
   street: string;
   building: string;
@@ -37,7 +39,8 @@ const EMPTY: FormValues = {
   label: "",
   fullName: "",
   phone: "",
-  city: "",
+  zoneId: "",
+  subZoneId: "",
   area: "",
   street: "",
   building: "",
@@ -68,7 +71,9 @@ const AddressFormDialog = ({ open, address, onClose }: AddressFormDialogProps) =
             label: address.label ?? "",
             fullName: address.fullName,
             phone: address.phone,
-            city: address.city,
+            // Empty on a legacy address, so editing it asks for an area.
+            zoneId: address.zone ?? "",
+            subZoneId: address.subZone ?? "",
             area: address.area ?? "",
             street: address.street,
             building: address.building ?? "",
@@ -85,7 +90,7 @@ const AddressFormDialog = ({ open, address, onClose }: AddressFormDialogProps) =
         label: values.label || undefined,
         fullName: values.fullName,
         phone: values.phone,
-        city: values.city,
+        subZoneId: values.subZoneId,
         area: values.area || undefined,
         street: values.street,
         building: values.building || undefined,
@@ -103,7 +108,11 @@ const AddressFormDialog = ({ open, address, onClose }: AddressFormDialogProps) =
       onClose();
     },
     onError: (error: any) =>
-      toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
+      toast.error(
+        error?.response?.data?.code === "delivery_unavailable"
+          ? t("deliveryUnavailable")
+          : error?.response?.data?.message ?? t("somethingWentWrong")
+      ),
   });
 
   return (
@@ -139,15 +148,7 @@ const AddressFormDialog = ({ open, address, onClose }: AddressFormDialogProps) =
                 rules={{ required: true }}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextInputComponent
-                name="city"
-                label={t("city")}
-                control={control}
-                required
-                rules={{ required: true }}
-              />
-            </Grid>
+            <DeliveryAreaFields control={control} />
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextInputComponent name="area" label={t("area")} control={control} />
             </Grid>

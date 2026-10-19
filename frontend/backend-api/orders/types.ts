@@ -54,6 +54,8 @@ export type Quote = {
   coupon?: AppliedCoupon;
   /** Why the requested coupon doesn't apply; the rest of the quote still stands. */
   couponError?: { code: CouponErrorCode; minSubtotal?: number };
+  /** `pending` until an area is chosen; `shippingFee` is 0 unless `available`. */
+  delivery: "pending" | "available" | "unavailable";
   shippingFee: number;
   total: number;
   currency?: LocalizedField;
@@ -76,7 +78,10 @@ export type OrderItem = {
 export type ShippingAddress = {
   fullName: string;
   phone: string;
-  city: string;
+  zoneName?: LocalizedField;
+  subZoneName?: LocalizedField;
+  /** Only on orders placed before the price list existed. */
+  city?: string;
   area?: string;
   street: string;
   building?: string;
@@ -133,7 +138,15 @@ export type GuestOrder = Order & { account: GuestAccountStatus };
 export type CreateGuestOrderPayload = {
   items: OrderItemInput[];
   email: string;
-  shippingAddress: ShippingAddress;
+  shippingAddress: {
+    fullName: string;
+    phone: string;
+    subZoneId: string;
+    area?: string;
+    street: string;
+    building?: string;
+    notes?: string;
+  };
   paymentMethod?: PaymentMethod;
   notes?: string;
   couponCode?: string;

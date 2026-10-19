@@ -1,9 +1,17 @@
+import { LocalizedField } from "../globalTypes";
+
 export type Address = {
   _id: string;
   label?: string;
   fullName: string;
   phone: string;
-  city: string;
+  /** Price-list zone and subzone. Missing on addresses saved before the price list. */
+  zone?: string;
+  subZone?: string;
+  zoneName?: LocalizedField;
+  subZoneName?: LocalizedField;
+  /** Free-text city, only on addresses saved before the price list. */
+  city?: string;
   area?: string;
   street: string;
   building?: string;
@@ -50,8 +58,16 @@ export type UpdateProfilePayload = {
   phone?: string;
 };
 
-/** Everything an address needs except its id, which the server assigns. */
-export type AddressPayload = Omit<Address, "_id" | "isDefault"> & {
+/** What saving an address sends; the server fills in the zone from the subzone. */
+export type AddressPayload = {
+  label?: string;
+  fullName: string;
+  phone: string;
+  subZoneId: string;
+  area?: string;
+  street: string;
+  building?: string;
+  notes?: string;
   isDefault?: boolean;
 };
 

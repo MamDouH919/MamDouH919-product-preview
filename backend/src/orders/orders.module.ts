@@ -18,6 +18,7 @@ import { CustomerAuthModule } from '../customer-auth/customer-auth.module';
 import { MailModule } from '../mail/mail.module';
 import { OrderNotificationsService } from './order-notifications.service';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
+import { PriceListModule } from '../price-list/price-list.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 
 @Module({
@@ -27,6 +28,7 @@ import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
     CustomersModule,
     CustomerAuthModule,
     CouponsModule,
+    PriceListModule,
     MailModule,
   ],
   // Order matters: `/orders/quote`, `/orders/guest` and `/orders/me` must

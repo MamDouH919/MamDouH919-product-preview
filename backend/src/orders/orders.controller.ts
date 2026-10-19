@@ -40,7 +40,7 @@ export class OrderQuoteController {
 
   @Post()
   quote(@Body() dto: QuoteOrderDto) {
-    return this.ordersService.quote(dto.items, dto.couponCode);
+    return this.ordersService.quote(dto.items, dto.couponCode, dto.subZoneId);
   }
 }
 

@@ -55,6 +55,11 @@ export class QuoteOrderDto {
   @IsString()
   @MaxLength(50)
   couponCode?: string;
+
+  @ApiProperty({ required: false, description: 'Prices delivery to this subzone; omitted until one is chosen' })
+  @IsOptional()
+  @IsMongoId()
+  subZoneId?: string;
 }
 
 export class CreateOrderDto extends QuoteOrderDto {
@@ -93,11 +98,9 @@ export class GuestShippingAddressDto {
   @MaxLength(50)
   phone!: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  city!: string;
+  @ApiProperty({ description: 'A subzone the store delivers to (see GET /delivery-areas)' })
+  @IsMongoId()
+  subZoneId!: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

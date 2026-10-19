@@ -3,6 +3,29 @@ import { LocalizedField } from "@/backend-api/globalTypes";
 export const localized = (field: LocalizedField | undefined, lang: string): string =>
   field?.[lang] || field?.["ar"] || field?.["en"] || "";
 
+/** "Street, building, area, subzone, zone" — falls back to the legacy free-text city. */
+export const formatAddress = (
+  address: {
+    street?: string;
+    building?: string;
+    area?: string;
+    subZoneName?: LocalizedField;
+    zoneName?: LocalizedField;
+    city?: string;
+  },
+  lang: string,
+  separator = ", "
+): string =>
+  [
+    address.street,
+    address.building,
+    address.area,
+    localized(address.subZoneName, lang),
+    localized(address.zoneName, lang) || address.city,
+  ]
+    .filter(Boolean)
+    .join(separator);
+
 export const formatMoney = (amount: number, currency: string): string =>
   `${amount.toLocaleString()} ${currency}`.trim();
 

@@ -60,8 +60,21 @@ export class ShippingAddress {
   @Prop({ required: true })
   phone!: string;
 
-  @Prop({ required: true })
-  city!: string;
+  @Prop({ type: Types.ObjectId, ref: 'Zone', required: false })
+  zone?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'SubZone', required: false })
+  subZone?: Types.ObjectId;
+
+  @Prop({ type: LocalizedFieldSchema, required: false })
+  zoneName?: LocalizedField;
+
+  @Prop({ type: LocalizedFieldSchema, required: false })
+  subZoneName?: LocalizedField;
+
+  /** Only on orders placed before the price list existed. */
+  @Prop({ required: false })
+  city?: string;
 
   @Prop({ required: false })
   area?: string;

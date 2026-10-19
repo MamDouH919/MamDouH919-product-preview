@@ -21,6 +21,7 @@ import { CustomerAuthModule } from './customer-auth/customer-auth.module';
 import { OrdersModule } from './orders/orders.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { PagesModule } from './pages/pages.module';
+import { PriceListModule } from './price-list/price-list.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -73,6 +74,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     OrdersModule,
     CouponsModule,
     PagesModule,
+    PriceListModule,
     TenantModule,
   ],
   controllers: [],

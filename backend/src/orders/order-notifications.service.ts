@@ -331,7 +331,15 @@ export class OrderNotificationsService {
     const lines = [
       a.fullName,
       a.phone,
-      [a.street, a.building, a.area, a.city].filter(Boolean).join(', '),
+      [
+        a.street,
+        a.building,
+        a.area,
+        this.localized(a.subZoneName, lang),
+        this.localized(a.zoneName, lang) || a.city,
+      ]
+        .filter(Boolean)
+        .join(', '),
       a.notes,
     ].filter(Boolean);
     return `<p style="margin:0 0 16px;line-height:1.6"><strong>${escapeHtml(this.t(lang, 'address'))}:</strong><br>${lines.map(escapeHtml).join('<br>')}</p>`;

@@ -15,11 +15,14 @@ export const MY_ORDERS_QUERY_KEY = "my-orders";
 export const GUEST_ORDER_QUERY_KEY = "guest-order";
 export const ORDERS_QUERY_KEY = "orders";
 
-/** Live prices and stock for the basket; refetches whenever its lines change. */
-export const useQuoteQuery = (items: OrderItemInput[], couponCode?: string) => {
+/**
+ * Live prices and stock for the basket; refetches whenever its lines change.
+ * Delivery is priced once a subzone is passed.
+ */
+export const useQuoteQuery = (items: OrderItemInput[], couponCode?: string, subZoneId?: string) => {
   return useQuery({
-    queryKey: [QUOTE_QUERY_KEY, items, couponCode],
-    queryFn: () => fetchQuote(items, couponCode),
+    queryKey: [QUOTE_QUERY_KEY, items, couponCode, subZoneId],
+    queryFn: () => fetchQuote(items, couponCode, subZoneId),
     enabled: items.length > 0,
     // Keep showing the last totals while a quantity change re-prices.
     placeholderData: keepPreviousData,

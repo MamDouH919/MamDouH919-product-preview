@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { LocalizedField, LocalizedFieldSchema } from '../../common/schemas/localized-field.schema';
 
 /**
  * Addresses are embedded rather than a collection of their own: they are only
@@ -20,9 +21,25 @@ export class Address {
   @Prop({ required: true })
   phone!: string;
 
-  @Prop({ required: true })
-  city!: string;
+  /** The price-list zone and subzone, chosen from where the store delivers. */
+  @Prop({ type: Types.ObjectId, ref: 'Zone', required: false })
+  zone?: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'SubZone', required: false })
+  subZone?: Types.ObjectId;
+
+  /** Names copied in when saved, so showing an address needs no lookup. */
+  @Prop({ type: LocalizedFieldSchema, required: false })
+  zoneName?: LocalizedField;
+
+  @Prop({ type: LocalizedFieldSchema, required: false })
+  subZoneName?: LocalizedField;
+
+  /** Free-text city from before the price list; new addresses use the subzone. */
+  @Prop({ required: false })
+  city?: string;
+
+  /** Neighbourhood / district inside the subzone. */
   @Prop({ required: false })
   area?: string;
 
@@ -38,6 +55,9 @@ export class Address {
   @Prop({ default: false })
   isDefault!: boolean;
 }
+
+/** What an address holds apart from its id and the owner's preferences. */
+export type AddressFields = Omit<Address, '_id' | 'label' | 'isDefault'>;
 
 export const AddressSchema = SchemaFactory.createForClass(Address);
 

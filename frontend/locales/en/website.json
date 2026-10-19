@@ -440,8 +440,6 @@
     "noteOptional": "Note (optional)",
     "shippedNotePlaceholder": "e.g. courier and tracking number",
     "cancelOrderRestockHint": "The items in this order will be returned to stock.",
-    "shippingFee": "Delivery fee",
-    "shippingFeeHint": "Added to every order. Leave 0 for free delivery.",
     "checkoutSettings": "Checkout",
     "orderStatus": {
         "pending": "Pending",
@@ -774,5 +772,31 @@
     "mailTestHint": "Checks the values above, even before you save.",
     "mailTestTo": "Send test to",
     "mailSendTest": "Send test",
-    "mailTestSent": "Test email sent to {{email}}"
+    "mailTestSent": "Test email sent to {{email}}",
+    "priceList": "Price list",
+    "zone": "Governorate",
+    "subZone": "City / area",
+    "deliveryArea": "Delivery area",
+    "deliveryPrice": "Delivery price",
+    "deliveryPriceHint": "0 means free delivery",
+    "addDeliveryPrice": "Add price",
+    "editDeliveryPrice": "Edit delivery price",
+    "setZonePrice": "Price a whole governorate",
+    "setZonePriceHint": "All {{count}} areas of {{zone}} will get this price. Areas that already have a price are overwritten.",
+    "alreadyPriced": "already priced",
+    "deleteDeliveryPriceConfirm": "Remove the delivery price for {{area}}?",
+    "deleteDeliveryPriceHint": "Customers won't be able to choose this area anymore. Past orders keep the fee they paid.",
+    "priceListNeedsCountry": "No delivery country is set yet. A super admin has to choose it in Settings first, which loads its governorates and cities.",
+    "deliveryCountry": "Delivery country",
+    "deliveryCountryHint": "Saving loads this country's governorates and cities into the price list. Prices you already set are kept.",
+    "countries": {
+        "EG": "Egypt"
+    },
+    "noDeliveryAreas": "Delivery isn't available yet. Please contact the store.",
+    "chooseZoneFirst": "Choose the governorate first",
+    "deliveryUnavailable": "We don't deliver to this area. Please choose another one.",
+    "chooseAreaForDelivery": "Choose your area",
+    "calculatedAtCheckout": "Calculated at checkout",
+    "addressNeedsArea": "This address has no delivery area. Edit it and choose your governorate and city to continue.",
+    "needsDeliveryArea": "Needs delivery area"
 }

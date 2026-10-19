@@ -19,7 +19,8 @@ export type Setting = {
   socialMedia?: SocialMediaItem[];
   primaryColor?: string;
   currency?: LocalizedField;
-  shippingFee?: number;
+  /** ISO country code the store delivers in; set by a super admin. */
+  country?: string;
 };
 
 export type MailEncryption = "ssl" | "starttls" | "none";

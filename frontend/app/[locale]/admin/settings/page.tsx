@@ -32,6 +32,8 @@ import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { updateColor } from "@/Store/slices/settings";
 import { LocalizedField } from "@/backend-api/globalTypes";
+import { SUPPORTED_COUNTRIES } from "@/backend-api/price-list/types";
+import { PRICE_LIST_QUERY_KEY, ZONES_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import config from "@/config.json";
 
 const SOCIAL_KEYS = ["FACEBOOK", "INSTAGRAM", "TWITTER", "LINKEDIN", "YOUTUBE", "TIKTOK", "WHATSAPP", "TELEGRAM"];
@@ -51,7 +53,7 @@ type SettingsFormValues = {
   address: string;
   socialMedia: SocialItem[];
   primaryColor?: string;
-  shippingFee: string;
+  country: string;
 };
 
 const LANGS = config.app.languages as string[];
@@ -78,7 +80,7 @@ const SettingsPage = () => {
       address: "",
       socialMedia: [],
       primaryColor: "#1976d2",
-      shippingFee: "0",
+      country: "",
     },
   });
 
@@ -111,7 +113,7 @@ const SettingsPage = () => {
         address: settings.address ?? "",
         socialMedia: settings.socialMedia ?? [],
         primaryColor: settings.primaryColor ?? "#1976d2",
-        shippingFee: String(settings.shippingFee ?? 0),
+        country: settings.country ?? "",
       });
     }
   }, [settings, reset]);
@@ -138,8 +140,8 @@ const SettingsPage = () => {
       if (data.email) formData.append("email", data.email);
       if (data.address) formData.append("address", data.address);
       if (data.primaryColor) formData.append("primaryColor", data.primaryColor);
-      // Always sent, so clearing the field really sets delivery back to free.
-      formData.append("shippingFee", String(Math.max(0, Number(data.shippingFee) || 0)));
+      // Only a super admin may set it; the server seeds the country's zones.
+      if (isSuper && data.country) formData.append("country", data.country);
       (data.socialMedia ?? []).forEach((item, i) => {
         formData.append(`socialMedia[${i}][key]`, item.key);
         formData.append(`socialMedia[${i}][value]`, item.value);
@@ -149,6 +151,8 @@ const SettingsPage = () => {
     onSuccess: () => {
       toast.success(t("saveSuccessfully"));
       queryClient.invalidateQueries({ queryKey: [SETTINGS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [ZONES_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [PRICE_LIST_QUERY_KEY] });
     },
     onError: () => {
       toast.error(t("somethingWentWrong"));
@@ -260,6 +264,36 @@ const SettingsPage = () => {
               </Grid>
             </Paper>
 
+            {/* Delivery country */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("deliveryCountry")}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Controller
+                name="country"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    select
+                    size="small"
+                    label={t("country")}
+                    value={field.value}
+                    onChange={field.onChange}
+                    helperText={t("deliveryCountryHint")}
+                    sx={{ maxWidth: 360 }}
+                    fullWidth
+                  >
+                    {SUPPORTED_COUNTRIES.map((code) => (
+                      <MenuItem key={code} value={code}>
+                        {t(`countries.${code}`)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+            </Paper>
+
             {/* Appearance */}
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
               <Typography variant="subtitle1" fontWeight={700} mb={2}>
@@ -320,23 +354,6 @@ const SettingsPage = () => {
             </Paper>
           </>
         )}
-
-        {/* Checkout — visible to all admins */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>
-            {t("checkoutSettings")}
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          <TextField
-            size="small"
-            type="number"
-            label={t("shippingFee")}
-            helperText={t("shippingFeeHint")}
-            slotProps={{ htmlInput: { min: 0, step: "any" } }}
-            sx={{ maxWidth: 260 }}
-            {...register("shippingFee")}
-          />
-        </Paper>
 
         {/* Contact Info — visible to all admins */}
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>

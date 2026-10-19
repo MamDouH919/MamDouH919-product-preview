@@ -131,7 +131,7 @@ const CartPage = () => {
               )}
               <SummaryRow
                 label={t("delivery")}
-                value={quote.shippingFee > 0 ? formatMoney(quote.shippingFee, currency) : t("free")}
+                value={t("calculatedAtCheckout")}
               />
               <SummaryRow label={t("total")} value={formatMoney(quote.total, currency)} strong />
 

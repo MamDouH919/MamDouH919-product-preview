@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
-import { Address, Customer } from './schemas/customer.schema';
+import { Address, AddressFields, Customer } from './schemas/customer.schema';
 import { Product } from '../products/schemas/product.schema';
+import { PriceListService } from '../price-list/price-list.service';
 import {
   AddressDto,
   QueryCustomersDto,
@@ -17,6 +18,7 @@ export class CustomersService {
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<Customer>,
     @InjectModel(Product.name) private productModel: Model<Product>,
+    private readonly priceListService: PriceListService,
   ) {}
 
   // ── Self-service ────────────────────────────────────────────────────────────
@@ -57,7 +59,9 @@ export class CustomersService {
 
     if (shouldDefault) this.clearDefaults(customer);
 
-    customer.addresses.push({ ...dto, isDefault: shouldDefault } as Address);
+    const { subZoneId, ...rest } = dto;
+    const location = await this.deliveryLocation(subZoneId);
+    customer.addresses.push({ ...rest, ...location, isDefault: shouldDefault } as Address);
     await customer.save();
 
     return customer.addresses;
@@ -76,7 +80,9 @@ export class CustomersService {
 
     if (dto.isDefault) this.clearDefaults(customer);
 
-    Object.assign(address, dto);
+    const { subZoneId, ...rest } = dto;
+    // `city` is cleared: a legacy address becomes a priced one once edited.
+    Object.assign(address, rest, await this.deliveryLocation(subZoneId), { city: undefined });
     // Never let the customer end up with no default by unsetting the only one.
     if (!customer.addresses.some((a) => a.isDefault) && customer.addresses.length) {
       customer.addresses[0].isDefault = true;
@@ -242,7 +248,7 @@ export class CustomersService {
    */
   async findOrCreateForCheckout(
     email: string,
-    address: Omit<AddressDto, 'label' | 'isDefault'>,
+    address: AddressFields,
   ): Promise<{ customer: Customer; created: boolean }> {
     const normalized = email.toLowerCase().trim();
     const existing = await this.customerModel.findOne({ email: normalized }).exec();
@@ -271,7 +277,8 @@ export class CustomersService {
     // curate — anyone who knows the email could otherwise fill it with junk.
     if (existing.isGuest) {
       const same = (a: Address) =>
-        (['fullName', 'phone', 'city', 'area', 'street', 'building'] as const).every(
+        String(a.subZone ?? '') === String(address.subZone ?? '') &&
+        (['fullName', 'phone', 'area', 'street', 'building'] as const).every(
           (key) => (a[key] ?? '') === (address[key] ?? ''),
         );
       if (!existing.addresses.some(same)) {
@@ -314,6 +321,23 @@ export class CustomersService {
     );
     if (!address) throw new NotFoundException('Address not found');
     return address;
+  }
+
+  /**
+   * The zone fields an address stores for a chosen subzone. Refuses a place
+   * the store doesn't deliver to, so a saved address is always one checkout
+   * can price.
+   */
+  async deliveryLocation(subZoneId: string): Promise<Pick<AddressFields, 'zone' | 'subZone' | 'zoneName' | 'subZoneName'>> {
+    const delivery = await this.priceListService.resolve(subZoneId);
+    if (!delivery) {
+      throw new BadRequestException({
+        message: "We don't deliver to this area.",
+        code: 'delivery_unavailable',
+      });
+    }
+    const { zone, subZone, zoneName, subZoneName } = delivery;
+    return { zone, subZone, zoneName, subZoneName };
   }
 
   private clearDefaults(customer: Customer): void {

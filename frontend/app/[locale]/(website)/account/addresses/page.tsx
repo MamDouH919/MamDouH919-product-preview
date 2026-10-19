@@ -26,9 +26,11 @@ import {
 import { deleteAddress, setDefaultAddress } from "@/backend-api/customers/mutations";
 import { Address } from "@/backend-api/customers/types";
 import AddressFormDialog from "@/features/Customer/AddressFormDialog";
+import { formatAddress, localized } from "@/features/Order/format";
 
 const AddressesPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -124,8 +126,11 @@ const AddressesPage = () => {
                   <Stack spacing={0.5} flex={1}>
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                       <Typography variant="subtitle2" fontWeight={700}>
-                        {address.label || address.city}
+                        {address.label || localized(address.subZoneName, lang) || address.city}
                       </Typography>
+                      {!address.subZone && (
+                        <Chip label={t("needsDeliveryArea")} size="small" color="warning" variant="outlined" />
+                      )}
                       {address.isDefault && (
                         <Chip label={t("default")} size="small" color="primary" />
                       )}
@@ -133,9 +138,7 @@ const AddressesPage = () => {
 
                     <Typography variant="body2">{address.fullName}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {[address.street, address.building, address.area, address.city]
-                        .filter(Boolean)
-                        .join("، ")}
+                      {formatAddress(address, lang, "، ")}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       {address.phone}

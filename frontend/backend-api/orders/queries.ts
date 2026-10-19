@@ -5,11 +5,13 @@ import { GuestOrder, Order, OrderFilters, OrderItemInput, OrdersResponse, Quote 
 /** Prices a basket against the live catalogue. Public — works for guests. */
 export const fetchQuote = async (
   items: OrderItemInput[],
-  couponCode?: string
+  couponCode?: string,
+  subZoneId?: string
 ): Promise<Quote> => {
   const response = await customerApi.post("/orders/quote", {
     items,
     couponCode: couponCode || undefined,
+    subZoneId: subZoneId || undefined,
   });
   return response.data;
 };

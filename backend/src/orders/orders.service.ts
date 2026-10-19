@@ -10,7 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
-import { Order, OrderItem, ShippingAddress } from './schemas/order.schema';
+import { Order, OrderItem } from './schemas/order.schema';
 import { Counter } from './schemas/counter.schema';
 import { Product } from '../products/schemas/product.schema';
 import { Setting } from '../settings/schemas/setting.schema';
@@ -22,6 +22,8 @@ import { CustomersService } from '../customers/customers.service';
 import { Customer } from '../customers/schemas/customer.schema';
 import { CustomerAuthService } from '../customer-auth/customer-auth.service';
 import { CouponError, CouponsService } from '../coupons/coupons.service';
+import { PriceListService } from '../price-list/price-list.service';
+import { AddressFields } from '../customers/schemas/customer.schema';
 import { OrderNotificationsService } from './order-notifications.service';
 import {
   ORDER_TRANSITIONS,
@@ -63,6 +65,11 @@ export interface Quote {
   coupon?: { code: string; type: string; value: number };
   /** Why the requested coupon doesn't apply. Doesn't make the quote invalid. */
   couponError?: { code: CouponError; minSubtotal?: number };
+  /**
+   * `pending` until a subzone is given, then whether the store delivers there.
+   * `shippingFee` is 0 unless this is `available`.
+   */
+  delivery: 'pending' | 'available' | 'unavailable';
   shippingFee: number;
   total: number;
   currency?: LocalizedField;
@@ -118,6 +125,7 @@ export class OrdersService {
     private readonly customersService: CustomersService,
     private readonly customerAuthService: CustomerAuthService,
     private readonly couponsService: CouponsService,
+    private readonly priceListService: PriceListService,
     private readonly notifications: OrderNotificationsService,
   ) {}
 
@@ -128,9 +136,11 @@ export class OrdersService {
    * calls this to show real prices and flag problems before checkout, and
    * placing an order runs the same check — the client never supplies a price.
    */
-  async quote(items: OrderItemInputDto[], couponCode?: string): Promise<Quote> {
+  async quote(items: OrderItemInputDto[], couponCode?: string, subZoneId?: string): Promise<Quote> {
     const lines = await this.resolveLines(items);
-    const { shippingFee, currency } = await this.getCheckoutSettings();
+    const { currency } = await this.getCheckoutSettings();
+    const delivery = subZoneId ? await this.priceListService.resolve(subZoneId) : undefined;
+    const shippingFee = delivery?.price ?? 0;
 
     const subtotal = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
     const valid = lines.every((line) => !line.issue);
@@ -154,6 +164,7 @@ export class OrdersService {
       discount,
       coupon,
       couponError,
+      delivery: delivery === undefined ? 'pending' : delivery ? 'available' : 'unavailable',
       shippingFee,
       total: round2(subtotal - discount + shippingFee),
       currency,
@@ -186,9 +197,15 @@ export class OrdersService {
     dto: CreateGuestOrderDto,
     host: string,
   ): Promise<{ order: Order; token: string; account: GuestAccountStatus }> {
+    // Checked before a customer record exists, so a refused area leaves nothing behind.
+    const { subZoneId, ...rest } = dto.shippingAddress;
+    const address: AddressFields = {
+      ...rest,
+      ...(await this.customersService.deliveryLocation(subZoneId)),
+    };
     const { customer, created } = await this.customersService.findOrCreateForCheckout(
       dto.email,
-      dto.shippingAddress,
+      address,
     );
     if (!customer.isActive) {
       throw new ForbiddenException('This account is blocked from placing orders.');
@@ -197,7 +214,7 @@ export class OrdersService {
     const token = nanoid(32);
     let order: Order;
     try {
-      order = await this.place(customer, dto.shippingAddress, dto, host, {
+      order = await this.place(customer, address, dto, host, {
         guestToken: token,
         canClaimAccount: created,
       });
@@ -290,7 +307,7 @@ export class OrdersService {
    */
   private async place(
     customer: Customer,
-    address: ShippingAddress,
+    address: AddressFields,
     dto: PlaceOrderInput,
     host: string,
     guest?: { guestToken: string; canClaimAccount: boolean },
@@ -307,7 +324,12 @@ export class OrdersService {
     }
 
     const settings = await this.getCheckoutSettings();
-    const { shippingFee, currency } = settings;
+    const { currency } = settings;
+    // Priced again from the subzone — the store may have stopped delivering
+    // there, or changed the price, since the address was saved.
+    const delivery = await this.priceListService.resolve(address.subZone);
+    if (!delivery) this.rejectDelivery();
+    const shippingFee = delivery.price;
     const subtotal = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
 
     // Checked again here with the customer, so per-customer limits apply.
@@ -340,7 +362,10 @@ export class OrdersService {
       shippingAddress: {
         fullName: address.fullName,
         phone: address.phone,
-        city: address.city,
+        zone: delivery.zone,
+        subZone: delivery.subZone,
+        zoneName: delivery.zoneName,
+        subZoneName: delivery.subZoneName,
         area: address.area,
         street: address.street,
         building: address.building,
@@ -422,6 +447,13 @@ export class OrdersService {
     throw new BadRequestException({
       message: COUPON_MESSAGES[code],
       couponError: { code, minSubtotal },
+    });
+  }
+
+  private rejectDelivery(): never {
+    throw new BadRequestException({
+      message: "We don't deliver to this address. Please choose another area.",
+      code: 'delivery_unavailable',
     });
   }
 
@@ -676,16 +708,14 @@ export class OrdersService {
   }
 
   private async getCheckoutSettings(): Promise<{
-    shippingFee: number;
     currency?: LocalizedField;
     storeName?: LocalizedField;
   }> {
     const settings = await this.settingModel
       .findOne()
-      .select('shippingFee currency siteTitle')
+      .select('currency siteTitle')
       .exec();
     return {
-      shippingFee: settings?.shippingFee ?? 0,
       currency: settings?.currency,
       storeName: settings?.siteTitle,
     };

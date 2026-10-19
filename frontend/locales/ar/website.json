@@ -439,8 +439,6 @@
     "noteOptional": "ملاحظة (اختياري)",
     "shippedNotePlaceholder": "مثال: شركة الشحن ورقم التتبع",
     "cancelOrderRestockHint": "ستُعاد منتجات هذا الطلب إلى المخزون.",
-    "shippingFee": "رسوم التوصيل",
-    "shippingFeeHint": "تُضاف إلى كل طلب. اتركها 0 للتوصيل المجاني.",
     "checkoutSettings": "إتمام الطلب",
     "orderStatus": {
         "pending": "قيد الانتظار",
@@ -769,5 +767,31 @@
     "mailTestHint": "يختبر القيم أعلاه حتى قبل الحفظ.",
     "mailTestTo": "إرسال التجربة إلى",
     "mailSendTest": "إرسال تجربة",
-    "mailTestSent": "تم إرسال رسالة تجريبية إلى {{email}}"
+    "mailTestSent": "تم إرسال رسالة تجريبية إلى {{email}}",
+    "priceList": "قائمة أسعار التوصيل",
+    "zone": "المحافظة",
+    "subZone": "المدينة / المنطقة",
+    "deliveryArea": "منطقة التوصيل",
+    "deliveryPrice": "سعر التوصيل",
+    "deliveryPriceHint": "0 يعني توصيل مجاني",
+    "addDeliveryPrice": "إضافة سعر",
+    "editDeliveryPrice": "تعديل سعر التوصيل",
+    "setZonePrice": "تسعير محافظة كاملة",
+    "setZonePriceHint": "سيتم تطبيق هذا السعر على جميع مناطق {{zone}} ({{count}}). المناطق المسعّرة مسبقًا سيتم استبدال سعرها.",
+    "alreadyPriced": "مسعّرة بالفعل",
+    "deleteDeliveryPriceConfirm": "حذف سعر التوصيل لـ {{area}}؟",
+    "deleteDeliveryPriceHint": "لن يتمكن العملاء من اختيار هذه المنطقة بعد الآن. الطلبات السابقة تحتفظ برسوم التوصيل المدفوعة.",
+    "priceListNeedsCountry": "لم يتم تحديد دولة التوصيل بعد. يجب على المدير العام اختيارها من الإعدادات أولًا ليتم تحميل المحافظات والمدن.",
+    "deliveryCountry": "دولة التوصيل",
+    "deliveryCountryHint": "عند الحفظ يتم تحميل محافظات ومدن هذه الدولة في قائمة الأسعار. الأسعار التي حددتها مسبقًا لن تتغير.",
+    "countries": {
+        "EG": "مصر"
+    },
+    "noDeliveryAreas": "التوصيل غير متاح حاليًا. يرجى التواصل مع المتجر.",
+    "chooseZoneFirst": "اختر المحافظة أولًا",
+    "deliveryUnavailable": "لا نوصّل إلى هذه المنطقة. يرجى اختيار منطقة أخرى.",
+    "chooseAreaForDelivery": "اختر منطقتك",
+    "calculatedAtCheckout": "يُحسب عند إتمام الطلب",
+    "addressNeedsArea": "هذا العنوان بدون منطقة توصيل. عدّله واختر المحافظة والمدينة للمتابعة.",
+    "needsDeliveryArea": "يحتاج منطقة توصيل"
 }

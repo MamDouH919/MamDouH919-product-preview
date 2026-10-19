@@ -40,6 +40,7 @@ export const useLinksList = () => {
             children: [
                 { primary: t("orders"), pathname: "/admin/orders" },
                 { primary: t("coupons"), pathname: "/admin/coupons" },
+                { primary: t("priceList"), pathname: "/admin/price-list" },
                 { primary: t("customers"), pathname: "/admin/customers" },
             ],
         },

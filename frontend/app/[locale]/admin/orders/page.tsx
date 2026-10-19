@@ -84,8 +84,19 @@ const OrdersPage = () => {
       },
       {
         id: "city",
-        header: t("city"),
-        render: (row: Order) => row.shippingAddress.city,
+        header: t("deliveryArea"),
+        render: (row: Order) => {
+          const a = row.shippingAddress;
+          if (!a.subZoneName) return a.city;
+          return (
+            <Stack>
+              <Typography variant="body2">{localized(a.subZoneName, lang)}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {localized(a.zoneName, lang)}
+              </Typography>
+            </Stack>
+          );
+        },
       },
       {
         id: "items",

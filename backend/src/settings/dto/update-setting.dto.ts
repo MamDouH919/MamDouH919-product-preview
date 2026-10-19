@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
+import { SUPPORTED_COUNTRIES } from '../../price-list/data';
 
 export class SocialMediaItemDto {
   @IsString()
@@ -65,8 +66,6 @@ export class UpdateSettingDto {
   currency?: LocalizedFieldDto;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  shippingFee?: number;
+  @IsIn(SUPPORTED_COUNTRIES)
+  country?: string;
 }

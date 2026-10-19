@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,13 +25,15 @@ import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { clearCart, setCouponCode } from "@/Store/slices/cart";
 import { useCustomerAddressesQuery } from "@/backend-api/customers/hooks";
+import { Address } from "@/backend-api/customers/types";
+import { DELIVERY_AREAS_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import { MY_ORDERS_QUERY_KEY, QUOTE_QUERY_KEY, useQuoteQuery } from "@/backend-api/orders/hooks";
 import { placeGuestOrder, placeOrder } from "@/backend-api/orders/mutations";
 import { CreateGuestOrderPayload } from "@/backend-api/orders/types";
 import { useCurrency } from "@/Hooks/useCurrency";
 import AddressFormDialog from "@/features/Customer/AddressFormDialog";
 import OrderLines from "@/features/Order/OrderLines";
-import { localized } from "@/features/Order/format";
+import { formatAddress, localized } from "@/features/Order/format";
 import GuestDetails, { EMPTY_GUEST_DETAILS, GuestDetailsValues } from "@/features/Checkout/GuestDetails";
 
 const CheckoutPage = () => {
@@ -48,6 +50,8 @@ const CheckoutPage = () => {
   const [pickedAddressId, setAddressId] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  // The saved address being edited from here, or null when adding one.
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   // Set once the order goes through, so emptying the cart doesn't bounce the
   // shopper back to /cart on the way to their confirmation page.
   const placed = useRef(false);
@@ -56,11 +60,9 @@ const CheckoutPage = () => {
     () => items.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })),
     [items]
   );
-  const { data: quote, isLoading: quoteLoading } = useQuoteQuery(inputs, couponCode);
   const { data: addresses, isLoading: addressesLoading } = useCustomerAddressesQuery();
   const guestForm = useForm<GuestDetailsValues>({ defaultValues: EMPTY_GUEST_DETAILS });
-
-  const currency = localized(quote?.currency, lang) || fallbackCurrency;
+  const guestSubZoneId = useWatch({ control: guestForm.control, name: "subZoneId" });
 
   useEffect(() => {
     if (hydrated && items.length === 0 && !placed.current) router.replace(`/${lang}/cart`);
@@ -70,6 +72,15 @@ const CheckoutPage = () => {
   const addressId = addresses?.some((a) => a._id === pickedAddressId)
     ? pickedAddressId
     : ((addresses?.find((a) => a.isDefault) ?? addresses?.[0])?._id ?? "");
+  const selectedAddress = addresses?.find((a) => a._id === addressId);
+
+  // Delivery is priced from the area being shipped to.
+  const subZoneId = isLoggedIn ? selectedAddress?.subZone : guestSubZoneId || undefined;
+  const { data: quote, isLoading: quoteLoading } = useQuoteQuery(inputs, couponCode, subZoneId);
+  /** A saved address from before the price list has no area to price. */
+  const addressNeedsArea = isLoggedIn && !!selectedAddress && !selectedAddress.subZone;
+
+  const currency = localized(quote?.currency, lang) || fallbackCurrency;
 
   const onPlaced = (href: string) => {
     placed.current = true;
@@ -79,6 +90,13 @@ const CheckoutPage = () => {
 
   const onOrderError = (error: any) => {
       const data = error?.response?.data;
+      // The store stopped delivering to the chosen area — refresh the pickers.
+      if (data?.code === "delivery_unavailable") {
+        queryClient.invalidateQueries({ queryKey: [QUOTE_QUERY_KEY] });
+        queryClient.invalidateQueries({ queryKey: [DELIVERY_AREAS_QUERY_KEY] });
+        toast.error(t("deliveryUnavailable"));
+        return;
+      }
       // The coupon stopped applying (used up, or a per-customer limit) — re-price
       // here; the summary explains it and offers to drop the code.
       if (data?.couponError) {
@@ -124,7 +142,7 @@ const CheckoutPage = () => {
       shippingAddress: {
         fullName: address.fullName.trim(),
         phone: address.phone.trim(),
-        city: address.city.trim(),
+        subZoneId: address.subZoneId,
         area: optional(address.area),
         street: address.street.trim(),
         building: optional(address.building),
@@ -183,7 +201,14 @@ const CheckoutPage = () => {
                 <Typography variant="subtitle1" fontWeight={700}>
                   {t("deliveryAddress")}
                 </Typography>
-                <Button size="small" startIcon={<Add />} onClick={() => setDialogOpen(true)}>
+                <Button
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setDialogOpen(true);
+                  }}
+                >
                   {t("addAddress")}
                 </Button>
               </Stack>
@@ -218,9 +243,7 @@ const CheckoutPage = () => {
                                 {address.fullName}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                {[address.street, address.building, address.area, address.city]
-                                  .filter(Boolean)
-                                  .join(", ")}
+                                {formatAddress(address, lang)}
                               </Typography>
                               <Typography variant="body2" color="text.secondary" dir="ltr" sx={{ textAlign: "start" }}>
                                 {address.phone}
@@ -232,6 +255,27 @@ const CheckoutPage = () => {
                     ))}
                   </Stack>
                 </RadioGroup>
+              )}
+
+              {addressNeedsArea && (
+                <Alert
+                  severity="warning"
+                  sx={{ mt: 2 }}
+                  action={
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => {
+                        setEditingAddress(selectedAddress ?? null);
+                        setDialogOpen(true);
+                      }}
+                    >
+                      {t("edit")}
+                    </Button>
+                  }
+                >
+                  {t("addressNeedsArea")}
+                </Alert>
               )}
             </Paper>
           )}
@@ -295,9 +339,14 @@ const CheckoutPage = () => {
                 discount={quote.discount}
                 couponCode={quote.coupon?.code}
                 shippingFee={quote.shippingFee}
+                shippingPending={quote.delivery === "pending"}
                 total={quote.total}
                 currency={currency}
               />
+
+              {quote.delivery === "unavailable" && (
+                <Alert severity="warning">{t("deliveryUnavailable")}</Alert>
+              )}
 
               {couponCode && quote.couponError && (
                 <Alert
@@ -331,7 +380,12 @@ const CheckoutPage = () => {
                 variant="contained"
                 size="large"
                 onClick={submit}
-                disabled={!quote.valid || (isLoggedIn && !addressId) || isPending}
+                disabled={
+                  !quote.valid ||
+                  (isLoggedIn && (!addressId || addressNeedsArea)) ||
+                  quote.delivery === "unavailable" ||
+                  isPending
+                }
                 sx={{ borderRadius: 2 }}
               >
                 {isPending ? <CircularProgress size={24} color="inherit" /> : t("placeOrder")}
@@ -342,7 +396,7 @@ const CheckoutPage = () => {
       </Stack>
 
       {isLoggedIn && (
-        <AddressFormDialog open={dialogOpen} address={null} onClose={() => setDialogOpen(false)} />
+        <AddressFormDialog open={dialogOpen} address={editingAddress} onClose={() => setDialogOpen(false)} />
       )}
     </Container>
   );
