@@ -8,7 +8,9 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
-import { Order, OrderItem } from './schemas/order.schema';
+import * as bcrypt from 'bcrypt';
+import { nanoid } from 'nanoid';
+import { Order, OrderItem, ShippingAddress } from './schemas/order.schema';
 import { Counter } from './schemas/counter.schema';
 import { Product } from '../products/schemas/product.schema';
 import { Setting } from '../settings/schemas/setting.schema';
@@ -17,6 +19,8 @@ import { InventoryService } from '../inventory/inventory.service';
 import { MovementType } from '../inventory/enums/movement-type.enum';
 import { AdjustStockDto } from '../inventory/dto/adjust-stock.dto';
 import { CustomersService } from '../customers/customers.service';
+import { Customer } from '../customers/schemas/customer.schema';
+import { CustomerAuthService } from '../customer-auth/customer-auth.service';
 import { CouponError, CouponsService } from '../coupons/coupons.service';
 import { OrderNotificationsService } from './order-notifications.service';
 import {
@@ -25,6 +29,7 @@ import {
   PaymentMethod,
 } from './enums/order-status.enum';
 import {
+  CreateGuestOrderDto,
   CreateOrderDto,
   OrderItemInputDto,
   QueryOrdersDto,
@@ -74,6 +79,21 @@ const COUPON_MESSAGES: Record<CouponError, string> = {
   min_subtotal: 'Your order is below the minimum for this coupon.',
 };
 
+/**
+ * Where a guest order's customer stands, which decides what its confirmation
+ * page offers: `claimable` — this order created the record, so its token
+ * holder may set a password right there; `guest` — an older guest record, which
+ * can only be activated through an emailed link; `registered` — the email
+ * already has an account, so the shopper should just sign in.
+ */
+export type GuestAccountStatus = 'claimable' | 'guest' | 'registered';
+
+/** What placing an order needs beyond the basket, whoever is placing it. */
+type PlaceOrderInput = Pick<
+  CreateOrderDto,
+  'items' | 'couponCode' | 'paymentMethod' | 'notes' | 'locale'
+>;
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** A priced line plus what placing it will do to stock. */
@@ -96,6 +116,7 @@ export class OrdersService {
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
     private readonly inventoryService: InventoryService,
     private readonly customersService: CustomersService,
+    private readonly customerAuthService: CustomerAuthService,
     private readonly couponsService: CouponsService,
     private readonly notifications: OrderNotificationsService,
   ) {}
@@ -151,6 +172,130 @@ export class OrdersService {
     }
 
     const address = await this.customersService.getAddress(customerId, dto.addressId);
+
+    return this.place(customer, address, dto, host);
+  }
+
+  /**
+   * Checkout without signing in, Shopify style. The email links the order to
+   * a customer — a new guest record built from the checkout details, or the
+   * existing one for that email — and the order gets a secret token, so the
+   * confirmation page and emails can show it without a session.
+   */
+  async createGuest(
+    dto: CreateGuestOrderDto,
+    host: string,
+  ): Promise<{ order: Order; token: string; account: GuestAccountStatus }> {
+    const { customer, created } = await this.customersService.findOrCreateForCheckout(
+      dto.email,
+      dto.shippingAddress,
+    );
+    if (!customer.isActive) {
+      throw new ForbiddenException('This account is blocked from placing orders.');
+    }
+
+    const token = nanoid(32);
+    let order: Order;
+    try {
+      order = await this.place(customer, dto.shippingAddress, dto, host, {
+        guestToken: token,
+        canClaimAccount: created,
+      });
+    } catch (error) {
+      // Don't leave a customer behind for an order that never happened —
+      // unless a concurrent checkout with the same email got one through.
+      if (created && !(await this.orderModel.exists({ customer: customer._id }))) {
+        await this.customersService.removeGuest(customer._id as Types.ObjectId);
+      }
+      throw error;
+    }
+
+    return { order, token, account: this.accountStatus(customer, order) };
+  }
+
+  /** A guest order, for whoever holds its token. */
+  async findGuestOrder(
+    orderId: string,
+    token: string,
+  ): Promise<Record<string, unknown> & { account: GuestAccountStatus }> {
+    const order = await this.findByGuestToken(orderId, token);
+    const customer = await this.customersService.getProfile(order.customer.toString());
+    return { ...order.toObject(), account: this.accountStatus(customer, order) };
+  }
+
+  /**
+   * Turns a guest order's customer into a real account. When this order
+   * created the record, its token holder sets a password and is signed in on
+   * the spot. Otherwise the record predates them, so all they get is an
+   * activation email to the address on file.
+   */
+  async claimGuestAccount(
+    orderId: string,
+    token: string,
+    password: string | undefined,
+    host: string,
+  ) {
+    const order = await this.findByGuestToken(orderId, token);
+    const customer = await this.customersService.getProfile(order.customer.toString());
+
+    if (!customer.isGuest) {
+      throw new BadRequestException({
+        message: 'An account already exists for this email. Please sign in.',
+        code: 'registered',
+      });
+    }
+    if (!customer.isActive) {
+      throw new ForbiddenException('This account has been disabled');
+    }
+
+    if (order.canClaimAccount) {
+      if (!password) throw new BadRequestException('password must be at least 6 characters');
+      const activated = await this.customersService.activateGuest(
+        customer._id as Types.ObjectId,
+        await bcrypt.hash(password, 10),
+      );
+      if (!activated) {
+        throw new BadRequestException({
+          message: 'An account already exists for this email. Please sign in.',
+          code: 'registered',
+        });
+      }
+      await this.orderModel.updateOne({ _id: order._id }, { $set: { canClaimAccount: false } }).exec();
+      return { session: await this.customerAuthService.createSession(activated, host) };
+    }
+
+    await this.customerAuthService.sendActivationEmail(customer, host, order.locale);
+    return { activationSent: true };
+  }
+
+  private accountStatus(customer: Customer, order: Order): GuestAccountStatus {
+    if (!customer.isGuest) return 'registered';
+    return order.canClaimAccount ? 'claimable' : 'guest';
+  }
+
+  private async findByGuestToken(orderId: string, token: string): Promise<Order> {
+    if (!Types.ObjectId.isValid(orderId) || !token) throw new NotFoundException('Order not found');
+    const order = await this.orderModel
+      .findOne({ _id: orderId, guestToken: token })
+      .select('-statusHistory.by')
+      .exec();
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  /**
+   * Prices the basket again, writes the order, claims the coupon and takes the
+   * stock — undoing everything if any step loses a race. Shared by signed-in
+   * and guest checkout; only who it's for and where it ships differ.
+   */
+  private async place(
+    customer: Customer,
+    address: ShippingAddress,
+    dto: PlaceOrderInput,
+    host: string,
+    guest?: { guestToken: string; canClaimAccount: boolean },
+  ): Promise<Order> {
+    const customerId = (customer._id as Types.ObjectId).toString();
 
     const lines = await this.resolveLines(dto.items);
     const problems = lines.filter((line) => line.issue);
@@ -214,6 +359,8 @@ export class OrdersService {
       statusHistory: [{ status: OrderStatus.PENDING, at: new Date() }],
       notes: dto.notes,
       locale: dto.locale,
+      guestToken: guest?.guestToken,
+      canClaimAccount: guest?.canClaimAccount ?? false,
     });
 
     // Claim the coupon use atomically — the check above can lose a race for
@@ -252,12 +399,20 @@ export class OrdersService {
       throw error;
     }
 
+    // A guest's confirmation carries the invite to finish their account. Mail
+    // is best effort, so a failure making the link mustn't fail the order.
+    const activationLink = customer.isGuest
+      ? await this.customerAuthService
+          .createActivationLink(customer._id as Types.ObjectId, host, dto.locale)
+          .catch(() => undefined)
+      : undefined;
+
     this.notifications.orderPlaced(order, {
       host,
       customerEmail: customer.email,
       storeName: settings.storeName,
-      storeEmail: settings.storeEmail,
       currency,
+      activationLink,
     });
 
     return order;
@@ -327,7 +482,6 @@ export class OrdersService {
         host,
         customerEmail,
         storeName: settings.storeName,
-        storeEmail: settings.storeEmail,
         currency: order.currency,
       },
       change,
@@ -525,17 +679,15 @@ export class OrdersService {
     shippingFee: number;
     currency?: LocalizedField;
     storeName?: LocalizedField;
-    storeEmail?: string;
   }> {
     const settings = await this.settingModel
       .findOne()
-      .select('shippingFee currency siteTitle email')
+      .select('shippingFee currency siteTitle')
       .exec();
     return {
       shippingFee: settings?.shippingFee ?? 0,
       currency: settings?.currency,
       storeName: settings?.siteTitle,
-      storeEmail: settings?.email,
     };
   }
 

@@ -1,35 +1,26 @@
 
 import { useMemo } from "react";
 import {
-    Inventory2Outlined,
-    MiscellaneousServices,
+    Database,
+    LayoutGrid,
+    MessagesSquare,
+    MonitorSmartphone,
+    Package,
     Settings,
-    ViewCarousel,
-    ContactMail,
-    Handshake,
-    Gavel,
-    StorageOutlined,
-    WarehouseOutlined,
-    PeopleAltOutlined,
-    ReceiptLongOutlined,
-    LocalOfferOutlined,
-    MarkEmailReadOutlined,
-} from "@mui/icons-material";
+    ShoppingCart,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
 
-interface LinkItem {
-    pathname?: string;
+export interface LinkItem {
     primary: string;
+    /** Route under the locale, e.g. "/admin/orders". Groups have none. */
+    pathname?: string;
     icon?: React.ElementType;
-    permission?: string;
-    action?: () => void;
+    /** Sub-links; an item with children renders as a collapsible group. */
     children?: LinkItem[];
-    sectionName?: string;
-    id?: string;
-    regex?: RegExp;
-    collapse?: string;
-    show?: boolean;
+    /** Match only the exact path (for "/admin", which prefixes every route). */
+    exact?: boolean;
 }
 
 export const useLinksList = () => {
@@ -38,71 +29,59 @@ export const useLinksList = () => {
 
     const linksList: LinkItem[] = useMemo(() => [
         {
-            primary: t("orders"),
-            pathname: "/admin/orders",
-            icon: ReceiptLongOutlined,
+            primary: t("dashboard"),
+            pathname: "/admin",
+            icon: LayoutGrid,
+            exact: true,
         },
         {
-            primary: t("coupons"),
-            pathname: "/admin/coupons",
-            icon: LocalOfferOutlined,
+            primary: t("navSales"),
+            icon: ShoppingCart,
+            children: [
+                { primary: t("orders"), pathname: "/admin/orders" },
+                { primary: t("coupons"), pathname: "/admin/coupons" },
+                { primary: t("customers"), pathname: "/admin/customers" },
+            ],
         },
         {
-            primary: t("banners"),
-            pathname: "/admin/banners",
-            icon: ViewCarousel,
+            primary: t("navCatalog"),
+            icon: Package,
+            children: [
+                { primary: t("products"), pathname: "/admin/products" },
+                { primary: t("categories"), pathname: "/admin/categories" },
+                { primary: t("subCategories"), pathname: "/admin/sub-categories" },
+                { primary: t("inventory"), pathname: "/admin/inventory" },
+            ],
         },
         {
-            primary: t("sections"),
-            pathname: "/admin/sections",
-            icon: Inventory2Outlined,
+            primary: t("navWebsite"),
+            icon: MonitorSmartphone,
+            children: [
+                { primary: t("pages"), pathname: "/admin/pages" },
+                { primary: t("banners"), pathname: "/admin/banners" },
+                { primary: t("sections"), pathname: "/admin/sections" },
+            ],
         },
         {
-            primary: t("categories"),
-            pathname: "/admin/categories",
-            icon: MiscellaneousServices,
+            primary: t("navMessages"),
+            icon: MessagesSquare,
+            children: [
+                { primary: t("contactMessages"), pathname: "/admin/contact" },
+                { primary: t("subscribers"), pathname: "/admin/subscribers" },
+            ],
         },
-        {
-            primary: t("subCategories"),
-            pathname: "/admin/sub-categories",
-            icon: Gavel,
-        },
-        {
-            primary: t("products"),
-            pathname: "/admin/products",
-            icon: Handshake,
-        },
-        {
-            primary: t("inventory"),
-            pathname: "/admin/inventory",
-            icon: WarehouseOutlined,
-        },
-        {
-            primary: t("customers"),
-            pathname: "/admin/customers",
-            icon: PeopleAltOutlined,
-        },
-        {
-            primary: t("contactMessages"),
-            pathname: "/admin/contact",
-            icon: ContactMail,
-        },
-        {
-            primary: t("subscribers"),
-            pathname: "/admin/subscribers",
-            icon: MarkEmailReadOutlined,
-        },
-
         {
             primary: t("settings"),
-            pathname: "/admin/settings",
             icon: Settings,
+            children: [
+                { primary: t("generalSettings"), pathname: "/admin/settings", exact: true },
+                { primary: t("mailSettings"), pathname: "/admin/settings/mail" },
+            ],
         },
-
         ...(isSuper ? [{
             primary: t("database"),
             pathname: "/admin/database",
-            icon: StorageOutlined,
+            icon: Database,
         }] : []),
     ], [t, isSuper]);
 

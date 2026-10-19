@@ -18,6 +18,8 @@ import useExtensions from "./useExtensions";
 interface EditorProps {
   value?: string;
   onChange?: (value: string) => void;
+  /** Uploads an image and resolves to its public URL. Without it images stay local blob URLs. */
+  onUploadImage?: (file: File) => Promise<string>;
 }
 
 function fileListToImageFiles(fileList: FileList): File[] {
@@ -27,7 +29,7 @@ function fileListToImageFiles(fileList: FileList): File[] {
   });
 }
 
-export default function Editor({ value, onChange }: EditorProps) {
+export default function Editor({ value, onChange, onUploadImage }: EditorProps) {
   const extensions = useExtensions({
     placeholder: ""
   });
@@ -52,18 +54,28 @@ export default function Editor({ value, onChange }: EditorProps) {
     (files: File[], insertPosition?: number): void => {
       if (!rteRef.current?.editor) return;
 
-      const attributesForImageFiles = files.map((file) => ({
+      const insert = (images: { src: string; alt: string }[]) => {
+        if (!rteRef.current?.editor) return;
+        insertImages({
+          images,
+          editor: rteRef.current.editor,
+          position: insertPosition,
+        });
+      };
+
+      if (onUploadImage) {
+        Promise.all(
+          files.map(async (file) => ({ src: await onUploadImage(file), alt: file.name })),
+        ).then(insert, () => undefined);
+        return;
+      }
+
+      insert(files.map((file) => ({
         src: URL.createObjectURL(file),
         alt: file.name,
-      }));
-
-      insertImages({
-        images: attributesForImageFiles,
-        editor: rteRef.current.editor,
-        position: insertPosition,
-      });
+      })));
     },
-    []
+    [onUploadImage]
   );
 
   /** Drop images */
@@ -125,7 +137,7 @@ export default function Editor({ value, onChange }: EditorProps) {
         const html = editor.getHTML();
         onChange?.(html);
       }}
-      renderControls={() => <EditorMenuControls />}
+      renderControls={() => <EditorMenuControls onUploadImage={onUploadImage} />}
       RichTextFieldProps={{
         variant: "outlined",
         MenuBarProps: {

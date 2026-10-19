@@ -5,10 +5,6 @@ export default () => ({
   database: {
     connectionString: process.env.MONGO_URL,
   },
-  mail: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
   frontendUrl: process.env.FRONTEND_URL,
   seed: {
     adminName: process.env.SEED_ADMIN_NAME,

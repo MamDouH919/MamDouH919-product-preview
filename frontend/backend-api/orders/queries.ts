@@ -1,6 +1,6 @@
 import api from "@/lib/api";
 import customerApi from "@/lib/customerApi";
-import { Order, OrderFilters, OrderItemInput, OrdersResponse, Quote } from "./types";
+import { GuestOrder, Order, OrderFilters, OrderItemInput, OrdersResponse, Quote } from "./types";
 
 /** Prices a basket against the live catalogue. Public — works for guests. */
 export const fetchQuote = async (
@@ -11,6 +11,12 @@ export const fetchQuote = async (
     items,
     couponCode: couponCode || undefined,
   });
+  return response.data;
+};
+
+/** A guest order, opened with the token from its confirmation link. */
+export const fetchGuestOrder = async (id: string, token: string): Promise<GuestOrder> => {
+  const response = await customerApi.post(`/orders/guest/${id}`, { token });
   return response.data;
 };
 

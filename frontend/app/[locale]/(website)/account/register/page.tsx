@@ -24,6 +24,8 @@ type FormValues = {
   confirmPassword: string;
 };
 
+const SERVER_FIELDS: (keyof FormValues)[] = ["name", "email", "phone", "password"];
+
 const CustomerRegisterPage = () => {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -37,7 +39,7 @@ const CustomerRegisterPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, isLoggedIn]);
 
-  const { control, handleSubmit, watch } = useForm<FormValues>({
+  const { control, handleSubmit, watch, setError } = useForm<FormValues>({
     defaultValues: {
       name: "",
       email: "",
@@ -59,7 +61,31 @@ const CustomerRegisterPage = () => {
       router.replace(`/${i18n.language}/account`);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? t("somethingWentWrong"));
+      // The email belongs to a guest checkout; the server emailed them a link
+      // to activate it instead of letting anyone set its password here.
+      if (error?.response?.data?.code === "activation_sent") {
+        toast.success(t("guestEmailActivationSent"), { duration: 8000 });
+        return;
+      }
+      const message = error?.response?.data?.message;
+      const messages: string[] = Array.isArray(message)
+        ? message
+        : message
+          ? [message]
+          : [];
+
+      // Backend messages start with the field name ("email must be an email",
+      // "Email already in use"), so route each one under its input.
+      const unmatched = messages.filter((msg) => {
+        const field = msg.split(" ")[0]?.toLowerCase() as keyof FormValues;
+        if (!SERVER_FIELDS.includes(field)) return true;
+        setError(field, { type: "server", message: msg }, { shouldFocus: true });
+        return false;
+      });
+
+      if (unmatched.length || !messages.length) {
+        toast.error(unmatched[0] ?? t("somethingWentWrong"));
+      }
     },
   });
 
@@ -67,7 +93,7 @@ const CustomerRegisterPage = () => {
     <CustomerAuthCard title={t("createAccount")} subtitle={t("registerSubtitle")}>
       <form
         onSubmit={handleSubmit(({ confirmPassword, phone, ...data }) =>
-          mutate({ ...data, phone: phone || undefined })
+          mutate({ ...data, phone: phone || undefined, locale: i18n.language })
         )}
       >
         <Stack spacing={2.5}>
@@ -96,6 +122,7 @@ const CustomerRegisterPage = () => {
             rules={{
               required: true,
               minLength: { value: 6, message: t("passwordTooShort") },
+              deps: ["confirmPassword"],
             }}
           />
           <TextInputComponent

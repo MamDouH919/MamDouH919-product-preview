@@ -120,6 +120,22 @@ export class Order extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Customer', required: true, index: true })
   customer!: Types.ObjectId;
 
+  /**
+   * Set on guest orders: the secret in the confirmation link that lets the
+   * shopper see the order without signing in.
+   */
+  @Prop({ required: false, index: true })
+  guestToken?: string;
+
+  /**
+   * True when this guest order is what created the customer record — the
+   * shopper holding its token may then set a password straight away. Cleared
+   * once used. A record that existed before can only be activated by email,
+   * or anyone who knew an address could take over its order history.
+   */
+  @Prop({ default: false })
+  canClaimAccount!: boolean;
+
   @Prop({ type: [OrderItemSchema], required: true })
   items!: OrderItem[];
 

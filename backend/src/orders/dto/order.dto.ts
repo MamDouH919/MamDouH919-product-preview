@@ -4,15 +4,18 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsEmail,
   IsEnum,
   IsIn,
   IsInt,
   IsMongoId,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { OrderStatus, PaymentMethod } from '../enums/order-status.enum';
@@ -74,6 +77,96 @@ export class CreateOrderDto extends QuoteOrderDto {
   @IsOptional()
   @IsIn(['en', 'ar'])
   locale?: string;
+}
+
+/** The delivery address a guest types at checkout. */
+export class GuestShippingAddressDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  fullName!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  phone!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  city!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  area?: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  street!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  building?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
+}
+
+/** Checkout without signing in: contact email and address instead of an address id. */
+export class CreateGuestOrderDto extends QuoteOrderDto {
+  @ApiProperty()
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+
+  @ApiProperty({ type: GuestShippingAddressDto })
+  @ValidateNested()
+  @Type(() => GuestShippingAddressDto)
+  shippingAddress!: GuestShippingAddressDto;
+
+  @ApiProperty({ required: false, enum: PaymentMethod })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notes?: string;
+
+  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for order emails' })
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  locale?: string;
+}
+
+export class GuestOrderTokenDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+}
+
+/** Turning a guest order into an account, from its confirmation page. */
+export class GuestOrderAccountDto extends GuestOrderTokenDto {
+  @ApiProperty({ required: false, minimum: 6, description: 'Needed when the account can be claimed directly' })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  password?: string;
 }
 
 export class UpdateOrderStatusDto {

@@ -56,8 +56,13 @@ export class Customer extends Document {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;
 
-  @Prop({ required: true })
-  password!: string;
+  /**
+   * Absent on a guest — someone checkout created a record for by email, who
+   * hasn't set a password yet. They activate the account through an emailed
+   * link (or straight from their order confirmation), like Shopify's invites.
+   */
+  @Prop({ required: false })
+  password?: string;
 
   @Prop({ required: false })
   phone?: string;
@@ -65,6 +70,10 @@ export class Customer extends Document {
   /** Reserved for optional email verification — ordering does not require it. */
   @Prop({ default: false })
   isVerified!: boolean;
+
+  /** Created by a guest checkout and not activated yet. */
+  @Prop({ default: false })
+  isGuest!: boolean;
 
   /** Lets an admin block an account without deleting its order history. */
   @Prop({ default: true })

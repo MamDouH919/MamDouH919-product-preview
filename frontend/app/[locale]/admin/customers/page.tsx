@@ -76,7 +76,14 @@ const CustomersPage = () => {
         header: t("name"),
         render: (row: Customer) => (
           <Stack>
-            <Typography variant="body2">{row.name}</Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="body2">{row.name}</Typography>
+              {row.isGuest && (
+                <Tooltip title={t("guestCustomerHint")}>
+                  <Chip label={t("guestCustomer")} size="small" variant="outlined" color="warning" />
+                </Tooltip>
+              )}
+            </Stack>
             <Typography variant="caption" color="text.secondary">
               {row.email}
             </Typography>

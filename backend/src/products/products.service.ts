@@ -115,9 +115,12 @@ export class ProductsService {
     const maxPrice = num(query.maxPrice);
     const inStock = String(query.inStock) === 'true';
 
+    // `category`/`subCategory` are declared with `type: Types.ObjectId`, which
+    // Mongoose treats as Mixed, so stored ids may be strings or ObjectIds.
+    const anyId = (id: string) => ({ $in: [id, new Types.ObjectId(id)] });
     const match: Record<string, unknown> = { isActive: true };
-    if (query.categoryId) match.category = new Types.ObjectId(query.categoryId);
-    if (query.subCategoryId) match.subCategory = new Types.ObjectId(query.subCategoryId);
+    if (query.categoryId) match.category = anyId(query.categoryId);
+    if (query.subCategoryId) match.subCategory = anyId(query.subCategoryId);
 
     const term = query.q?.trim();
     if (term) {
@@ -180,10 +183,12 @@ export class ProductsService {
               {
                 $lookup: {
                   from: 'categories',
-                  localField: 'category',
-                  foreignField: '_id',
+                  let: { categoryId: { $convert: { input: '$category', to: 'objectId', onError: null, onNull: null } } },
                   as: 'category',
-                  pipeline: [{ $project: { name: 1, slug: 1 } }],
+                  pipeline: [
+                    { $match: { $expr: { $eq: ['$_id', '$$categoryId'] } } },
+                    { $project: { name: 1, slug: 1 } },
+                  ],
                 },
               },
               { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },

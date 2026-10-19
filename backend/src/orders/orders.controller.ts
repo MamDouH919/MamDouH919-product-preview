@@ -11,10 +11,14 @@ import {
 } from '@nestjs/common';
 // `import type` — used bare in decorated signatures (see customer-auth.controller).
 import type { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import {
   CancelOrderDto,
+  CreateGuestOrderDto,
   CreateOrderDto,
+  GuestOrderAccountDto,
+  GuestOrderTokenDto,
   QueryOrdersDto,
   QuoteOrderDto,
   UpdateOrderStatusDto,
@@ -25,6 +29,7 @@ import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
+import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
 
 type CustomerRequest = Request & { customerId?: string };
 
@@ -36,6 +41,40 @@ export class OrderQuoteController {
   @Post()
   quote(@Body() dto: QuoteOrderDto) {
     return this.ordersService.quote(dto.items, dto.couponCode);
+  }
+}
+
+/**
+ * Checkout without an account. Public, so each route is rate limited, and a
+ * guest order is only ever readable with the secret token it was issued.
+ */
+@Controller('orders/guest')
+export class GuestOrdersController {
+  constructor(private readonly ordersService: OrdersService) {}
+
+  @UseGuards(AuthThrottlerGuard)
+  @Post()
+  create(@Body() dto: CreateGuestOrderDto, @Req() req: Request) {
+    return this.ordersService.createGuest(dto, req.hostname);
+  }
+
+  // POST rather than GET so the token stays out of access logs.
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @Post(':id')
+  findOne(@Param('id') id: string, @Body() dto: GuestOrderTokenDto) {
+    return this.ordersService.findGuestOrder(id, dto.token);
+  }
+
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 15 * 60_000, limit: 5 } })
+  @Post(':id/account')
+  claimAccount(
+    @Param('id') id: string,
+    @Body() dto: GuestOrderAccountDto,
+    @Req() req: Request,
+  ) {
+    return this.ordersService.claimGuestAccount(id, dto.token, dto.password, req.hostname);
   }
 }
 

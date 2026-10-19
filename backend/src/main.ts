@@ -14,6 +14,10 @@ async function bootstrap() {
     app.set('trust proxy', Number(process.env.TRUST_PROXY));
   }
 
+  // Custom pages are saved as one JSON document; rich-text blocks can push it
+  // past Express's 100kb default.
+  app.useBodyParser('json', { limit: '2mb' });
+
   // ✅ CORS allowlist — every tenant's frontendUrl from the tenant map, so
   // `npm run add-tenant` is the only step needed to onboard a store. Extra
   // origins (e.g. a second dev port) go in CORS_ORIGINS, comma-separated.

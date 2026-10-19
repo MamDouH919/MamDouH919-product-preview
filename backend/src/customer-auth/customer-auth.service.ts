@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -9,6 +11,7 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { nanoid } from 'nanoid';
+import { ConfigService } from '@nestjs/config';
 import { Customer } from '../customers/schemas/customer.schema';
 import {
   CustomerRefreshToken,
@@ -23,6 +26,26 @@ import { MailService } from '../mail/mail.service';
 import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 import { CUSTOMER_TOKEN_TYPE } from '../guards/customer-auth.guard';
 
+/** How long a guest's "activate your account" link stays usable. */
+const ACTIVATION_DAYS = 7;
+
+const ACTIVATION_COPY = {
+  en: {
+    subject: 'Activate your account',
+    title: 'Your account is almost ready',
+    body: 'Set a password to track your orders and check out faster next time.',
+    button: 'Activate account',
+    expiry: `This link expires in ${ACTIVATION_DAYS} days.`,
+  },
+  ar: {
+    subject: 'فعّل حسابك',
+    title: 'حسابك جاهز تقريبًا',
+    body: 'عيّن كلمة مرور لمتابعة طلباتك وإتمام الشراء أسرع في المرة القادمة.',
+    button: 'تفعيل الحساب',
+    expiry: `تنتهي صلاحية هذا الرابط خلال ${ACTIVATION_DAYS} أيام.`,
+  },
+};
+
 @Injectable()
 export class CustomerAuthService {
   constructor(
@@ -34,12 +57,25 @@ export class CustomerAuthService {
     private jwtService: JwtService,
     private mailService: MailService,
     private tenantConnection: TenantConnectionService,
+    private configService: ConfigService,
   ) {}
 
   async register(dto: CustomerRegisterDto, tenant: string) {
     const email = dto.email.toLowerCase().trim();
 
-    if (await this.customerModel.exists({ email })) {
+    const existing = await this.customerModel.findOne({ email }).exec();
+    if (existing?.isGuest) {
+      // A guest checkout already made this record. Setting a password here
+      // would hand its orders and addresses to whoever typed the email, so the
+      // owner has to prove it through their inbox instead.
+      await this.sendActivationEmail(existing, tenant, dto.locale);
+      throw new ConflictException({
+        message:
+          "You've ordered with this email before. We sent you a link to activate your account.",
+        code: 'activation_sent',
+      });
+    }
+    if (existing) {
       throw new BadRequestException('Email already in use');
     }
 
@@ -62,7 +98,11 @@ export class CustomerAuthService {
 
     // Same message either way, so the response cannot be used to discover
     // which email addresses are registered.
-    if (!customer || !(await bcrypt.compare(dto.password, customer.password))) {
+    // A guest has no password, so it fails the same way as a wrong one.
+    if (
+      !customer?.password ||
+      !(await bcrypt.compare(dto.password, customer.password))
+    ) {
       throw new BadRequestException('wrong credentials');
     }
 
@@ -100,7 +140,10 @@ export class CustomerAuthService {
     const customer = await this.customerModel.findById(customerId).exec();
     if (!customer) throw new BadRequestException('Customer not found');
 
-    if (!(await bcrypt.compare(dto.oldPassword, customer.password))) {
+    if (
+      !customer.password ||
+      !(await bcrypt.compare(dto.oldPassword, customer.password))
+    ) {
       throw new BadRequestException('Wrong password');
     }
 
@@ -129,12 +172,13 @@ export class CustomerAuthService {
       // Point the link at the tenant's own storefront, so a reset requested on
       // one shop can never land the customer on another.
       const frontendUrl = this.tenantConnection.getFrontendUrl(host);
-      await this.mailService.sendResetPasswordLink(
-        customer.email,
-        token,
-        frontendUrl,
-        'account/reset-password',
-      );
+      // Swallow mail failures: an error only for known emails would reveal
+      // which addresses have accounts.
+      await this.mailService
+        .sendResetPasswordLink(customer.email, token, frontendUrl, 'account/reset-password')
+        .catch((error: Error) =>
+          Logger.warn(`Reset email not sent — ${error.message}`, CustomerAuthService.name),
+        );
     }
 
     // Always the same response — see login.
@@ -153,7 +197,15 @@ export class CustomerAuthService {
     await this.customerModel
       .updateOne(
         { _id: resetToken.customerId },
-        { $set: { password: await bcrypt.hash(newPassword, 10) } },
+        {
+          $set: {
+            password: await bcrypt.hash(newPassword, 10),
+            // Following an emailed link proves the inbox, which is all a guest
+            // record was waiting for.
+            isGuest: false,
+            isVerified: true,
+          },
+        },
       )
       .exec();
 
@@ -171,6 +223,58 @@ export class CustomerAuthService {
       .exec();
     if (!customer) throw new BadRequestException('Customer not found');
     return customer;
+  }
+
+  /** Signs a customer in — for flows outside this service, like checkout. */
+  async createSession(customer: Customer, tenant: string) {
+    const tokens = await this.generateTokens(customer._id as Types.ObjectId, tenant);
+    return { ...tokens, customer: this.sanitize(customer) };
+  }
+
+  /**
+   * A one-use link that lets a guest set their password. It is a reset token
+   * underneath, so the reset-password page redeems it.
+   */
+  async createActivationLink(
+    customerId: Types.ObjectId,
+    host: string,
+    locale?: string,
+  ): Promise<string> {
+    const token = nanoid(64);
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + ACTIVATION_DAYS);
+    await this.resetTokenModel.create({ customerId, token, expiryDate });
+
+    const base = (
+      this.tenantConnection.getFrontendUrl(host) ??
+      this.configService.get<string>('frontendUrl') ??
+      ''
+    ).replace(/\/+$/, '');
+    const lang = locale === 'en' ? 'en' : 'ar';
+    return `${base}/${lang}/account/reset-password?token=${token}&activate=1`;
+  }
+
+  async sendActivationEmail(customer: Customer, host: string, locale?: string) {
+    const lang = locale === 'en' ? 'en' : 'ar';
+    const copy = ACTIVATION_COPY[lang];
+    const link = await this.createActivationLink(
+      customer._id as Types.ObjectId,
+      host,
+      lang,
+    );
+    const dir = lang === 'ar' ? 'rtl' : 'ltr';
+    await this.mailService.send({
+      to: customer.email,
+      subject: copy.subject,
+      html: `
+        <div dir="${dir}" style="font-family:Tahoma,Arial,sans-serif;line-height:1.6">
+          <h2>${copy.title}</h2>
+          <p>${copy.body}</p>
+          <p><a href="${link}">${copy.button}</a></p>
+          <p style="color:#888">${copy.expiry}</p>
+        </div>
+      `,
+    });
   }
 
   private async generateTokens(customerId: Types.ObjectId, tenant: string) {

@@ -32,7 +32,12 @@ import {
   isTouchDevice,
 } from "mui-tiptap";
 
-export default function EditorMenuControls() {
+interface EditorMenuControlsProps {
+  /** Uploads an image and resolves to its public URL. Without it images stay local blob URLs. */
+  onUploadImage?: (file: File) => Promise<string>;
+}
+
+export default function EditorMenuControls({ onUploadImage }: EditorMenuControlsProps = {}) {
   const theme = useTheme();
   return (
     <MenuControlsContainer>
@@ -141,6 +146,11 @@ export default function EditorMenuControls() {
 
       <MenuButtonImageUpload
         onUploadFiles={(files) =>
+          onUploadImage
+            ? Promise.all(
+                files.map(async (file) => ({ src: await onUploadImage(file), alt: file.name })),
+              )
+            :
           // For the sake of a demo, we don't have a server to upload the files
           // to, so we'll instead convert each one to a local "temporary" object
           // URL. This will not persist properly in a production setting. You

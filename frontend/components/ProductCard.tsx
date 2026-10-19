@@ -1,13 +1,16 @@
 "use client"
 
+import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Product } from "@/backend-api/products/types"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { useCurrency } from "@/Hooks/useCurrency"
 import { useTheme, alpha } from "@mui/material/styles"
-import { ShoppingBag, ArrowUpRight } from "lucide-react"
+import { ShoppingBag, Plus } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
+import QuickAddDialog from "@/features/Cart/QuickAddDialog"
 import Image from "next/image"
 
 function localizedField(field: Record<string, string | undefined> | undefined, lang: string) {
@@ -16,120 +19,166 @@ function localizedField(field: Record<string, string | undefined> | undefined, l
 }
 
 export default function ProductCard({ product, lang }: { product: Product; lang: string }) {
+  const { t } = useTranslation()
   const theme = useTheme()
   const currency = useCurrency()
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
 
   const name = localizedField(product.name, lang)
   const categoryName = localizedField(product.category?.name, lang)
   const image = product.images?.[0]
+  const hoverImage = product.images?.[1]
 
   const variants = product.variants ?? []
   const variantPrices = variants.map((v) => v.price).filter((p): p is number => p != null)
   const minVariantPrice = variantPrices.length ? Math.min(...variantPrices) : null
   const displayPrice = variants.length > 0 ? minVariantPrice : product.price
-  const visibleVariants = variants.slice(0, 2)
+  const visibleVariants = variants.slice(0, 3)
   const extraVariantCount = variants.length - visibleVariants.length
+
+  const limited = product.trackStock && !product.allowBackorder
+  const stock = product.totalStock ?? (variants.length ? variants.reduce((s, v) => s + (v.stock ?? 0), 0) : product.stock)
+  const soldOut = limited && (stock ?? 0) <= 0
+  const canQuickAdd = !soldOut && displayPrice != null
 
   const cssVars = {
     "--primary": theme.palette.primary.main,
-    "--primary-8": alpha(theme.palette.primary.main, 0.08),
-    "--primary-20": alpha(theme.palette.primary.main, 0.2),
-    "--primary-shadow": alpha(theme.palette.primary.main, 0.28),
+    "--primary-dark": theme.palette.primary.dark,
+    "--primary-glow": alpha(theme.palette.primary.main, 0.45),
   } as React.CSSProperties
 
   return (
     <article
       style={cssVars}
-      className="group relative flex flex-col rounded-[22px] bg-white ring-1 ring-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_45px_-24px_var(--primary-shadow)] hover:ring-(--primary-20) transition-shadow duration-300"
+      className="group relative isolate aspect-3/4 overflow-hidden rounded-[28px] bg-neutral-900 shadow-[0_2px_6px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition-shadow duration-300 hover:shadow-[0_24px_44px_-22px_var(--primary-glow)]"
     >
-      {/* Whole-card link (kept out of the DOM flow so it never nests inside the WhatsApp anchor) */}
+      {/* Whole-card link; every interactive control sits above it (z-20) so nothing nests inside the anchor */}
       <CustomLink
         href={`/products/${product.slug}`}
         ariaLabel={name}
-        className="absolute inset-0 z-10 rounded-[22px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
+        className="absolute inset-0 z-10 rounded-[28px] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
       />
 
-      {/* Image */}
-      <div className="relative aspect-square overflow-hidden rounded-t-[22px] bg-neutral-50">
-        {image ? (
+      {/* Media */}
+      {image ? (
+        <>
           <Image
             src={getBackendUri(image)}
             alt={name}
             fill
-            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            className={`object-cover will-change-transform transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.05] ${
+              hoverImage ? "md:group-hover:opacity-0" : ""
+            } ${soldOut ? "grayscale" : ""}`}
           />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-neutral-50 to-neutral-100">
-            <ShoppingBag className="h-9 w-9 text-neutral-300" strokeWidth={1.5} />
-          </div>
-        )}
+          {hoverImage && (
+            <Image
+              src={getBackendUri(hoverImage)}
+              alt=""
+              fill
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+              className="hidden object-cover opacity-0 will-change-transform transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.05] group-hover:opacity-100 md:block"
+            />
+          )}
+        </>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(120%_90%_at_30%_10%,var(--primary)_0%,var(--primary-dark)_55%,#0a0a0a_100%)]">
+          <ShoppingBag className="h-12 w-12 text-white/30" strokeWidth={1.25} />
+        </div>
+      )}
 
-        {categoryName && (
-          <span className="absolute start-3 top-3 z-20 rounded-full border border-black/5 bg-white/95 px-2.5 py-1 text-[11px] font-medium text-neutral-600 shadow-sm backdrop-blur-sm">
-            {categoryName}
-          </span>
-        )}
+      {/* Readability scrim behind the bottom text, plus a light one so top controls hold on bright photos */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-linear-to-t from-black/90 via-black/50 via-45% to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 bg-linear-to-b from-black/25 to-transparent" />
 
-        <div className="absolute end-3 top-3 z-20 flex flex-col gap-2">
-          <WhatsAppButton slug={product.slug} productName={name} className="shadow-md" />
+      {/* Top row */}
+      <div className="absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
+          {categoryName && (
+            <span className="pointer-events-none max-w-full truncate rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-neutral-800 shadow-md">
+              {categoryName}
+            </span>
+          )}
+          {soldOut && (
+            <span className="pointer-events-none rounded-full bg-neutral-900 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-md">
+              {t("outOfStock")}
+            </span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-2">
           <WishlistButton productId={product._id} />
+          <WhatsAppButton slug={product.slug} productName={name} className="h-9! w-9! shadow-md" />
         </div>
       </div>
 
-      {/* Info panel — floats slightly over the image to give the card depth */}
-      <div className="relative z-20 -mt-6 mx-3 mb-3 rounded-2xl bg-white p-3.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.04]">
-        <p className="min-h-[2.5em] text-[14px] font-semibold leading-snug text-neutral-900 line-clamp-2">
-          {name}
-        </p>
-
+      {/* Bottom info */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2.5 p-4">
         {visibleVariants.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {visibleVariants.map((v, i) => (
+          <div className="flex flex-wrap gap-1">
+            {visibleVariants.map((v) => (
               <span
-                key={i}
-                className="inline-flex items-center rounded-full bg-(--primary-8) px-2 py-0.5 text-[10px] font-medium text-(--primary)"
+                key={v._id}
+                className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white ring-1 ring-white/20"
               >
                 {v.label}
               </span>
             ))}
             {extraVariantCount > 0 && (
-              <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
-                +{extraVariantCount}
-              </span>
+              <span className="rounded-md px-1 py-0.5 text-[10px] font-medium text-white/60">+{extraVariantCount}</span>
             )}
           </div>
         )}
 
-        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2.5">
-          {displayPrice != null ? (
-            <span className="text-[15px] font-bold text-(--primary)">
-              {displayPrice.toLocaleString()}{" "}
-              <span className="text-[11px] font-medium text-neutral-400">{currency}</span>
-              {variants.length > 0 && <span className="text-[11px] font-semibold">+</span>}
-            </span>
-          ) : (
-            <span className="text-sm text-neutral-300">—</span>
-          )}
+        <h3 className="text-base font-semibold leading-snug text-white line-clamp-2 [text-shadow:0_1px_12px_rgba(0,0,0,0.35)]">
+          {name}
+        </h3>
 
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--primary-20) text-(--primary) transition-colors duration-300 group-hover:border-(--primary) group-hover:bg-(--primary) group-hover:text-white">
-            <ArrowUpRight className="h-4 w-4" />
-          </span>
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex min-w-0 flex-col leading-none">
+            {variants.length > 1 && displayPrice != null && (
+              <span className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/55">{t("from")}</span>
+            )}
+            {displayPrice != null ? (
+              <span className="flex items-baseline gap-1 text-white">
+                <span className="text-xl font-extrabold tabular-nums tracking-tight">{displayPrice.toLocaleString()}</span>
+                <span className="text-[11px] font-medium text-white/60">{currency}</span>
+              </span>
+            ) : (
+              <span className="text-sm text-white/40">—</span>
+            )}
+          </div>
+
+          {/* Only color and transform animate here — no width/padding changes, so hover never triggers layout */}
+          <button
+            type="button"
+            onClick={() => setQuickAddOpen(true)}
+            disabled={!canQuickAdd}
+            aria-label={t("addToCart")}
+            title={t("addToCart")}
+            className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-neutral-900 shadow-lg transition-[background-color,color,transform] duration-200 hover:scale-105 group-hover:bg-(--primary) group-hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"
+          >
+            <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.25} />
+          </button>
         </div>
       </div>
+
+      <QuickAddDialog product={product} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
     </article>
   )
 }
 
 export function ProductCardSkeleton() {
   return (
-    <div className="flex flex-col rounded-[22px] bg-white ring-1 ring-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04)] animate-pulse">
-      <div className="aspect-square rounded-t-[22px] bg-neutral-200" />
-      <div className="relative -mt-6 mx-3 mb-3 rounded-2xl bg-white p-3.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.04]">
-        <div className="h-3.5 w-4/5 rounded-lg bg-neutral-200" />
-        <div className="mt-2 h-3.5 w-2/5 rounded-lg bg-neutral-200" />
-        <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2.5">
-          <div className="h-4 w-1/3 rounded-lg bg-neutral-200" />
-          <div className="h-9 w-9 rounded-full bg-neutral-200" />
+    <div className="relative aspect-3/4 overflow-hidden rounded-[28px] bg-neutral-200 animate-pulse">
+      <div className="absolute inset-s-3 top-3 h-6 w-20 rounded-full bg-neutral-300" />
+      <div className="absolute inset-e-3 top-3 h-9 w-9 rounded-full bg-neutral-300" />
+      <div className="absolute inset-x-4 bottom-4 flex flex-col gap-2.5">
+        <div className="h-4 w-4/5 rounded-lg bg-neutral-300" />
+        <div className="h-4 w-3/5 rounded-lg bg-neutral-300" />
+        <div className="flex items-end justify-between">
+          <div className="h-6 w-1/3 rounded-lg bg-neutral-300" />
+          <div className="h-11 w-11 rounded-full bg-neutral-300" />
         </div>
       </div>
     </div>

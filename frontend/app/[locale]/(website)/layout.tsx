@@ -26,7 +26,7 @@ export default function Layout({
       <CartSync />
       <Navbar />
       <SocialIcons />
-      <Box component="main" sx={{ flexGrow: 1, pt: 9 }}>
+      <Box component="main" sx={{ flexGrow: 1, pt: { xs: 10, md: 12 } }}>
         {children}
       </Box>
       <Footer />

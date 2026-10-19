@@ -20,6 +20,7 @@ import { useAppSelector } from '@/Store/store';
 import { getBackendUri, getLocalizedString } from '@/utils/helperFunctions';
 import { useSettingsQuery } from '@/backend-api/settings/hooks';
 import { useCategoriesQuery } from '@/backend-api/categories/hooks';
+import { usePagesNavigationQuery } from '@/backend-api/pages/hooks';
 import { useCurrency } from '@/Hooks/useCurrency';
 import CustomLink from '@/components/CustomLink';
 import SocialMediaLinks from '@/components/Social';
@@ -95,6 +96,7 @@ const Footer = () => {
   const { logo } = useAppSelector((state) => state.settings);
   const { data: settings } = useSettingsQuery();
   const { data: categories } = useCategoriesQuery();
+  const { data: navPages } = usePagesNavigationQuery();
   const currency = useCurrency();
 
   const socialLinks = (settings?.socialMedia ?? []).filter((s) => s.value);
@@ -113,6 +115,9 @@ const Footer = () => {
   const quickLinks = [
     { href: '/', label: t('home') },
     // { href: '/about', label: t('aboutUs') },
+    ...(navPages ?? [])
+      .filter((p) => p.showInFooter)
+      .map((p) => ({ href: `/${p.slug}`, label: getLocalizedString(p.title, lang) })),
     { href: '/contact', label: t('contactUs') },
   ];
 

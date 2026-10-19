@@ -4,6 +4,7 @@ import {
   fetchMyOrder,
   fetchMyOrders,
   fetchOrderById,
+  fetchGuestOrder,
   fetchOrders,
   fetchQuote,
 } from "./queries";
@@ -11,6 +12,7 @@ import { OrderFilters, OrderItemInput } from "./types";
 
 export const QUOTE_QUERY_KEY = "order-quote";
 export const MY_ORDERS_QUERY_KEY = "my-orders";
+export const GUEST_ORDER_QUERY_KEY = "guest-order";
 export const ORDERS_QUERY_KEY = "orders";
 
 /** Live prices and stock for the basket; refetches whenever its lines change. */
@@ -41,6 +43,15 @@ export const useMyOrderQuery = (id: string) => {
     queryKey: [MY_ORDERS_QUERY_KEY, id],
     queryFn: () => fetchMyOrder(id),
     enabled: isLoggedIn && !!id,
+  });
+};
+
+export const useGuestOrderQuery = (id: string, token: string | null) => {
+  return useQuery({
+    queryKey: [GUEST_ORDER_QUERY_KEY, id, token],
+    queryFn: () => fetchGuestOrder(id, token!),
+    enabled: !!id && !!token,
+    retry: false,
   });
 };
 

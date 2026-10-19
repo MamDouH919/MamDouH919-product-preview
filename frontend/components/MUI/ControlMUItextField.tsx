@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload } from "@mui/icons-material";
+import { Upload, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
   CircularProgress,
   IconButton,
@@ -8,7 +8,7 @@ import {
   TextField,
   TextFieldProps,
 } from "@mui/material";
-import { KeyboardEvent, useRef } from "react";
+import { KeyboardEvent, useRef, useState } from "react";
 import { Control, Controller, FieldValues, Path } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 export const capitalizeFirstLetter = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
@@ -47,10 +47,13 @@ const TextInputComponent = <T extends FieldValues>({
   fileInputKey,
   inputRef, // 👈 Accept inputRef prop
   readOnly = false,
+  type,
   ...rest
 }: IProps<T>) => {
   const { t } = useTranslation();
   const fileDialogOpenRef = useRef(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
 
 
 
@@ -118,27 +121,23 @@ const TextInputComponent = <T extends FieldValues>({
     <Controller
       name={name}
       control={control}
-      rules={
-        required ? {
-          required: t("fieldIsRequired"),
-          validate: {
-            whiteSpace: (value) => {
-              if (value && typeof value === "string") {
-                return !!value.trim() || t("fieldIsRequired");
-              }
-            },
-          }
-        } : {
-          validate: {
-            whiteSpace: (value) => {
-              if (value && typeof value === "string") {
-                return !!value.trim() || t("fieldIsRequired");
-              }
-            },
+      rules={{
+        ...rules,
+        required:
+          required || rules?.required === true
+            ? t("fieldIsRequired")
+            : rules?.required,
+        validate: {
+          whiteSpace: (value: any) => {
+            if (value && typeof value === "string") {
+              return !!value.trim() || t("fieldIsRequired");
+            }
           },
-          ...rules
-        }
-      }
+          ...(typeof rules?.validate === "function"
+            ? { custom: rules.validate }
+            : rules?.validate),
+        },
+      }}
       render={({ field, fieldState: { error } }) => (
         <>
           {fileUpload && (
@@ -173,7 +172,7 @@ const TextInputComponent = <T extends FieldValues>({
             size="small"
             fullWidth
             variant={variant || "outlined"}
-            type={fileUpload ? "text" : rest.type}
+            type={fileUpload ? "text" : isPassword && showPassword ? "text" : type}
             inputRef={inputRef} //
             InputProps={{
               readOnly: fileUpload || readOnly,
@@ -187,6 +186,18 @@ const TextInputComponent = <T extends FieldValues>({
                     disabled={rest.disabled}
                   >
                     <Upload />
+                  </IconButton>
+                </InputAdornment>
+              ) : isPassword ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    edge="end"
+                    size="small"
+                    aria-label={showPassword ? "hide password" : "show password"}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
                 </InputAdornment>
               ) : (

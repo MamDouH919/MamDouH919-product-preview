@@ -17,10 +17,13 @@ import { addToCart } from "@/Store/slices/cart"
 export default function AddToCart({
   product,
   variantIndex,
+  onAdded,
 }: {
   product: Product
   /** The selected variant, or null when none is chosen. */
   variantIndex: number | null
+  /** Called after the item is added, e.g. to close a quick-add dialog. */
+  onAdded?: () => void
 }) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
@@ -61,6 +64,7 @@ export default function AddToCart({
       })
     )
     setQuantity(1)
+    onAdded?.()
     toast.success(t("addedToCart"), {
       action: {
         label: t("viewCart"),

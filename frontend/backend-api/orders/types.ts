@@ -125,6 +125,28 @@ export type OrderFilters = {
   limit?: number;
 };
 
+/** See GuestAccountStatus on the server. */
+export type GuestAccountStatus = "claimable" | "guest" | "registered";
+
+export type GuestOrder = Order & { account: GuestAccountStatus };
+
+export type CreateGuestOrderPayload = {
+  items: OrderItemInput[];
+  email: string;
+  shippingAddress: ShippingAddress;
+  paymentMethod?: PaymentMethod;
+  notes?: string;
+  couponCode?: string;
+  locale?: string;
+};
+
+export type GuestOrderResponse = {
+  order: Order;
+  /** The secret that opens the order's confirmation page without signing in. */
+  token: string;
+  account: GuestAccountStatus;
+};
+
 export type CreateOrderPayload = {
   items: OrderItemInput[];
   addressId: string;

@@ -231,6 +231,75 @@ export class CustomersService {
     return customer;
   }
 
+  // ── Guest checkout ──────────────────────────────────────────────────────────
+
+  /**
+   * The customer a guest checkout belongs to, matched on email the way Shopify
+   * does: a new email gets a guest record built from what was typed at
+   * checkout; a known one gets the order added to its history. `created` tells
+   * the caller this call made the record, so it can undo that if the order
+   * then fails.
+   */
+  async findOrCreateForCheckout(
+    email: string,
+    address: Omit<AddressDto, 'label' | 'isDefault'>,
+  ): Promise<{ customer: Customer; created: boolean }> {
+    const normalized = email.toLowerCase().trim();
+    const existing = await this.customerModel.findOne({ email: normalized }).exec();
+
+    if (!existing) {
+      try {
+        const customer = await this.customerModel.create({
+          name: address.fullName,
+          email: normalized,
+          phone: address.phone,
+          isGuest: true,
+          addresses: [{ ...address, isDefault: true }],
+        });
+        return { customer, created: true };
+      } catch (error: any) {
+        // Two checkouts with the same new email at once — use the winner's.
+        if (error?.code !== 11000) throw error;
+        const winner = await this.customerModel.findOne({ email: normalized }).exec();
+        if (!winner) throw error;
+        return { customer: winner, created: false };
+      }
+    }
+
+    // A guest's address book only ever comes from their own checkouts, so a
+    // new address is worth keeping. A registered account's is the owner's to
+    // curate — anyone who knows the email could otherwise fill it with junk.
+    if (existing.isGuest) {
+      const same = (a: Address) =>
+        (['fullName', 'phone', 'city', 'area', 'street', 'building'] as const).every(
+          (key) => (a[key] ?? '') === (address[key] ?? ''),
+        );
+      if (!existing.addresses.some(same)) {
+        if (existing.addresses.length) this.clearDefaults(existing);
+        existing.addresses.push({ ...address, isDefault: true } as Address);
+        await existing.save();
+      }
+    }
+
+    return { customer: existing, created: false };
+  }
+
+  /** Lets a guest set a password; only for a record that still has none. */
+  async activateGuest(customerId: Types.ObjectId, passwordHash: string): Promise<Customer | null> {
+    return this.customerModel
+      .findOneAndUpdate(
+        { _id: customerId, isGuest: true, password: { $exists: false } },
+        { $set: { password: passwordHash, isGuest: false } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  /** Undoes a guest record whose first order never went through. */
+  async removeGuest(customerId: Types.ObjectId): Promise<void> {
+    await this.customerModel.deleteOne({ _id: customerId, isGuest: true }).exec();
+  }
+
   /** The address an order should preselect, if the customer has saved one. */
   async getDefaultAddress(customerId: string): Promise<Address | undefined> {
     const customer = await this.getProfile(customerId);

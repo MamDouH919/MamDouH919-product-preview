@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,11 +26,13 @@ import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { clearCart, setCouponCode } from "@/Store/slices/cart";
 import { useCustomerAddressesQuery } from "@/backend-api/customers/hooks";
 import { MY_ORDERS_QUERY_KEY, QUOTE_QUERY_KEY, useQuoteQuery } from "@/backend-api/orders/hooks";
-import { placeOrder } from "@/backend-api/orders/mutations";
+import { placeGuestOrder, placeOrder } from "@/backend-api/orders/mutations";
+import { CreateGuestOrderPayload } from "@/backend-api/orders/types";
 import { useCurrency } from "@/Hooks/useCurrency";
 import AddressFormDialog from "@/features/Customer/AddressFormDialog";
 import OrderLines from "@/features/Order/OrderLines";
 import { localized } from "@/features/Order/format";
+import GuestDetails, { EMPTY_GUEST_DETAILS, GuestDetailsValues } from "@/features/Checkout/GuestDetails";
 
 const CheckoutPage = () => {
   const { t, i18n } = useTranslation();
@@ -55,15 +58,9 @@ const CheckoutPage = () => {
   );
   const { data: quote, isLoading: quoteLoading } = useQuoteQuery(inputs, couponCode);
   const { data: addresses, isLoading: addressesLoading } = useCustomerAddressesQuery();
+  const guestForm = useForm<GuestDetailsValues>({ defaultValues: EMPTY_GUEST_DETAILS });
 
   const currency = localized(quote?.currency, lang) || fallbackCurrency;
-
-  useEffect(() => {
-    if (isInitialized && !isLoggedIn) {
-      const here = `/${lang}/checkout`;
-      router.replace(`/${lang}/account/login?from=${encodeURIComponent(here)}`);
-    }
-  }, [isInitialized, isLoggedIn, lang, router]);
 
   useEffect(() => {
     if (hydrated && items.length === 0 && !placed.current) router.replace(`/${lang}/cart`);
@@ -74,15 +71,13 @@ const CheckoutPage = () => {
     ? pickedAddressId
     : ((addresses?.find((a) => a.isDefault) ?? addresses?.[0])?._id ?? "");
 
-  const orderMutation = useMutation({
-    mutationFn: placeOrder,
-    onSuccess: (order) => {
-      placed.current = true;
-      dispatch(clearCart());
-      queryClient.invalidateQueries({ queryKey: [MY_ORDERS_QUERY_KEY] });
-      router.replace(`/${lang}/account/orders/${order._id}?placed=1`);
-    },
-    onError: (error: any) => {
+  const onPlaced = (href: string) => {
+    placed.current = true;
+    dispatch(clearCart());
+    router.replace(href);
+  };
+
+  const onOrderError = (error: any) => {
       const data = error?.response?.data;
       // The coupon stopped applying (used up, or a per-customer limit) — re-price
       // here; the summary explains it and offers to drop the code.
@@ -100,10 +95,54 @@ const CheckoutPage = () => {
         return;
       }
       toast.error(Array.isArray(data?.message) ? data.message[0] : data?.message ?? t("somethingWentWrong"));
+  };
+
+  const orderMutation = useMutation({
+    mutationFn: placeOrder,
+    onSuccess: (order) => {
+      queryClient.invalidateQueries({ queryKey: [MY_ORDERS_QUERY_KEY] });
+      onPlaced(`/${lang}/account/orders/${order._id}?placed=1`);
     },
+    onError: onOrderError,
+  });
+
+  // The confirmation opens by the order's token — no session needed.
+  const guestMutation = useMutation({
+    mutationFn: placeGuestOrder,
+    onSuccess: ({ order, token }) =>
+      onPlaced(`/${lang}/orders/${order._id}?token=${encodeURIComponent(token)}&placed=1`),
+    onError: onOrderError,
+  });
+
+  const isPending = orderMutation.isPending || guestMutation.isPending;
+
+  const submitGuest = guestForm.handleSubmit(({ email, ...address }) => {
+    const optional = (value: string) => value.trim() || undefined;
+    const payload: CreateGuestOrderPayload = {
+      items: inputs,
+      email: email.trim(),
+      shippingAddress: {
+        fullName: address.fullName.trim(),
+        phone: address.phone.trim(),
+        city: address.city.trim(),
+        area: optional(address.area),
+        street: address.street.trim(),
+        building: optional(address.building),
+        notes: optional(address.notes),
+      },
+      paymentMethod: "cash_on_delivery",
+      notes: notes.trim() || undefined,
+      couponCode: quote?.coupon?.code,
+      locale: lang,
+    };
+    guestMutation.mutate(payload);
   });
 
   const submit = () => {
+    if (!isLoggedIn) {
+      submitGuest();
+      return;
+    }
     if (!addressId) {
       toast.error(t("chooseAddress"));
       return;
@@ -119,7 +158,7 @@ const CheckoutPage = () => {
     });
   };
 
-  if (!isInitialized || !isLoggedIn || !hydrated || items.length === 0) {
+  if (!isInitialized || !hydrated || items.length === 0) {
     return (
       <Stack alignItems="center" justifyContent="center" minHeight="50vh">
         <CircularProgress />
@@ -135,63 +174,67 @@ const CheckoutPage = () => {
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems="flex-start">
         <Stack spacing={3} flex={1} width="100%">
-          {/* Address */}
-          <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 3 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-              <Typography variant="subtitle1" fontWeight={700}>
-                {t("deliveryAddress")}
-              </Typography>
-              <Button size="small" startIcon={<Add />} onClick={() => setDialogOpen(true)}>
-                {t("addAddress")}
-              </Button>
-            </Stack>
+          {!isLoggedIn ? (
+            <GuestDetails control={guestForm.control} />
+          ) : (
+            // Signed in: pick one of the saved addresses.
+            <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 3 }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  {t("deliveryAddress")}
+                </Typography>
+                <Button size="small" startIcon={<Add />} onClick={() => setDialogOpen(true)}>
+                  {t("addAddress")}
+                </Button>
+              </Stack>
 
-            {addressesLoading ? (
-              <CircularProgress size={24} />
-            ) : !addresses?.length ? (
-              <Alert severity="info">{t("addAddressToContinue")}</Alert>
-            ) : (
-              <RadioGroup value={addressId} onChange={(e) => setAddressId(e.target.value)}>
-                <Stack spacing={1.5}>
-                  {addresses.map((address) => (
-                    <Paper
-                      key={address._id}
-                      variant="outlined"
-                      sx={{
-                        px: 2,
-                        py: 1,
-                        borderRadius: 2,
-                        borderColor: address._id === addressId ? "primary.main" : "divider",
-                        borderWidth: address._id === addressId ? 2 : 1,
-                      }}
-                    >
-                      <FormControlLabel
-                        value={address._id}
-                        control={<Radio />}
-                        sx={{ width: "100%", m: 0, alignItems: "flex-start", "& .MuiRadio-root": { mt: 0.25 } }}
-                        label={
-                          <Box py={1}>
-                            <Typography variant="body2" fontWeight={600}>
-                              {address.label ? `${address.label} · ` : ""}
-                              {address.fullName}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {[address.street, address.building, address.area, address.city]
-                                .filter(Boolean)
-                                .join(", ")}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" dir="ltr" sx={{ textAlign: "start" }}>
-                              {address.phone}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </Paper>
-                  ))}
-                </Stack>
-              </RadioGroup>
-            )}
-          </Paper>
+              {addressesLoading ? (
+                <CircularProgress size={24} />
+              ) : !addresses?.length ? (
+                <Alert severity="info">{t("addAddressToContinue")}</Alert>
+              ) : (
+                <RadioGroup value={addressId} onChange={(e) => setAddressId(e.target.value)}>
+                  <Stack spacing={1.5}>
+                    {addresses.map((address) => (
+                      <Paper
+                        key={address._id}
+                        variant="outlined"
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          borderRadius: 2,
+                          borderColor: address._id === addressId ? "primary.main" : "divider",
+                          borderWidth: address._id === addressId ? 2 : 1,
+                        }}
+                      >
+                        <FormControlLabel
+                          value={address._id}
+                          control={<Radio />}
+                          sx={{ width: "100%", m: 0, alignItems: "flex-start", "& .MuiRadio-root": { mt: 0.25 } }}
+                          label={
+                            <Box py={1}>
+                              <Typography variant="body2" fontWeight={600}>
+                                {address.label ? `${address.label} · ` : ""}
+                                {address.fullName}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {[address.street, address.building, address.area, address.city]
+                                  .filter(Boolean)
+                                  .join(", ")}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" dir="ltr" sx={{ textAlign: "start" }}>
+                                {address.phone}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </Paper>
+                    ))}
+                  </Stack>
+                </RadioGroup>
+              )}
+            </Paper>
+          )}
 
           {/* Payment */}
           <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 3 }}>
@@ -288,17 +331,19 @@ const CheckoutPage = () => {
                 variant="contained"
                 size="large"
                 onClick={submit}
-                disabled={!quote.valid || !addressId || orderMutation.isPending}
+                disabled={!quote.valid || (isLoggedIn && !addressId) || isPending}
                 sx={{ borderRadius: 2 }}
               >
-                {orderMutation.isPending ? <CircularProgress size={24} color="inherit" /> : t("placeOrder")}
+                {isPending ? <CircularProgress size={24} color="inherit" /> : t("placeOrder")}
               </Button>
             </Stack>
           )}
         </Paper>
       </Stack>
 
-      <AddressFormDialog open={dialogOpen} address={null} onClose={() => setDialogOpen(false)} />
+      {isLoggedIn && (
+        <AddressFormDialog open={dialogOpen} address={null} onClose={() => setDialogOpen(false)} />
+      )}
     </Container>
   );
 };

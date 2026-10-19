@@ -19,4 +19,5 @@ export enum Resource {
   CUSTOMERS = 'customers',
   ORDERS = 'orders',
   COUPONS = 'coupons',
+  PAGES = 'pages',
 }

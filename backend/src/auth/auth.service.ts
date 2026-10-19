@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { SignupDto } from './dtos/signup.dto';
 import { User } from './schemas/user.schema';
 import { InjectModel } from '@nestjs/mongoose';
@@ -186,7 +186,13 @@ export class AuthService {
       // Build the reset link against the tenant's own frontend so the email
       // points users back to the site they signed up on.
       const frontendUrl = this.tenantConnection.getFrontendUrl(host);
-      await this.mailService.sendResetPasswordLink(email, resetToken, frontendUrl);
+      // Swallow mail failures: an error only for known emails would reveal
+      // which addresses have accounts.
+      await this.mailService
+        .sendResetPasswordLink(email, resetToken, frontendUrl)
+        .catch((error: Error) =>
+          Logger.warn(`Reset email not sent — ${error.message}`, AuthService.name),
+        );
     }
 
     return { message: 'If the email exists, a password reset link will be sent' };

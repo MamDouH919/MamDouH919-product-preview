@@ -37,7 +37,6 @@ const CartPage = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { items, couponCode, hydrated } = useAppSelector((state) => state.cart);
-  const isLoggedIn = useAppSelector((state) => state.customer.isLoggedIn);
   const fallbackCurrency = useCurrency();
 
   const inputs = useMemo(
@@ -53,8 +52,8 @@ const CartPage = () => {
   const currency = localized(quote?.currency, lang) || fallbackCurrency;
 
   const goToCheckout = () => {
-    const checkout = `/${lang}/checkout`;
-    router.push(isLoggedIn ? checkout : `/${lang}/account/login?from=${encodeURIComponent(checkout)}`);
+    // Guests check out too — signing in is offered on the checkout page.
+    router.push(`/${lang}/checkout`);
   };
 
   if (!hydrated) {

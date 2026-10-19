@@ -18,6 +18,8 @@ export type Customer = {
   phone?: string;
   isVerified: boolean;
   isActive: boolean;
+  /** Created by a guest checkout and not activated yet. */
+  isGuest?: boolean;
   addresses: Address[];
   /** Saved product ids. */
   wishlist?: string[];
@@ -35,6 +37,7 @@ export type RegisterPayload = {
   email: string;
   password: string;
   phone?: string;
+  locale?: string;
 };
 
 export type LoginPayload = {

@@ -19,6 +19,8 @@ const ResetPasswordForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  // The same token mechanism activates an account a guest checkout created.
+  const activating = searchParams.get("activate") === "1";
 
   const { control, handleSubmit, watch } = useForm<FormValues>({
     defaultValues: { newPassword: "", confirmPassword: "" },
@@ -27,7 +29,7 @@ const ResetPasswordForm = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: customerResetPassword,
     onSuccess: () => {
-      toast.success(t("passwordResetSuccess"));
+      toast.success(t(activating ? "accountActivated" : "passwordResetSuccess"));
       router.replace(`/${i18n.language}/account/login`);
     },
     onError: (error: any) =>
@@ -50,7 +52,10 @@ const ResetPasswordForm = () => {
   }
 
   return (
-    <CustomerAuthCard title={t("resetPassword")} subtitle={t("resetPasswordSubtitle")}>
+    <CustomerAuthCard
+      title={t(activating ? "activateAccount" : "resetPassword")}
+      subtitle={t(activating ? "activateAccountSubtitle" : "resetPasswordSubtitle")}
+    >
       <form
         onSubmit={handleSubmit(({ newPassword }) => mutate({ token, newPassword }))}
       >
@@ -79,7 +84,7 @@ const ResetPasswordForm = () => {
             }}
           />
           <Button type="submit" variant="contained" size="large" disabled={isPending}>
-            {t("resetPassword")}
+            {t(activating ? "activateAccount" : "resetPassword")}
           </Button>
         </Stack>
       </form>

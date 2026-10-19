@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from '../mail/mail.service';
+import { MailService, OutgoingMail } from '../mail/mail.service';
+import { MailNotification } from '../mail/schemas/mail-setting.schema';
 import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 import { LocalizedField } from '../common/schemas/localized-field.schema';
 import { escapeHtml } from '../common/helpers/escape-html';
@@ -15,9 +16,9 @@ export interface NotificationContext {
   host: string;
   customerEmail?: string;
   storeName?: LocalizedField;
-  /** Where new-order alerts go; falls back to the sending mailbox. */
-  storeEmail?: string;
   currency?: LocalizedField;
+  /** For a guest: where they set a password and turn the record into an account. */
+  activationLink?: string;
 }
 
 const COPY: Record<Lang, Record<string, string>> = {
@@ -54,6 +55,9 @@ const COPY: Record<Lang, Record<string, string>> = {
     note: 'Note',
     viewOrder: 'View your order',
     openInDashboard: 'Open in dashboard',
+    activateTitle: 'Save your details for next time',
+    activateBody: 'Create an account to track this order and check out faster.',
+    activate: 'Create account',
   },
   ar: {
     placedSubject: 'تم استلام الطلب رقم #{n}',
@@ -88,12 +92,17 @@ const COPY: Record<Lang, Record<string, string>> = {
     note: 'ملاحظة',
     viewOrder: 'عرض طلبك',
     openInDashboard: 'فتح في لوحة التحكم',
+    activateTitle: 'احفظ بياناتك للمرة القادمة',
+    activateBody: 'أنشئ حسابًا لمتابعة هذا الطلب وإتمام الشراء بشكل أسرع.',
+    activate: 'إنشاء حساب',
   },
 };
 
 /**
  * Order emails. Every send is fire-and-forget: a mail outage must never fail
  * or slow down checkout or a status change, so failures are logged and dropped.
+ * Store alerts go to the recipients set in Settings → Email, and each kind of
+ * email can be switched off there.
  */
 @Injectable()
 export class OrderNotificationsService {
@@ -111,7 +120,7 @@ export class OrderNotificationsService {
     const n = String(order.orderNumber);
 
     if (ctx.customerEmail) {
-      this.dispatch(order, {
+      this.dispatch(order, 'customerOrderPlaced', {
         to: ctx.customerEmail,
         subject: this.subject(lang, 'placedSubject', n, ctx),
         html: this.layout(lang, ctx, [
@@ -120,26 +129,26 @@ export class OrderNotificationsService {
           this.itemsTable(order, lang, ctx),
           this.addressBlock(order, lang),
           this.button(this.customerLink(order, ctx.host), this.t(lang, 'viewOrder')),
+          ctx.activationLink ? '<hr style="border:none;border-top:1px solid #eee;margin:28px 0 20px">' : '',
+          ctx.activationLink ? this.heading(this.t(lang, 'activateTitle')) : '',
+          ctx.activationLink ? this.paragraph(this.t(lang, 'activateBody')) : '',
+          ctx.activationLink ? this.button(ctx.activationLink, this.t(lang, 'activate')) : '',
         ]),
       });
     }
 
-    const storeEmail = ctx.storeEmail || this.config.get<string>('mail.user');
-    if (storeEmail) {
-      const total = this.money(order.total, lang, ctx);
-      this.dispatch(order, {
-        to: storeEmail,
-        replyTo: ctx.customerEmail,
-        subject: this.t(lang, 'alertSubject', { n, total }),
-        html: this.layout(lang, ctx, [
-          this.heading(this.t(lang, 'alertTitle', { n })),
-          this.itemsTable(order, lang, ctx),
-          this.addressBlock(order, lang),
-          order.notes ? this.labelled(this.t(lang, 'notes'), order.notes) : '',
-          this.button(this.adminLink(order, ctx.host), this.t(lang, 'openInDashboard')),
-        ]),
-      });
-    }
+    const total = this.money(order.total, lang, ctx);
+    this.dispatch(order, 'storeNewOrder', {
+      replyTo: ctx.customerEmail,
+      subject: this.t(lang, 'alertSubject', { n, total }),
+      html: this.layout(lang, ctx, [
+        this.heading(this.t(lang, 'alertTitle', { n })),
+        this.itemsTable(order, lang, ctx),
+        this.addressBlock(order, lang),
+        order.notes ? this.labelled(this.t(lang, 'notes'), order.notes) : '',
+        this.button(this.adminLink(order, ctx.host), this.t(lang, 'openInDashboard')),
+      ]),
+    });
   }
 
   /** Tells the customer their order moved; tells the store if the customer cancelled. */
@@ -154,7 +163,7 @@ export class OrderNotificationsService {
     if (status === OrderStatus.PENDING) return;
 
     if (ctx.customerEmail) {
-      this.dispatch(order, {
+      this.dispatch(order, 'customerOrderStatus', {
         to: ctx.customerEmail,
         subject: this.subject(lang, `${status}Subject`, n, ctx),
         html: this.layout(lang, ctx, [
@@ -169,10 +178,7 @@ export class OrderNotificationsService {
     }
 
     if (change.byCustomer && status === OrderStatus.CANCELLED) {
-      const storeEmail = ctx.storeEmail || this.config.get<string>('mail.user');
-      if (!storeEmail) return;
-      this.dispatch(order, {
-        to: storeEmail,
+      this.dispatch(order, 'storeOrderCancelled', {
         subject: this.t(lang, 'alertCancelledSubject', { n }),
         html: this.layout(lang, ctx, [
           this.heading(this.t(lang, 'alertCancelledTitle', { n })),
@@ -185,11 +191,17 @@ export class OrderNotificationsService {
 
   // ── Delivery ────────────────────────────────────────────────────────────────
 
+  /** A message without `to` is a store alert. */
   private dispatch(
     order: Order,
-    message: { to: string; subject: string; html: string; replyTo?: string },
+    kind: MailNotification,
+    message: Omit<OutgoingMail, 'to'> & { to?: string },
   ): void {
-    this.mail.send(message).catch((error: Error) =>
+    const { to, ...rest } = message;
+    const sending = to
+      ? this.mail.send({ ...rest, to }, kind)
+      : this.mail.sendToStore(rest, kind);
+    sending.catch((error: Error) =>
       this.logger.warn(
         `Order #${order.orderNumber}: email "${message.subject}" not sent — ${error.message}`,
       ),
@@ -230,6 +242,10 @@ export class OrderNotificationsService {
   }
 
   private customerLink(order: Order, host: string): string {
+    // A guest order opens by its token, so the link works without signing in.
+    if (order.guestToken) {
+      return `${this.frontend(host)}/${this.lang(order)}/orders/${order._id}?token=${order.guestToken}`;
+    }
     return `${this.frontend(host)}/${this.lang(order)}/account/orders/${order._id}`;
   }
 

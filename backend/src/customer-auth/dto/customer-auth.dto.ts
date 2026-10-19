@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -26,6 +27,11 @@ export class CustomerRegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for emails' })
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  locale?: string;
 }
 
 export class CustomerLoginDto {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { SxProps, Theme } from "@mui/material/styles";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,6 +14,7 @@ import {
   ListItemText,
   Paper,
   Stack,
+  alpha,
 } from "@mui/material";
 import PersonOutline from "@mui/icons-material/PersonOutline";
 import LocationOnOutlined from "@mui/icons-material/LocationOnOutlined";
@@ -29,6 +31,23 @@ import { setCustomerAuthToken } from "@/lib/customerApi";
 
 /** Pages under /account that a guest may still open. */
 const PUBLIC_ACCOUNT_PATHS = ["/account/login", "/account/register", "/account/forgot-password", "/account/reset-password"];
+
+const navItemSx: SxProps<Theme> = {
+  borderRadius: 2,
+  color: "text.secondary",
+  "& .MuiListItemIcon-root": { color: "inherit" },
+  "&:hover": {
+    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06),
+    color: "text.primary",
+  },
+  "&.Mui-selected": {
+    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+    color: "primary.main",
+  },
+  "&.Mui-selected:hover": {
+    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.14),
+  },
+};
 
 const AccountLayout = ({ children }: { children: React.ReactNode }) => {
   const { t, i18n } = useTranslation();
@@ -85,7 +104,7 @@ const AccountLayout = ({ children }: { children: React.ReactNode }) => {
           variant="outlined"
           sx={{ borderRadius: 3, width: { xs: "100%", md: 260 }, flexShrink: 0 }}
         >
-          <List disablePadding>
+          <List sx={{ p: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
             {navItems.map(({ href, label, icon: Icon, exact }) => {
               const localised = `/${i18n.language}${href}`;
               const selected = exact ? pathname === localised : pathname.startsWith(localised);
@@ -95,11 +114,15 @@ const AccountLayout = ({ children }: { children: React.ReactNode }) => {
                   key={href}
                   selected={selected}
                   onClick={() => router.push(localised)}
+                  sx={navItemSx}
                 >
                   <ListItemIcon sx={{ minWidth: 40 }}>
                     <Icon />
                   </ListItemIcon>
-                  <ListItemText primary={label} />
+                  <ListItemText
+                    primary={label}
+                    slotProps={{ primary: { fontWeight: selected ? 700 : 500 } }}
+                  />
                 </ListItemButton>
               );
             })}
@@ -107,11 +130,21 @@ const AccountLayout = ({ children }: { children: React.ReactNode }) => {
             <ListItemButton
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
+              sx={{
+                ...navItemSx,
+                "&:hover": {
+                  bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                },
+              }}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
                 <LogoutOutlined color="error" />
               </ListItemIcon>
-              <ListItemText primary={t("signOut")} sx={{ color: "error.main" }} />
+              <ListItemText
+                primary={t("signOut")}
+                sx={{ color: "error.main" }}
+                slotProps={{ primary: { fontWeight: 500 } }}
+              />
             </ListItemButton>
           </List>
         </Paper>
