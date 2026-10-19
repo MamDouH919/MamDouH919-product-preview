@@ -30,6 +30,7 @@ import { useSectionsQuery } from "@/backend-api/sections/hooks";
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import type { LocalizedField } from "@/backend-api/globalTypes";
+import SalesOverview from "@/features/Dashboard/SalesOverview";
 
 export const dynamic = "force-dynamic";
 
@@ -261,6 +262,12 @@ const Dashboard = () => {
   return (
     <Container maxWidth="xl" disableGutters>
       <Stack spacing={4}>
+        <SalesOverview />
+
+        <Typography variant="h6" fontWeight={800}>
+          {t("catalogOverview")}
+        </Typography>
+
         {/* Stat cards */}
         <Grid container spacing={3}>
           {stats.map((stat) => (

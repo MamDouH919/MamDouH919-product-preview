@@ -20,6 +20,7 @@ export class MailNotificationsDto {
   @IsOptional() @IsBoolean() storeNewOrder?: boolean;
   @IsOptional() @IsBoolean() storeOrderCancelled?: boolean;
   @IsOptional() @IsBoolean() contactForm?: boolean;
+  @IsOptional() @IsBoolean() customerAbandonedCart?: boolean;
 }
 
 export class UpdateMailSettingDto {

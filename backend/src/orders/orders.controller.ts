@@ -19,6 +19,7 @@ import {
   CreateOrderDto,
   GuestOrderAccountDto,
   GuestOrderTokenDto,
+  TrackOrderDto,
   QueryOrdersDto,
   QuoteOrderDto,
   UpdateOrderStatusDto,
@@ -41,6 +42,22 @@ export class OrderQuoteController {
   @Post()
   quote(@Body() dto: QuoteOrderDto) {
     return this.ordersService.quote(dto.items, dto.couponCode, dto.subZoneId);
+  }
+}
+
+/**
+ * Public order lookup by number plus email or phone. Rate limited hard, since
+ * order numbers are sequential and this is the one place they can be probed.
+ */
+@Controller('orders/track')
+export class OrderTrackingController {
+  constructor(private readonly ordersService: OrdersService) {}
+
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 15 * 60_000, limit: 10 } })
+  @Post()
+  track(@Body() dto: TrackOrderDto) {
+    return this.ordersService.track(Number(dto.orderNumber), dto.contact);
   }
 }
 

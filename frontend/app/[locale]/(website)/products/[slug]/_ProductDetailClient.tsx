@@ -1,7 +1,7 @@
 "use client"
 
 import { use, useEffect, useState } from "react"
-import { useProductBySlugQuery, useProductsQuery } from "@/backend-api/products/hooks"
+import { useProductBySlugQuery, useRelatedProductsQuery } from "@/backend-api/products/hooks"
 import { incrementProductView } from "@/backend-api/products/mutations"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
@@ -14,6 +14,10 @@ import WhatsAppButton from "@/components/WhatsAppButton"
 import AddToCart from "@/features/Cart/AddToCart"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
 import { useTheme, alpha } from "@mui/material/styles"
+import ProductReviews from "@/features/Review/ProductReviews"
+import Stars from "@/features/Review/Stars"
+import RecentlyViewed from "@/features/Product/RecentlyViewed"
+import { recordRecentlyViewed } from "@/features/Product/recentlyViewedStore"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -70,14 +74,13 @@ export default function ProductDetailClient({ params }: Props) {
   const { data: product, isLoading, isError } = useProductBySlugQuery(slug)
 
   const activeVariant = selectedVariant ?? (product?.variants?.length ? 0 : null)
-  const { data: categoryProducts } = useProductsQuery(
-    product?.category?._id ? { categoryId: product.category._id } : undefined
-  )
+  const { data: related } = useRelatedProductsQuery(product?._id, 4)
+  const relatedProducts = related ?? []
 
-  const relatedProducts = (categoryProducts ?? [])
-    .filter((p) => p.isActive && p.slug !== slug)
-    .sort((a, b) => a.order - b.order)
-    .slice(0, 4)
+  // The strip below leaves this product out itself, so recording it right away is fine.
+  useEffect(() => {
+    if (product?._id && product.isActive) recordRecentlyViewed(product._id)
+  }, [product?._id, product?.isActive])
 
   useEffect(() => {
     if (!product?.slug) return
@@ -216,6 +219,14 @@ export default function ProductDetailClient({ params }: Props) {
 
             <h1 className="text-3xl font-bold text-gray-900 leading-tight">{name}</h1>
 
+            {!!product.ratingCount && (
+              <a href="#reviews" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-(--primary) w-fit">
+                <Stars value={product.ratingAverage ?? 0} />
+                <span className="font-semibold text-gray-800 tabular-nums">{(product.ratingAverage ?? 0).toFixed(1)}</span>
+                <span className="underline underline-offset-4">{t("reviewsCount", { count: product.ratingCount })}</span>
+              </a>
+            )}
+
             {(() => {
               const displayPrice = activeVariant !== null
                 ? product.variants?.[activeVariant]?.price
@@ -323,6 +334,8 @@ export default function ProductDetailClient({ params }: Props) {
           </div>
         )}
 
+        <ProductReviews productId={product._id} />
+
         {relatedProducts.length > 0 && (
           <div>
             <div className="flex items-center gap-3 mb-6">
@@ -336,6 +349,8 @@ export default function ProductDetailClient({ params }: Props) {
             </div>
           </div>
         )}
+
+        <RecentlyViewed excludeId={product._id} className="mt-16" />
       </div>
     </div>
   )

@@ -35,11 +35,20 @@ const GetSettings = ({ children }: { children: React.ReactNode }) => {
             .finally(() => setReady(true));
     }, [dispatch]);
 
-    if (!ready) return <Stack alignItems="center" justifyContent="center" height="100dvh">
-        <CircularProgress size={40} />
-    </Stack>;
-
-    return <>{children}</>;
+    // The page renders underneath the spinner rather than in its place, so the
+    // server HTML carries the real content and structured data for crawlers.
+    // Visibility is toggled on one wrapper, never by swapping trees, so nothing
+    // remounts when settings arrive.
+    return (
+        <>
+            {!ready && (
+                <Stack alignItems="center" justifyContent="center" height="100dvh">
+                    <CircularProgress size={40} />
+                </Stack>
+            )}
+            <div style={{ display: ready ? "contents" : "none" }}>{children}</div>
+        </>
+    );
 };
 
 export default GetSettings;

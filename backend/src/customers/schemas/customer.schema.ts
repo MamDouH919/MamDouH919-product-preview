@@ -61,6 +61,45 @@ export type AddressFields = Omit<Address, '_id' | 'label' | 'isDefault'>;
 
 export const AddressSchema = SchemaFactory.createForClass(Address);
 
+/** One basket line as saved for a signed-in customer — what and how many, never a price. */
+@Schema({ _id: false })
+export class SavedCartItem {
+  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
+  product!: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, required: false })
+  variantId?: Types.ObjectId;
+
+  @Prop({ required: true, min: 1 })
+  quantity!: number;
+}
+
+export const SavedCartItemSchema = SchemaFactory.createForClass(SavedCartItem);
+
+/**
+ * A signed-in customer's basket, mirrored from the browser so it follows them
+ * across devices and so an abandoned one can be followed up by email.
+ */
+@Schema({ _id: false })
+export class SavedCart {
+  @Prop({ type: [SavedCartItemSchema], default: [] })
+  items!: SavedCartItem[];
+
+  /** Storefront language when it last changed — the language a reminder is written in. */
+  @Prop({ required: false })
+  locale?: string;
+
+  /** When the contents last changed. Re-saving the same lines doesn't move it. */
+  @Prop({ type: Date, required: true })
+  updatedAt!: Date;
+
+  /** When a reminder went out. One per change: older than `updatedAt` means it's due again. */
+  @Prop({ type: Date, required: false })
+  remindedAt?: Date;
+}
+
+export const SavedCartSchema = SchemaFactory.createForClass(SavedCart);
+
 /**
  * Storefront customers. Deliberately a separate collection from `User`, which
  * is the admin identity: `User` carries `roleId` and `isSuper`, and the
@@ -105,6 +144,17 @@ export class Customer extends Document {
   /** Saved products, most recent last. */
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }], default: [] })
   wishlist!: Types.ObjectId[];
+
+  /** Left out of every query unless asked for, so profile responses stay small. */
+  @Prop({ type: SavedCartSchema, required: false, select: false })
+  cart?: SavedCart;
+
+  /** Cleared by the opt-out link in a reminder email. */
+  @Prop({ default: true })
+  cartReminders!: boolean;
 }
 
 export const CustomerSchema = SchemaFactory.createForClass(Customer);
+
+// Finds carts due a reminder without scanning every customer.
+CustomerSchema.index({ 'cart.updatedAt': 1 }, { sparse: true });

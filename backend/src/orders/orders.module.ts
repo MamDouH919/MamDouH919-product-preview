@@ -4,6 +4,7 @@ import {
   CustomerOrdersController,
   GuestOrdersController,
   OrderQuoteController,
+  OrderTrackingController,
   OrdersController,
 } from './orders.controller';
 import { Order, OrderSchema } from './schemas/order.schema';
@@ -35,6 +36,7 @@ import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
   // register before `GET /orders/:id`, or "me" would be read as an order id.
   controllers: [
     OrderQuoteController,
+    OrderTrackingController,
     GuestOrdersController,
     CustomerOrdersController,
     OrdersController,

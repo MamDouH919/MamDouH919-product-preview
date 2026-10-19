@@ -85,6 +85,14 @@ export class Product extends Document {
 
   @Prop({ default: 0 })
   whatsappClicks!: number;
+
+  // ── Reviews ────────────────────────────────────────────────────────────────
+  // Maintained by ReviewsService from approved reviews only; never edited here.
+  @Prop({ default: 0 })
+  ratingAverage!: number;
+
+  @Prop({ default: 0 })
+  ratingCount!: number;
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);

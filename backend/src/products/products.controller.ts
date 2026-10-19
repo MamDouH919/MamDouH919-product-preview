@@ -63,6 +63,18 @@ export class ProductsController {
     return this.productsService.search(query);
   }
 
+  /** Public: active products by comma-separated ids, kept in the order given. */
+  @Get('by-ids')
+  findByIds(@Query('ids') ids?: string) {
+    return this.productsService.findByIds((ids ?? '').split(',').map((id) => id.trim()));
+  }
+
+  @Get(':id/related')
+  findRelated(@Param('id') id: string, @Query('limit') limit?: string) {
+    const n = Math.min(Math.max(Number(limit) || 8, 1), 24);
+    return this.productsService.findRelated(id, n);
+  }
+
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlug(slug);

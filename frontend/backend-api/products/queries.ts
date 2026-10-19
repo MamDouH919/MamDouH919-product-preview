@@ -26,3 +26,15 @@ export const searchProducts = async (
   const response = await api.get("/products/search", { params });
   return response.data;
 };
+
+/** Best matches for a product: same sub-category, category, tags and bought-together. */
+export const fetchRelatedProducts = async (id: string, limit = 8): Promise<Product[]> => {
+  const response = await api.get(`/products/${id}/related`, { params: { limit } });
+  return response.data;
+};
+
+/** Active products in the order the ids were given; unknown or hidden ones are skipped. */
+export const fetchProductsByIds = async (ids: string[]): Promise<Product[]> => {
+  const response = await api.get("/products/by-ids", { params: { ids: ids.join(",") } });
+  return response.data;
+};

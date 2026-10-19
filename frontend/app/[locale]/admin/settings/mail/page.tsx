@@ -70,6 +70,7 @@ const NOTIFICATION_KEYS: (keyof MailNotifications)[] = [
   "storeNewOrder",
   "storeOrderCancelled",
   "contactForm",
+  "customerAbandonedCart",
 ];
 
 type FormValues = {

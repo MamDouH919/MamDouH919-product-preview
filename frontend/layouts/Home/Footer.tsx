@@ -118,6 +118,7 @@ const Footer = () => {
     ...(navPages ?? [])
       .filter((p) => p.showInFooter)
       .map((p) => ({ href: `/${p.slug}`, label: getLocalizedString(p.title, lang) })),
+    { href: '/track', label: t('trackOrder') },
     { href: '/contact', label: t('contactUs') },
   ];
 

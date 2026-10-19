@@ -22,6 +22,10 @@ import { OrdersModule } from './orders/orders.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { PagesModule } from './pages/pages.module';
 import { PriceListModule } from './price-list/price-list.module';
+import { ReportsModule } from './reports/reports.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { SitemapModule } from './sitemap/sitemap.module';
+import { CartModule } from './cart/cart.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -75,6 +79,10 @@ import { TenantModule } from './common/tenant/tenant.module';
     CouponsModule,
     PagesModule,
     PriceListModule,
+    ReportsModule,
+    ReviewsModule,
+    SitemapModule,
+    CartModule,
     TenantModule,
   ],
   controllers: [],

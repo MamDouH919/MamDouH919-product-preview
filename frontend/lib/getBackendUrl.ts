@@ -18,14 +18,22 @@ const api: Record<string, string> = {
 }
 
 export function getBackendUrl(): string {
+  if (typeof window !== "undefined") {
+    return backendUrlForHost(window.location.hostname);
+  }
+
+  return process.env.NEXT_PUBLIC_BACKEND_URL ?? "";
+}
+
+/**
+ * The backend for a given storefront host (port ignored). For server code —
+ * metadata, sitemap, robots — which has a request host but no window.
+ */
+export function backendUrlForHost(host?: string | null): string {
   const override = process.env.NEXT_PUBLIC_BACKEND_URL;
   if (override) return override;
 
-  if (typeof window !== "undefined") {
-    return api[window.location.hostname] ?? "";
-  }
-
-  return "";
+  return api[host?.split(":")[0] ?? ""] ?? "";
 }
 
 export function getTenantKey(): string {

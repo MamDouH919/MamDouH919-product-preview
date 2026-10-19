@@ -169,3 +169,22 @@ export type CreateOrderPayload = {
   /** Language the order emails are written in. */
   locale?: string;
 };
+
+/** What the public tracking form returns — no street, phone or guest token. */
+export type TrackedOrder = {
+  _id: string;
+  orderNumber: number;
+  status: OrderStatus;
+  createdAt: string;
+  statusHistory: OrderStatusChange[];
+  items: Pick<OrderItem, "name" | "variantLabel" | "image" | "slug" | "quantity" | "unitPrice" | "lineTotal">[];
+  subtotal: number;
+  discount?: number;
+  shippingFee: number;
+  total: number;
+  currency?: LocalizedField;
+  paymentMethod: PaymentMethod;
+  delivery: { zoneName?: LocalizedField; subZoneName?: LocalizedField; city?: string };
+  /** First name only. */
+  recipient: string;
+};

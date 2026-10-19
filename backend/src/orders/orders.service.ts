@@ -230,6 +230,63 @@ export class OrdersService {
     return { order, token, account: this.accountStatus(customer, order) };
   }
 
+  /**
+   * Order status for someone who knows the order number and the email or phone
+   * it was placed with. Deliberately a narrower view than the token page: no
+   * street, no phone and no guest token — the token can also claim the
+   * account, and an order number plus an email is not proof of owning it.
+   * Every mismatch reads the same, so the form can't confirm which part was right.
+   */
+  async track(orderNumber: number, contact: string) {
+    const notFound = new NotFoundException('No order matches those details');
+    const order = await this.orderModel
+      .findOne({ orderNumber })
+      .populate<{ customer: Customer }>('customer', 'email')
+      .lean()
+      .exec();
+    if (!order) throw notFound;
+
+    const given = contact.trim().toLowerCase();
+    const matches = given.includes('@')
+      ? given === order.customer?.email?.toLowerCase()
+      : this.samePhone(given, order.shippingAddress.phone);
+    if (!matches) throw notFound;
+
+    const a = order.shippingAddress;
+    return {
+      _id: order._id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      createdAt: (order as unknown as { createdAt: Date }).createdAt,
+      statusHistory: order.statusHistory.map(({ status, note, at }) => ({ status, note, at })),
+      items: order.items.map(({ name, variantLabel, image, slug, quantity, unitPrice, lineTotal }) => ({
+        name,
+        variantLabel,
+        image,
+        slug,
+        quantity,
+        unitPrice,
+        lineTotal,
+      })),
+      subtotal: order.subtotal,
+      discount: order.discount,
+      shippingFee: order.shippingFee,
+      total: order.total,
+      currency: order.currency,
+      paymentMethod: order.paymentMethod,
+      // Where it's going in broad strokes only.
+      delivery: { zoneName: a.zoneName, subZoneName: a.subZoneName, city: a.city },
+      recipient: a.fullName.trim().split(/\s+/)[0],
+    };
+  }
+
+  /** "+20 100 123 4567" and "01001234567" are the same phone: compare the last nine digits. */
+  private samePhone(given: string, stored?: string): boolean {
+    const a = given.replace(/\D/g, '');
+    const b = (stored ?? '').replace(/\D/g, '');
+    return a.length >= 8 && b.length >= 8 && a.slice(-9) === b.slice(-9);
+  }
+
   /** A guest order, for whoever holds its token. */
   async findGuestOrder(
     orderId: string,
@@ -431,6 +488,11 @@ export class OrdersService {
           .createActivationLink(customer._id as Types.ObjectId, host, dto.locale)
           .catch(() => undefined)
       : undefined;
+
+    // Best effort: a stale saved cart only risks one needless reminder.
+    this.customersService
+      .clearSavedCart(customer._id as Types.ObjectId)
+      .catch((error: Error) => this.logger.warn(`Saved cart not cleared: ${error.message}`));
 
     this.notifications.orderPlaced(order, {
       host,

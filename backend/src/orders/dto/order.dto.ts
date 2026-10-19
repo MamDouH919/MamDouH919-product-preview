@@ -156,6 +156,21 @@ export class CreateGuestOrderDto extends QuoteOrderDto {
   locale?: string;
 }
 
+/** Looking up an order without signing in. */
+export class TrackOrderDto {
+  @ApiProperty({ example: 1042 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  orderNumber!: number;
+
+  @ApiProperty({ description: 'The email or phone number the order was placed with' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  contact!: string;
+}
+
 export class GuestOrderTokenDto {
   @ApiProperty()
   @IsString()

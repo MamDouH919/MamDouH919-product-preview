@@ -124,6 +124,11 @@ export class CustomersService {
     return customer.addresses;
   }
 
+  /** Once the basket has become an order there's nothing left to save or remind about. */
+  async clearSavedCart(customerId: Types.ObjectId | string): Promise<void> {
+    await this.customerModel.updateOne({ _id: customerId }, { $unset: { cart: 1 } }).exec();
+  }
+
   // ── Wishlist ────────────────────────────────────────────────────────────────
 
   /**

@@ -7,6 +7,7 @@ import {
   GuestOrderResponse,
   Order,
   OrderStatus,
+  TrackedOrder,
 } from "./types";
 
 export const placeOrder = async (data: CreateOrderPayload): Promise<Order> => {
@@ -45,6 +46,12 @@ export const cancelMyOrder = async ({
   reason?: string;
 }): Promise<Order> => {
   const response = await customerApi.post(`/orders/me/${id}/cancel`, { reason });
+  return response.data;
+};
+
+/** Public lookup by order number plus the email or phone it was placed with. */
+export const trackOrder = async (data: { orderNumber: number; contact: string }): Promise<TrackedOrder> => {
+  const response = await customerApi.post("/orders/track", data, { skipAuthRedirect: true });
   return response.data;
 };
 

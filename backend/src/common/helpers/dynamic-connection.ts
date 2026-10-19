@@ -79,6 +79,11 @@ export class TenantConnectionService {
             .filter((url): url is string => Boolean(url));
     }
 
+    /** Every configured tenant host — for background jobs that visit each store. */
+    getHosts(): string[] {
+        return Object.keys(this.loadTenantMap());
+    }
+
     async getConnection(host: string): Promise<Connection> {
         if (this.connections.has(host)) {
             return this.connections.get(host)!;

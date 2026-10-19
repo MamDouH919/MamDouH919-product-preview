@@ -34,6 +34,9 @@ export type Product = {
   totalStock?: number;
   views: number;
   whatsappClicks: number;
+  /** Average of approved reviews, 0 when there are none. */
+  ratingAverage?: number;
+  ratingCount?: number;
 };
 
 export type ProductSort = "featured" | "newest" | "price_asc" | "price_desc";

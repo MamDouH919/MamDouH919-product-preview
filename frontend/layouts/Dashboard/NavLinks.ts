@@ -52,6 +52,7 @@ export const useLinksList = () => {
                 { primary: t("categories"), pathname: "/admin/categories" },
                 { primary: t("subCategories"), pathname: "/admin/sub-categories" },
                 { primary: t("inventory"), pathname: "/admin/inventory" },
+                { primary: t("reviews"), pathname: "/admin/reviews" },
             ],
         },
         {

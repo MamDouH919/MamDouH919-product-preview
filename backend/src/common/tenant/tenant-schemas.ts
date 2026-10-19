@@ -19,6 +19,7 @@ import { Coupon, CouponSchema } from '../../coupons/schemas/coupon.schema';
 import { Page, PageSchema } from '../../pages/schemas/page.schema';
 import { Zone, ZoneSchema, SubZone, SubZoneSchema } from '../../price-list/schemas/zone.schema';
 import { DeliveryPrice, DeliveryPriceSchema } from '../../price-list/schemas/delivery-price.schema';
+import { Review, ReviewSchema } from '../../reviews/schemas/review.schema';
 import { MailSetting, MailSettingSchema } from '../../mail/schemas/mail-setting.schema';
 import {
   CustomerRefreshToken,
@@ -57,4 +58,5 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: Zone.name, schema: ZoneSchema },
   { name: SubZone.name, schema: SubZoneSchema },
   { name: DeliveryPrice.name, schema: DeliveryPriceSchema },
+  { name: Review.name, schema: ReviewSchema },
 ];

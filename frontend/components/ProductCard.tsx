@@ -6,7 +6,7 @@ import { Product } from "@/backend-api/products/types"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { useCurrency } from "@/Hooks/useCurrency"
 import { useTheme, alpha } from "@mui/material/styles"
-import { ShoppingBag, Plus } from "lucide-react"
+import { ShoppingBag, Plus, Star } from "lucide-react"
 import CustomLink from "@/components/CustomLink"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
@@ -133,6 +133,17 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
         <h3 className="text-base font-semibold leading-snug text-white line-clamp-2 [text-shadow:0_1px_12px_rgba(0,0,0,0.35)]">
           {name}
         </h3>
+
+        {!!product.ratingCount && (
+          <span
+            className="flex items-center gap-1 text-xs text-white/80"
+            aria-label={t("ratingOutOfFive", { rating: (product.ratingAverage ?? 0).toFixed(1) })}
+          >
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden />
+            <span className="font-semibold text-white tabular-nums">{(product.ratingAverage ?? 0).toFixed(1)}</span>
+            <span className="tabular-nums">({product.ratingCount})</span>
+          </span>
+        )}
 
         <div className="flex items-end justify-between gap-3">
           <div className="flex min-w-0 flex-col leading-none">

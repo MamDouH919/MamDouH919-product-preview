@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
 import { Product } from './schemas/product.schema';
+import { Order } from '../orders/schemas/order.schema';
+import { OrderStatus } from '../orders/enums/order-status.enum';
 import { CreateProductDto, ProductVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductSort, SearchProductsDto } from './dto/search-products.dto';
@@ -25,6 +27,7 @@ function buildSlug(text: string): string {
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
+    @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly inventoryService: InventoryService,
   ) {}
 
@@ -221,6 +224,96 @@ export class ProductsService {
       .exec();
   }
 
+  /**
+   * Active products to show beside this one, best match first. A product
+   * scores for sharing its sub-category (3), category (2), each tag (1), and
+   * for being in the same orders as this one (1 per order, up to 5) — what
+   * people actually bought together counts as much as catalogue placement.
+   * Topped up with the newest products when the catalogue is thin.
+   */
+  async findRelated(id: string, limit = 8): Promise<Product[]> {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException(`Product with id ${id} not found`);
+    const self = await this.productModel.findById(id).select('category subCategory tags').lean().exec();
+    if (!self) throw new NotFoundException(`Product with id ${id} not found`);
+    const selfId = new Types.ObjectId(id);
+
+    const boughtWith: { _id: Types.ObjectId; count: number }[] = await this.orderModel
+      .aggregate([
+        { $match: { 'items.product': selfId, status: { $ne: OrderStatus.CANCELLED } } },
+        { $sort: { createdAt: -1 } },
+        { $limit: 500 },
+        { $unwind: '$items' },
+        { $match: { 'items.product': { $ne: selfId } } },
+        // Once per order, however many of a line it had.
+        { $group: { _id: { order: '$_id', product: '$items.product' } } },
+        { $group: { _id: '$_id.product', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 20 },
+      ])
+      .exec();
+    const coCount = new Map(boughtWith.map((row) => [String(row._id), row.count]));
+
+    const tags = self.tags ?? [];
+    const candidates = await this.productModel
+      .find({
+        _id: { $ne: selfId },
+        isActive: true,
+        $or: [
+          { category: self.category },
+          ...(self.subCategory ? [{ subCategory: self.subCategory }] : []),
+          ...(tags.length ? [{ tags: { $in: tags } }] : []),
+          ...(boughtWith.length ? [{ _id: { $in: boughtWith.map((row) => row._id) } }] : []),
+        ],
+      })
+      .select('-description')
+      .limit(200)
+      .populate('category', 'name slug')
+      .exec();
+
+    // A ref is an ObjectId or, once populated, a document — compare either by id string.
+    const refId = (ref: unknown) => String((ref as { _id?: unknown } | undefined)?._id ?? ref ?? '');
+    const score = (p: Product) =>
+      (self.subCategory && refId(p.subCategory) === refId(self.subCategory) ? 3 : 0) +
+      (refId(p.category) === refId(self.category) ? 2 : 0) +
+      (p.tags ?? []).filter((t) => tags.includes(t)).length +
+      Math.min(coCount.get(String(p._id)) ?? 0, 5);
+
+    const ranked = candidates
+      .map((product) => ({ product, score: score(product) }))
+      .sort((a, b) => b.score - a.score || a.product.order - b.product.order)
+      .slice(0, limit)
+      .map((row) => row.product);
+
+    if (ranked.length < limit) {
+      const fill = await this.productModel
+        .find({ _id: { $nin: [selfId, ...ranked.map((p) => p._id)] }, isActive: true })
+        .select('-description')
+        .sort({ createdAt: -1 })
+        .limit(limit - ranked.length)
+        .populate('category', 'name slug')
+        .exec();
+      ranked.push(...fill);
+    }
+    return ranked;
+  }
+
+  /**
+   * Active products by id, in the order asked for — the storefront's
+   * "recently viewed" strip keeps ids, newest first. Unknown and hidden ids
+   * are skipped rather than failing the list.
+   */
+  async findByIds(ids: string[]): Promise<Product[]> {
+    const valid = [...new Set(ids)].filter((id) => Types.ObjectId.isValid(id)).slice(0, 24);
+    if (!valid.length) return [];
+    const products = await this.productModel
+      .find({ _id: { $in: valid }, isActive: true })
+      .select('-description')
+      .populate('category', 'name slug')
+      .exec();
+    const position = new Map(valid.map((id, i) => [id, i]));
+    return products.sort((a, b) => position.get(String(a._id))! - position.get(String(b._id))!);
+  }
+
   async findOne(id: string): Promise<Product> {
     const product = await this.productModel
       .findById(id)
@@ -260,6 +353,9 @@ export class ProductsService {
     // the incoming variants array replaces the stored one wholesale, and
     // whatever the form sent back is stale by definition.
     delete (updateProductDto as { stock?: number }).stock;
+    // Likewise the rating, which ReviewsService derives from approved reviews.
+    delete (updateProductDto as { ratingAverage?: number }).ratingAverage;
+    delete (updateProductDto as { ratingCount?: number }).ratingCount;
 
     let addedVariants: ProductVariantDto[] = [];
     if (updateProductDto.variants) {

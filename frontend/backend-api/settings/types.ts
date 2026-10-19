@@ -31,6 +31,7 @@ export type MailNotifications = {
   storeNewOrder: boolean;
   storeOrderCancelled: boolean;
   contactForm: boolean;
+  customerAbandonedCart: boolean;
 };
 
 /** The store's outgoing mail server. The password is never sent back. */

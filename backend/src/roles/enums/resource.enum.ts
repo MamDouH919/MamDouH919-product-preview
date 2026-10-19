@@ -21,4 +21,5 @@ export enum Resource {
   COUPONS = 'coupons',
   PAGES = 'pages',
   PRICE_LIST = 'price-list',
+  REVIEWS = 'reviews',
 }
