@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
-import { ChevronLeft, ChevronRight, ImagePlus, Pause, Play } from "lucide-react"
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react"
 import { useBannersQuery } from "@/backend-api/banners/hooks"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
@@ -133,20 +133,8 @@ export default function BannerSlider() {
     )
   }
 
-  if (isError || !count) {
-    return (
-      <section className="pt-4">
-        <div className={FRAME}>
-          <div className="absolute inset-y-0 start-[calc((100%-var(--slide))/2)] flex w-(--slide) items-center justify-center rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50">
-            <div className="text-center text-gray-400">
-              <ImagePlus className="mx-auto mb-3 h-12 w-12 opacity-50" />
-              <p className="text-lg font-medium">{t("youCanAddBannersHere")}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-    )
-  }
+  // Shoppers see the storefront, not a setup hint: no banners, no slider.
+  if (isError || !count) return null
 
   const navButton =
     "absolute top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-900 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] ring-1 ring-black/5 backdrop-blur transition-all duration-300 hover:scale-105 hover:bg-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 md:flex"

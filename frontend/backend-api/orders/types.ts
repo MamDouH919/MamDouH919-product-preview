@@ -1,3 +1,4 @@
+import { OrderPaymentStatus } from "../finance/types";
 import { LocalizedField } from "../globalTypes";
 import { CouponErrorCode, CouponType } from "../coupons/types";
 
@@ -110,6 +111,13 @@ export type Order = {
   refundedTotal?: number;
   currency?: LocalizedField;
   paymentMethod: PaymentMethod;
+  /** What has been paid — separate from `status`: delivered is not paid. */
+  paymentStatus?: OrderPaymentStatus;
+  /** Exact amount in minor units (piastres); absent on orders placed before the books. */
+  totalMinor?: number;
+  deliveredAt?: string;
+  /** When the sale was posted to the books. */
+  bookedAt?: string;
   status: OrderStatus;
   statusHistory?: OrderStatusChange[];
   notes?: string;

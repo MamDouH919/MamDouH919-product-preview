@@ -7,7 +7,6 @@ import {
   IsEnum,
   IsInt,
   IsMongoId,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -65,22 +64,6 @@ export class ReturnDecisionDto {
   @MaxLength(1000)
   @Transform(trim)
   note?: string;
-}
-
-export class RefundReturnDto extends ReturnDecisionDto {
-  @ApiProperty({ description: 'Money given back; 0 for an exchange or store credit handled elsewhere' })
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  amount!: number;
-
-  @ApiProperty({ type: [Number], description: 'Indexes into the return\'s items to put back in stock' })
-  @IsArray()
-  @ArrayMaxSize(100)
-  @Type(() => Number)
-  @IsInt({ each: true })
-  @Min(0, { each: true })
-  restock!: number[];
 }
 
 export class QueryReturnsDto {

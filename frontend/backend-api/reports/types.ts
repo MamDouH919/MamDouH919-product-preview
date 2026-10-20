@@ -4,17 +4,30 @@ import { OrderStatus } from "../orders/types";
 export type DashboardPeriod = 7 | 30 | 90;
 
 export type PeriodTotals = {
-  /** Sum of order totals, cancelled orders excluded. */
+  /**
+   * Net revenue from the books: orders delivered in the period, net of
+   * discounts and refunds, delivery fees included. Never an order total.
+   */
   revenue: number;
+  revenueMinor: number;
+  /** Orders delivered in the period. */
   orders: number;
   averageOrderValue: number;
+  /** Orders placed in the period — the pipeline, not revenue. */
+  placed: number;
+  /** Value of orders placed in the period and not cancelled. */
+  placedValue: number;
+  /** Orders placed in the period and since cancelled. */
   cancelled: number;
 };
 
 export type DashboardReport = {
   days: DashboardPeriod;
+  /** The store's own zone — days start at its midnight for every viewer. */
   timeZone: string;
   periodStart: string;
+  /** When this store's books began; sales delivered before it aren't counted. */
+  booksStartedAt?: string;
   current: PeriodTotals;
   /** The same number of days just before the current span, for comparison. */
   previous: PeriodTotals;

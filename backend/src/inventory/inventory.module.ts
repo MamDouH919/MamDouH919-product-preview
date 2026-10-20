@@ -5,6 +5,7 @@ import { StockMovement, StockMovementSchema } from './schemas/stock-movement.sch
 import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { AuthModule } from '../auth/auth.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
+import { FinanceModule } from '../finance/finance.module';
 
 /**
  * Registers the Product model itself rather than importing ProductsModule —
@@ -13,7 +14,7 @@ import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
  * connection, so registering the same model twice is harmless.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, FinanceModule],
   controllers: [InventoryController],
   providers: [
     InventoryService,

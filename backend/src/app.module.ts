@@ -23,6 +23,12 @@ import { CouponsModule } from './coupons/coupons.module';
 import { PagesModule } from './pages/pages.module';
 import { PriceListModule } from './price-list/price-list.module';
 import { ReportsModule } from './reports/reports.module';
+import { FinanceModule } from './finance/finance.module';
+import { RefundsModule } from './refunds/refunds.module';
+import { PurchasingModule } from './purchasing/purchasing.module';
+import { CouriersModule } from './couriers/couriers.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { MoneyAccountsModule } from './money-accounts/money-accounts.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SitemapModule } from './sitemap/sitemap.module';
 import { CartModule } from './cart/cart.module';
@@ -82,6 +88,12 @@ import { TenantModule } from './common/tenant/tenant.module';
     PagesModule,
     PriceListModule,
     ReportsModule,
+    FinanceModule,
+    RefundsModule,
+    PurchasingModule,
+    CouriersModule,
+    ExpensesModule,
+    MoneyAccountsModule,
     ReviewsModule,
     SitemapModule,
     CartModule,

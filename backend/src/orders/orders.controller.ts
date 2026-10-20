@@ -2,16 +2,16 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
   Patch,
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 // `import type` — used bare in decorated signatures (see customer-auth.controller).
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import {
@@ -146,9 +146,14 @@ export class OrdersController {
   /** Declared before `:id`, which would otherwise read "export" as an order id. */
   @Permissions([{ resource: Resource.ORDERS, actions: [Action.READ] }])
   @Get('export')
-  @Header('Content-Type', 'text/csv; charset=utf-8')
-  exportCsv(@Query() query: ExportOrdersDto) {
-    return this.ordersService.exportCsv(query);
+  async exportCsv(@Query() query: ExportOrdersDto, @Res() res: Response) {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    // Rows go out as they are read; waiting on `drain` keeps a long export
+    // from piling up in memory when the client reads slower than Mongo.
+    await this.ordersService.exportCsv(query, (chunk) =>
+      res.write(chunk) ? Promise.resolve() : new Promise((resolve) => res.once('drain', resolve)),
+    );
+    res.end();
   }
 
   @Permissions([{ resource: Resource.ORDERS, actions: [Action.READ] }])

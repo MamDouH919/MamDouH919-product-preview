@@ -24,9 +24,11 @@ export class ProductVariantDto {
   @IsNotEmpty()
   label!: string;
 
-  @ApiProperty({ required: false })
+  // Money: never negative, whole piastres only.
+  @ApiProperty({ required: false, minimum: 0 })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   price?: number;
 
   @ApiProperty({ required: false })
@@ -69,9 +71,11 @@ export class CreateProductDto {
   @IsString({ each: true })
   images?: string[];
 
-  @ApiProperty({ required: false })
+  // Money: never negative, whole piastres only.
+  @ApiProperty({ required: false, minimum: 0 })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   price?: number;
 
   @ApiProperty({ required: false })

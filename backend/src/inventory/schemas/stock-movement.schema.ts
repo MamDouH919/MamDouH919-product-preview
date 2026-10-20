@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { MovementType } from '../enums/movement-type.enum';
 
 /**
@@ -12,11 +12,11 @@ import { MovementType } from '../enums/movement-type.enum';
  */
 @Schema({ timestamps: true })
 export class StockMovement extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'Product', required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Product', required: true, index: true })
   product!: Types.ObjectId;
 
   /** Set when the movement targets one variant; absent for product-level stock. */
-  @Prop({ type: Types.ObjectId, required: false })
+  @Prop({ type: SchemaTypes.ObjectId, required: false })
   variantId?: Types.ObjectId;
 
   /** Snapshot of the variant label, so the ledger stays readable if it is renamed. */
@@ -41,8 +41,27 @@ export class StockMovement extends Document {
   @Prop({ required: false })
   reference?: string;
 
+  /**
+   * Value moved, signed like `quantity` (minor units). Unset for stock with no
+   * cost yet. Summed per product, these give its inventory value.
+   */
+  @Prop({ type: Number, required: false })
+  valueMinor?: number;
+
+  /** Inventory value after this movement — the valuation's audit anchor, like `balanceAfter`. */
+  @Prop({ type: Number, required: false })
+  valueAfterMinor?: number;
+
+  /** Part of the units went out short and were costed at the last unit cost. */
+  @Prop({ default: false })
+  costEstimated!: boolean;
+
+  /** A receipt that settled an earlier shortfall: true cost less its estimate, booked to COGS. */
+  @Prop({ type: Number, required: false })
+  varianceMinor?: number;
+
   /** The admin who did it. Absent when the system moved stock (e.g. a sale). */
-  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', required: false })
   user?: Types.ObjectId;
 }
 

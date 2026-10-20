@@ -9,7 +9,11 @@ export class DashboardQueryDto {
   @IsIn(DASHBOARD_PERIODS)
   days?: (typeof DASHBOARD_PERIODS)[number];
 
-  /** IANA zone of the viewer, e.g. "Africa/Cairo" — decides where a day starts. */
+  /**
+   * Ignored: days now start at midnight in the store's own zone (Settings →
+   * time zone), so two viewers in different zones see the same figures.
+   * Still accepted so older dashboards keep working.
+   */
   @ApiProperty({ required: false, example: 'Africa/Cairo' })
   @IsOptional()
   @IsString()

@@ -9,15 +9,12 @@ import {
   Avatar,
   Box,
   Button,
-  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  FormControlLabel,
-  InputAdornment,
   Paper,
   Stack,
   TextField,
@@ -26,7 +23,10 @@ import {
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { RETURNS_QUERY_KEY, useReturnQuery } from "@/backend-api/returns/hooks";
-import { approveReturn, refundReturn, rejectReturn } from "@/backend-api/returns/mutations";
+import { approveReturn, rejectReturn } from "@/backend-api/returns/mutations";
+import { REFUNDS_QUERY_KEY, useRefundsQuery } from "@/backend-api/refunds/hooks";
+import RefundRequestDialog from "@/features/Refund/RefundRequestDialog";
+import RefundsCard from "@/features/Refund/RefundsCard";
 import { ORDERS_QUERY_KEY } from "@/backend-api/orders/hooks";
 import { useCurrency } from "@/Hooks/useCurrency";
 import CustomLink from "@/components/CustomLink";
@@ -34,7 +34,7 @@ import ReturnStatusChip from "@/features/Return/ReturnStatusChip";
 import { formatDateTime, formatMoney, localized } from "@/features/Order/format";
 import { getBackendUri } from "@/utils/helperFunctions";
 
-type Decision = "approve" | "reject" | "refund";
+type Decision = "approve" | "reject";
 
 const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = use(params);
@@ -47,8 +47,9 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { data: ret, isLoading } = useReturnQuery(id);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [note, setNote] = useState("");
-  const [amount, setAmount] = useState("");
-  const [restock, setRestock] = useState<number[]>([]);
+  // Bumped to open a fresh refund dialog each time.
+  const [refundDialog, setRefundDialog] = useState(0);
+  const { data: refunds } = useRefundsQuery({ returnId: id, limit: 50 });
 
   useEffect(() => {
     dispatch(
@@ -81,11 +82,9 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const mutation = useMutation({
     mutationFn: async (kind: Decision) => {
       const trimmed = note.trim() || undefined;
-      if (kind === "approve") return approveReturn({ id, note: trimmed });
-      if (kind === "reject") return rejectReturn({ id, note: trimmed });
-      return refundReturn({ id, amount: Number(amount) || 0, restock, note: trimmed });
+      return kind === "approve" ? approveReturn({ id, note: trimmed }) : rejectReturn({ id, note: trimmed });
     },
-    onSuccess: (_, kind) => done(t(kind === "approve" ? "returnApproved" : kind === "reject" ? "returnRejected" : "refundRecorded")),
+    onSuccess: (_, kind) => done(t(kind === "approve" ? "returnApproved" : "returnRejected")),
     onError,
   });
 
@@ -101,16 +100,13 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const currency = localized(ret.orderSummary?.currency, lang) || fallbackCurrency;
   const customer = typeof ret.customer === "object" ? ret.customer : undefined;
   const open = ret.status === "requested" || ret.status === "approved";
-  const amountValue = Number(amount);
-  const amountInvalid = amount === "" || !Number.isFinite(amountValue) || amountValue < 0 || amountValue > ret.refundableRemaining;
+  // A return is settled by one refund; while one is open or paid, there's nothing more to ask for.
+  const hasRefund = (refunds?.data ?? []).some((r) => ["requested", "approved", "executed"].includes(r.status));
+  // Refunds live in the books, so only orders delivered after they started can be refunded here.
+  const canRefund = open && !hasRefund && !!ret.orderSummary?.bookedAt;
 
   const openDialog = (kind: Decision) => {
     setNote("");
-    if (kind === "refund") {
-      setAmount(String(ret.suggestedRefund));
-      // Put everything back by default — except what the customer says arrived damaged.
-      setRestock(ret.reason === "damaged" ? [] : ret.items.map((_, i) => i));
-    }
     setDecision(kind);
   };
 
@@ -171,6 +167,12 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
+          {open && !ret.orderSummary?.bookedAt && (
+            <Alert severity="info">{t("refundOutsideBooks")}</Alert>
+          )}
+
+          <RefundsCard returnId={id} currency={currency} />
+
           {open && (
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
               <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
@@ -179,9 +181,11 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
                     {t("approve")}
                   </Button>
                 )}
-                <Button variant="contained" onClick={() => openDialog("refund")}>
-                  {t("recordRefund")}
-                </Button>
+                {canRefund && (
+                  <Button variant="contained" onClick={() => setRefundDialog((n) => n + 1)}>
+                    {t("requestRefund")}
+                  </Button>
+                )}
                 <Button variant="outlined" color="error" onClick={() => openDialog("reject")}>
                   {t("reject")}
                 </Button>
@@ -203,8 +207,7 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
             {ret.orderSummary && (
               <Stack spacing={0.5} mt={1.5}>
                 <Row label={t("total")} value={formatMoney(ret.orderSummary.total, currency)} />
-                <Row label={t("refunded")} value={formatMoney(ret.orderSummary.refundedTotal ?? 0, currency)} />
-                <Row label={t("refundableRemaining")} value={formatMoney(ret.refundableRemaining, currency)} strong />
+                <Row label={t("refunded")} value={formatMoney(ret.orderSummary.refundedTotal ?? 0, currency)} strong />
               </Stack>
             )}
             <Divider sx={{ my: 2 }} />
@@ -247,52 +250,10 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
       <Dialog open={!!decision} onClose={() => setDecision(null)} fullWidth maxWidth="sm">
         <DialogTitle>
-          {decision === "approve" ? t("approveReturn") : decision === "reject" ? t("rejectReturn") : t("recordRefund")}
+          {decision === "approve" ? t("approveReturn") : t("rejectReturn")}
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} pt={1}>
-            {decision === "refund" && (
-              <>
-                <TextField
-                  label={t("refundAmount")}
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  error={amountInvalid}
-                  helperText={t("refundAmountHint", {
-                    suggested: formatMoney(ret.suggestedRefund, currency),
-                    max: formatMoney(ret.refundableRemaining, currency),
-                  })}
-                  slotProps={{
-                    htmlInput: { min: 0, max: ret.refundableRemaining, step: "0.01" },
-                    input: { endAdornment: <InputAdornment position="end">{currency}</InputAdornment> },
-                  }}
-                />
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={700}>
-                    {t("putBackInStock")}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                    {t("putBackInStockHint")}
-                  </Typography>
-                  {ret.items.map((item, i) => (
-                    <FormControlLabel
-                      key={i}
-                      sx={{ display: "flex" }}
-                      control={
-                        <Checkbox
-                          checked={restock.includes(i)}
-                          onChange={(e) =>
-                            setRestock((prev) => (e.target.checked ? [...prev, i] : prev.filter((x) => x !== i)))
-                          }
-                        />
-                      }
-                      label={`${item.quantity} × ${localized(item.name, lang)}${item.variantLabel ? ` (${item.variantLabel})` : ""}`}
-                    />
-                  ))}
-                </Box>
-              </>
-            )}
             <TextField
               label={t("noteToCustomer")}
               value={note}
@@ -308,13 +269,32 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
           <Button
             variant="contained"
             color={decision === "reject" ? "error" : "primary"}
-            disabled={mutation.isPending || (decision === "refund" && amountInvalid)}
+            disabled={mutation.isPending}
             onClick={() => decision && mutation.mutate(decision)}
           >
             {t("confirm")}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <RefundRequestDialog
+        key={refundDialog}
+        open={refundDialog > 0}
+        onClose={() => setRefundDialog(0)}
+        onDone={() => {
+          setRefundDialog(0);
+          queryClient.invalidateQueries({ queryKey: [REFUNDS_QUERY_KEY] });
+        }}
+        orderId={ret.order}
+        returnId={id}
+        lines={ret.items.map((item) => ({
+          lineIndex: item.lineIndex,
+          quantity: item.quantity,
+          label: `${item.quantity} × ${localized(item.name, lang)}${item.variantLabel ? ` (${item.variantLabel})` : ""}`,
+        }))}
+        defaultReason={ret.reason}
+        currency={currency}
+      />
     </Box>
   );
 };

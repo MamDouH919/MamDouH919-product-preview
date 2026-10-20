@@ -12,6 +12,10 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { SettingsService, settingImageStorage } from './settings.service';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 import { AuthenticationGuard } from '../guards/authentication.guard';
+import { AuthorizationGuard } from '../guards/authorization.guard';
+import { Permissions } from '../decorators/permissions.decorator';
+import { Resource } from '../roles/enums/resource.enum';
+import { Action } from '../roles/enums/action.enum';
 import { parseNestedBody } from '../common/helpers/parse-nested-body';
 
 @Controller('settings')
@@ -23,7 +27,10 @@ export class SettingsController {
     return this.settingsService.get();
   }
 
-  @UseGuards(AuthenticationGuard)
+  // A role decides who may change the store's settings, as for mail settings —
+  // being signed in to the dashboard is not enough.
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  @Permissions([{ resource: Resource.SETTINGS, actions: [Action.UPDATE] }])
   @Patch()
   @UseInterceptors(
     FileFieldsInterceptor(

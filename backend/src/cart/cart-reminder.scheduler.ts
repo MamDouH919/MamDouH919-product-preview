@@ -50,7 +50,7 @@ export class CartReminderScheduler implements OnApplicationBootstrap, OnModuleDe
     const delayMs = Number(this.config.get('CART_REMINDER_DELAY_MINUTES') ?? 180) * MINUTE;
 
     try {
-      for (const host of this.tenants.getHosts()) {
+      for (const host of this.tenants.getStoreHosts()) {
         try {
           const contextId = ContextIdFactory.create();
           this.moduleRef.registerRequestByContextId({ hostname: host, tenant: host }, contextId);

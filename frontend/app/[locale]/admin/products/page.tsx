@@ -50,8 +50,9 @@ const ProductsPage = () => {
       toast.success(t("saveSuccessfully"));
       queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
     },
-    onError: () => {
-      toast.error(t("somethingWentWrong"));
+    onError: (error: any) => {
+      // 409: the product has orders or stock history and can only be turned off.
+      toast.error(t(error?.response?.status === 409 ? "productHasHistory" : "somethingWentWrong"));
     },
   });
 

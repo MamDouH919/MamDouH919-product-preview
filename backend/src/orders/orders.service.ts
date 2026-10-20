@@ -1,14 +1,23 @@
-import { toCsv } from '../common/helpers/csv';
+import { CSV_BOM, csvCell } from '../common/helpers/csv';
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, QueryFilter, Types } from 'mongoose';
+import { ClientSession, Connection, Model, QueryFilter, Types } from 'mongoose';
+import { TENANT_CONNECTION } from '../common/tenant/tenant.module';
+import { withTransaction } from '../common/tenant/with-transaction';
+import { DEFAULT_CURRENCY, formatMinor, MoneyError } from '../common/money/money';
+import { safeTimeZone, zonedDayRange } from '../common/helpers/time-zone';
+import { JournalService } from '../finance/journal.service';
+import { ACCOUNT } from '../finance/accounts';
+import { orderAmounts, outstandingOf, paymentStatusFor, priceOrder, priceToMinor, toMajor } from '../finance/order-money';
 import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import { Order, OrderItem } from './schemas/order.schema';
@@ -16,7 +25,8 @@ import { Counter } from './schemas/counter.schema';
 import { Product } from '../products/schemas/product.schema';
 import { Setting } from '../settings/schemas/setting.schema';
 import { LocalizedField } from '../common/schemas/localized-field.schema';
-import { InventoryService } from '../inventory/inventory.service';
+import { InventoryService, varianceLines } from '../inventory/inventory.service';
+import { StockMovement } from '../inventory/schemas/stock-movement.schema';
 import { MovementType } from '../inventory/enums/movement-type.enum';
 import { AdjustStockDto } from '../inventory/dto/adjust-stock.dto';
 import { CustomersService } from '../customers/customers.service';
@@ -28,6 +38,7 @@ import { AddressFields } from '../customers/schemas/customer.schema';
 import { OrderNotificationsService } from './order-notifications.service';
 import {
   ORDER_TRANSITIONS,
+  OrderPaymentStatus,
   OrderStatus,
   PaymentMethod,
 } from './enums/order-status.enum';
@@ -54,6 +65,8 @@ export interface QuoteLine {
   unitPrice?: number;
   quantity: number;
   lineTotal: number;
+  unitPriceMinor?: number;
+  lineTotalMinor: number;
   /** Units that can be sold right now; null when the line is not stock-limited. */
   available: number | null;
   issue?: QuoteIssue;
@@ -63,6 +76,10 @@ export interface Quote {
   items: QuoteLine[];
   subtotal: number;
   discount: number;
+  subtotalMinor: number;
+  discountMinor: number;
+  shippingFeeMinor: number;
+  totalMinor: number;
   /** The coupon that was applied, when one was asked for and it applies. */
   coupon?: { code: string; type: string; value: number };
   /** Why the requested coupon doesn't apply. Doesn't make the quote invalid. */
@@ -103,16 +120,12 @@ type PlaceOrderInput = Pick<
   'items' | 'couponCode' | 'paymentMethod' | 'notes' | 'locale'
 >;
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 /** A priced line plus what placing it will do to stock. */
 interface ResolvedLine extends QuoteLine {
   tracksStock: boolean;
 }
 
 const ORDER_COUNTER = 'order';
-/** Most orders one CSV export will hold. */
-const EXPORT_LIMIT = 20_000;
 /** Order numbers start here so the first order isn't "#1". */
 const ORDER_NUMBER_BASE = 1000;
 
@@ -125,6 +138,8 @@ export class OrdersService {
     @InjectModel(Counter.name) private counterModel: Model<Counter>,
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
+    @Inject(TENANT_CONNECTION) private connection: Connection,
+    private readonly journal: JournalService,
     private readonly inventoryService: InventoryService,
     private readonly customersService: CustomersService,
     private readonly customerAuthService: CustomerAuthService,
@@ -144,33 +159,38 @@ export class OrdersService {
     const lines = await this.resolveLines(items);
     const { currency } = await this.getCheckoutSettings();
     const delivery = subZoneId ? await this.priceListService.resolve(subZoneId) : undefined;
-    const shippingFee = delivery?.price ?? 0;
+    const shippingFeeMinor = delivery ? priceToMinor(delivery.price) : 0;
 
-    const subtotal = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
+    const subtotalMinor = lines.reduce((sum, line) => sum + line.lineTotalMinor, 0);
     const valid = lines.every((line) => !line.issue);
 
-    let discount = 0;
+    let discountMinor = 0;
     let coupon: Quote['coupon'];
     let couponError: Quote['couponError'];
     if (couponCode?.trim()) {
-      const check = await this.couponsService.check(couponCode, subtotal);
+      const check = await this.couponsService.check(couponCode, subtotalMinor);
       if (check.ok) {
-        discount = check.discount;
+        discountMinor = check.discountMinor;
         coupon = { code: check.coupon.code, type: check.coupon.type, value: check.coupon.value };
       } else {
         couponError = { code: check.error, minSubtotal: check.minSubtotal };
       }
     }
 
+    const totalMinor = subtotalMinor - discountMinor + shippingFeeMinor;
     return {
       items: lines.map(({ tracksStock, ...line }) => line),
-      subtotal,
-      discount,
+      subtotal: toMajor(subtotalMinor),
+      discount: toMajor(discountMinor),
+      subtotalMinor,
+      discountMinor,
+      shippingFeeMinor,
+      totalMinor,
       coupon,
       couponError,
       delivery: delivery === undefined ? 'pending' : delivery ? 'available' : 'unavailable',
-      shippingFee,
-      total: round2(subtotal - discount + shippingFee),
+      shippingFee: toMajor(shippingFeeMinor),
+      total: toMajor(totalMinor),
       currency,
       valid,
     };
@@ -390,100 +410,133 @@ export class OrdersService {
     // there, or changed the price, since the address was saved.
     const delivery = await this.priceListService.resolve(address.subZone);
     if (!delivery) this.rejectDelivery();
-    const shippingFee = delivery.price;
-    const subtotal = round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
+    const shippingFeeMinor = priceToMinor(delivery.price);
+    const subtotalMinor = lines.reduce((sum, line) => sum + line.lineTotalMinor, 0);
+    const customerOid = new Types.ObjectId(customerId);
 
-    // Checked again here with the customer, so per-customer limits apply.
-    let coupon: Awaited<ReturnType<CouponsService['check']>> | undefined;
-    if (dto.couponCode?.trim()) {
-      coupon = await this.couponsService.check(dto.couponCode, subtotal, customerId);
-      if (!coupon.ok) this.rejectCoupon(coupon.error, coupon.minSubtotal);
-    }
-    const applied = coupon?.ok ? coupon : undefined;
-    const discount = applied?.discount ?? 0;
-
-    const orderNumber = await this.nextOrderNumber();
-
-    const order = await this.orderModel.create({
-      orderNumber,
-      customer: new Types.ObjectId(customerId),
-      items: lines.map<OrderItem>((line) => ({
-        product: new Types.ObjectId(line.productId),
-        variantId: line.variantId ? new Types.ObjectId(line.variantId) : undefined,
-        name: line.name!,
-        variantLabel: line.variantLabel,
-        sku: line.sku,
-        image: line.image,
-        slug: line.slug,
-        unitPrice: line.unitPrice!,
-        quantity: line.quantity,
-        lineTotal: line.lineTotal,
-        stockDeducted: line.tracksStock,
-      })),
-      shippingAddress: {
-        fullName: address.fullName,
-        phone: address.phone,
-        zone: delivery.zone,
-        subZone: delivery.subZone,
-        zoneName: delivery.zoneName,
-        subZoneName: delivery.subZoneName,
-        area: address.area,
-        street: address.street,
-        building: address.building,
-        notes: address.notes,
-      },
-      subtotal,
-      discount,
-      coupon: applied
-        ? { code: applied.coupon.code, type: applied.coupon.type, value: applied.coupon.value }
-        : undefined,
-      shippingFee,
-      total: round2(subtotal - discount + shippingFee),
-      currency,
-      paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH_ON_DELIVERY,
-      status: OrderStatus.PENDING,
-      statusHistory: [{ status: OrderStatus.PENDING, at: new Date() }],
-      notes: dto.notes,
-      locale: dto.locale,
-      guestToken: guest?.guestToken,
-      canClaimAccount: guest?.canClaimAccount ?? false,
-    });
-
-    // Claim the coupon use atomically — the check above can lose a race for
-    // the last redemption, and this is where that's decided.
-    if (applied && !(await this.couponsService.redeem(applied.coupon._id as Types.ObjectId))) {
-      await this.orderModel.deleteOne({ _id: order._id }).exec();
-      this.rejectCoupon('usage_limit');
-    }
-
-    // Stock moves after the order exists so each sale can point at its order
-    // number. The availability check above can be beaten by a concurrent
-    // checkout; `adjustMany` is the real guard — it either takes every line or
-    // none — and if it refuses, this order is withdrawn as if never placed.
-    const sales: AdjustStockDto[] = lines
-      .filter((line) => line.tracksStock)
-      .map((line) => ({
-        productId: line.productId,
-        variantId: line.variantId,
-        type: MovementType.SALE,
-        quantity: line.quantity,
-        reference: this.reference(orderNumber),
-      }));
-
-    try {
-      await this.inventoryService.adjustMany(sales);
-    } catch (error) {
-      await this.orderModel.deleteOne({ _id: order._id }).exec();
-      if (applied) await this.couponsService.release(applied.coupon.code);
-      // The inventory message quotes the stock it read before losing the race
-      // ("2 available, 2 requested"), which reads as nonsense to a shopper.
-      if (error instanceof BadRequestException) {
-        throw new ConflictException(
-          'Someone just bought the last of an item in your cart. Please review your cart and try again.',
-        );
+    // One transaction: the order number, the order, the coupon use and every
+    // stock movement commit together or not at all. A checkout that loses a
+    // race for the last unit or the last coupon use leaves nothing behind —
+    // not even a burnt order number.
+    const order = await withTransaction(this.connection, async (session) => {
+      // Checked again here with the customer, so per-customer limits apply.
+      let applied: Extract<Awaited<ReturnType<CouponsService['check']>>, { ok: true }> | undefined;
+      if (dto.couponCode?.trim()) {
+        const check = await this.couponsService.check(dto.couponCode, subtotalMinor, customerId, session);
+        if (!check.ok) this.rejectCoupon(check.error, check.minSubtotal);
+        applied = check;
       }
-      throw error;
-    }
+
+      const amounts = priceOrder(
+        lines.map((line) => ({ unitPriceMinor: line.unitPriceMinor!, quantity: line.quantity })),
+        applied?.discountMinor ?? 0,
+        shippingFeeMinor,
+      );
+      const orderNumber = await this.nextOrderNumber(session);
+
+      const [created] = await this.orderModel.create(
+        [
+          {
+            orderNumber,
+            customer: customerOid,
+            items: lines.map<OrderItem>((line, i) => ({
+              product: new Types.ObjectId(line.productId),
+              variantId: line.variantId ? new Types.ObjectId(line.variantId) : undefined,
+              name: line.name!,
+              variantLabel: line.variantLabel,
+              sku: line.sku,
+              image: line.image,
+              slug: line.slug,
+              unitPrice: toMajor(amounts.lines[i].unitPriceMinor),
+              quantity: line.quantity,
+              lineTotal: toMajor(amounts.lines[i].lineTotalMinor),
+              unitPriceMinor: amounts.lines[i].unitPriceMinor,
+              lineTotalMinor: amounts.lines[i].lineTotalMinor,
+              discountMinor: amounts.lines[i].discountMinor,
+              refundedQty: 0,
+              refundedMinor: 0,
+              costEstimated: false,
+              costReturnedMinor: 0,
+              stockDeducted: line.tracksStock,
+            })),
+            shippingAddress: {
+              fullName: address.fullName,
+              phone: address.phone,
+              zone: delivery.zone,
+              subZone: delivery.subZone,
+              zoneName: delivery.zoneName,
+              subZoneName: delivery.subZoneName,
+              area: address.area,
+              street: address.street,
+              building: address.building,
+              notes: address.notes,
+            },
+            subtotal: toMajor(amounts.subtotalMinor),
+            discount: toMajor(amounts.discountMinor),
+            coupon: applied
+              ? {
+                  id: applied.coupon._id,
+                  code: applied.coupon.code,
+                  type: applied.coupon.type,
+                  value: applied.coupon.value,
+                }
+              : undefined,
+            shippingFee: toMajor(amounts.shippingFeeMinor),
+            total: toMajor(amounts.totalMinor),
+            subtotalMinor: amounts.subtotalMinor,
+            discountMinor: amounts.discountMinor,
+            shippingFeeMinor: amounts.shippingFeeMinor,
+            taxMinor: amounts.taxMinor,
+            totalMinor: amounts.totalMinor,
+            currency,
+            currencyCode: settings.currencyCode,
+            paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH_ON_DELIVERY,
+            paymentStatus: OrderPaymentStatus.UNPAID,
+            status: OrderStatus.PENDING,
+            statusHistory: [{ status: OrderStatus.PENDING, at: new Date() }],
+            notes: dto.notes,
+            locale: dto.locale,
+            guestToken: guest?.guestToken,
+            canClaimAccount: guest?.canClaimAccount ?? false,
+          },
+        ],
+        { session },
+      );
+
+      // The check above can lose a race for the last redemption; this write is where it's decided.
+      if (applied) {
+        const lost = await this.couponsService.redeem(applied.coupon, customerOid, created._id as Types.ObjectId, session);
+        if (lost) this.rejectCoupon(lost);
+      }
+
+      // The availability check in `resolveLines` can be beaten by a concurrent
+      // checkout; the conditional stock writes here are the real guard.
+      const sales: AdjustStockDto[] = lines
+        .filter((line) => line.tracksStock)
+        .map((line) => ({
+          productId: line.productId,
+          variantId: line.variantId,
+          type: MovementType.SALE,
+          quantity: line.quantity,
+          reference: this.reference(orderNumber),
+        }));
+      let movements: Awaited<ReturnType<InventoryService['adjustMany']>>;
+      try {
+        movements = await this.inventoryService.adjustMany(sales, undefined, session);
+      } catch (error) {
+        // The inventory message quotes the stock it read before losing the race
+        // ("2 available, 2 requested"), which reads as nonsense to a shopper.
+        if (error instanceof BadRequestException) {
+          throw new ConflictException(
+            'Someone just bought the last of an item in your cart. Please review your cart and try again.',
+          );
+        }
+        throw error;
+      }
+
+      await this.reserveCost(created, lines, movements, session);
+      return created;
+    });
 
     // A guest's confirmation carries the invite to finish their account. Mail
     // is best effort, so a failure making the link mustn't fail the order.
@@ -586,6 +639,12 @@ export class OrdersService {
     );
   }
 
+  /**
+   * Moves an order along, as one transaction with everything the move
+   * implies: delivering books the sale; cancelling puts stock back and gives
+   * the coupon use back. Conditional on the status that was read, so two
+   * admins acting at once can't both succeed.
+   */
   private async transition(
     order: Order,
     to: OrderStatus,
@@ -599,50 +658,135 @@ export class OrdersService {
       throw new BadRequestException(`An order cannot go from ${from} to ${to}.`);
     }
 
-    // Conditional on the status we read: two admins pressing "cancel" at once
-    // must not both succeed, or the stock would be returned twice.
-    const updated = await this.orderModel
-      .findOneAndUpdate(
-        { _id: order._id, status: from },
-        {
-          $set: { status: to },
-          $push: {
-            statusHistory: {
+    return withTransaction(this.connection, async (session) => {
+      const at = new Date();
+      const updated = await this.orderModel
+        .findOneAndUpdate(
+          { _id: order._id, status: from },
+          {
+            $set: {
               status: to,
-              note: change.note,
-              by: change.by ? new Types.ObjectId(change.by) : undefined,
-              at: new Date(),
+              ...(to === OrderStatus.DELIVERED ? { deliveredAt: at } : {}),
+              ...(to === OrderStatus.CANCELLED ? { cancelledAt: at } : {}),
+            },
+            $push: {
+              statusHistory: {
+                status: to,
+                note: change.note,
+                by: change.by ? new Types.ObjectId(change.by) : undefined,
+                at,
+              },
             },
           },
-        },
-        { returnDocument: 'after' },
-      )
-      .exec();
+          { returnDocument: 'after', session },
+        )
+        .exec();
 
-    if (!updated) {
-      throw new ConflictException(
-        'This order was just changed by someone else. Reload it and try again.',
-      );
-    }
+      if (!updated) {
+        throw new ConflictException(
+          'This order was just changed by someone else. Reload it and try again.',
+        );
+      }
 
-    if (to === OrderStatus.CANCELLED) {
-      await this.restock(updated, change.by);
-      // A cancelled order no longer counts against the coupon's limits.
-      if (updated.coupon) await this.couponsService.release(updated.coupon.code);
-    }
+      if (to === OrderStatus.DELIVERED) {
+        await this.bookDelivery(updated, change.by, session);
+      }
+      if (to === OrderStatus.CANCELLED) {
+        await this.restock(updated, change.by, session);
+        // A cancelled order no longer counts against the coupon's limits.
+        if (updated.coupon) await this.couponsService.release(updated.coupon, updated.customer, session);
+      }
 
-    return updated;
+      return (await this.orderModel.findById(updated._id).session(session).exec())!;
+    });
   }
 
   /**
-   * Puts a cancelled order's stock back. Best effort per line: a product that
-   * was deleted or stopped tracking stock since the sale has nowhere to return
-   * to, and that must not block the cancellation itself.
+   * Delivery is when the sale is recognised: the customer now owes the total,
+   * split into product sales, the discount given and delivery income. Posted
+   * in the delivery's own transaction. Orders written before the books carry
+   * pounds only; their minor-unit amounts are filled in here, from the same
+   * figures, so every booked order can be reconciled.
    */
-  private async restock(order: Order, userId?: string): Promise<void> {
+  private async bookDelivery(order: Order, userId: string | undefined, session: ClientSession): Promise<void> {
+    await this.journal.goLiveAt(session);
+
+    let amounts: ReturnType<typeof orderAmounts>;
+    try {
+      amounts = orderAmounts(order);
+    } catch (error) {
+      if (error instanceof MoneyError) {
+        throw new InternalServerErrorException(
+          `Order #${order.orderNumber} can't be booked: ${error.message}. Nothing was changed.`,
+        );
+      }
+      throw error;
+    }
+
+    const ref = { order: order._id as Types.ObjectId };
+    // What the delivered goods cost leaves "awaiting delivery" for cost of goods sold.
+    const costMinor = order.items.reduce((sum, item) => sum + (item.costMinor ?? 0), 0);
+    await this.journal.post(
+      {
+        date: order.deliveredAt!,
+        source: { type: 'order', id: order._id as Types.ObjectId, number: order.orderNumber, event: 'delivered' },
+        lines: [
+          { account: ACCOUNT.RECEIVABLES, debitMinor: amounts.totalMinor, ...ref, customer: order.customer },
+          { account: ACCOUNT.SALES_DISCOUNTS, debitMinor: amounts.discountMinor, ...ref },
+          { account: ACCOUNT.PRODUCT_SALES, creditMinor: amounts.subtotalMinor, ...ref },
+          { account: ACCOUNT.DELIVERY_INCOME, creditMinor: amounts.shippingFeeMinor, ...ref },
+          { account: ACCOUNT.TAX_PAYABLE, creditMinor: amounts.taxMinor, ...ref },
+          { account: ACCOUNT.COGS, debitMinor: costMinor, ...ref },
+          { account: ACCOUNT.GOODS_AWAITING_DELIVERY, creditMinor: costMinor, ...ref },
+        ],
+        memo: `${this.reference(order.orderNumber)} delivered`,
+        createdBy: userId,
+      },
+      session,
+    );
+
+    const lineFields = Object.fromEntries(
+      amounts.lines.flatMap((line, i) => [
+        [`items.${i}.unitPriceMinor`, line.unitPriceMinor],
+        [`items.${i}.lineTotalMinor`, line.lineTotalMinor],
+        [`items.${i}.discountMinor`, line.discountMinor],
+      ]),
+    );
+    await this.orderModel
+      .updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            bookedAt: order.deliveredAt,
+            paymentStatus: paymentStatusFor(amounts.totalMinor, order.money ?? {}),
+            subtotalMinor: amounts.subtotalMinor,
+            discountMinor: amounts.discountMinor,
+            shippingFeeMinor: amounts.shippingFeeMinor,
+            taxMinor: amounts.taxMinor,
+            totalMinor: amounts.totalMinor,
+            currencyCode: order.currencyCode ?? DEFAULT_CURRENCY,
+            ...lineFields,
+          },
+        },
+        { session },
+      )
+      .exec();
+  }
+
+  /**
+   * Puts a cancelled order's stock back, in the cancellation's transaction,
+   * at the cost each line was taken out at — and takes that cost back out of
+   * "awaiting delivery". Best effort per line: a product that stopped tracking
+   * stock since the sale has nowhere to return to, and that must not block
+   * the cancellation. Those refusals come from our own checks, before any
+   * write, so they don't spoil the transaction.
+   */
+  private async restock(order: Order, userId: string | undefined, session: ClientSession): Promise<void> {
+    const lines: Parameters<JournalService['post']>[0]['lines'] = [];
+    const ref = { order: order._id as Types.ObjectId };
     for (const item of order.items.filter((i) => i.stockDeducted)) {
       try {
-        await this.inventoryService.adjust(
+        const movement = await this.inventoryService.adjust(
           {
             productId: item.product.toString(),
             variantId: item.variantId?.toString(),
@@ -651,13 +795,81 @@ export class OrdersService {
             reference: this.reference(order.orderNumber),
           },
           userId,
+          session,
+          item.costMinor,
         );
+        const value = movement.valueMinor ?? 0;
+        if (item.costMinor !== undefined) {
+          lines.push(
+            { account: ACCOUNT.INVENTORY, debitMinor: value, ...ref },
+            { account: ACCOUNT.GOODS_AWAITING_DELIVERY, creditMinor: item.costMinor, ...ref },
+            ...varianceLines(movement.varianceMinor ?? 0).map((l) => ({ ...l, ...ref })),
+          );
+        } else if (value > 0) {
+          // Sold before its stock had a cost, back now that it has one: the
+          // units gain today's cost, with nothing awaiting delivery to undo.
+          lines.push(
+            { account: ACCOUNT.INVENTORY, debitMinor: value, ...ref },
+            { account: ACCOUNT.INVENTORY_LOSSES, creditMinor: value, ...ref },
+          );
+        }
       } catch (error) {
+        if (!(error instanceof BadRequestException || error instanceof NotFoundException)) throw error;
         this.logger.warn(
           `Could not return stock for ${this.reference(order.orderNumber)}, product ${item.product}: ${(error as Error).message}`,
         );
       }
     }
+    if (lines.length) {
+      await this.journal.post(
+        {
+          date: order.cancelledAt ?? new Date(),
+          source: { type: 'order', id: order._id as Types.ObjectId, number: order.orderNumber, event: 'cancelled' },
+          lines,
+          memo: `${this.reference(order.orderNumber)} cancelled — stock back on the shelf`,
+          createdBy: userId,
+        },
+        session,
+      );
+    }
+  }
+
+  /**
+   * Records what each line's units cost as they left the shelf, and moves
+   * that cost from inventory to "awaiting delivery" — the goods are spoken
+   * for but not yet sold. Lines whose stock has no cost stay uncosted.
+   */
+  private async reserveCost(
+    order: Order,
+    lines: ResolvedLine[],
+    movements: StockMovement[],
+    session: ClientSession,
+  ): Promise<void> {
+    const tracked = lines.map((line, i) => ({ line, i })).filter(({ line }) => line.tracksStock);
+    const set: Record<string, unknown> = {};
+    let total = 0;
+    tracked.forEach(({ i }, k) => {
+      const movement = movements[k];
+      if (movement?.valueMinor === undefined || movement.valueMinor === null) return;
+      set[`items.${i}.costMinor`] = -movement.valueMinor;
+      set[`items.${i}.costEstimated`] = movement.costEstimated;
+      total += -movement.valueMinor;
+    });
+    if (!Object.keys(set).length) return;
+
+    await this.orderModel.updateOne({ _id: order._id }, { $set: set }, { session }).exec();
+    await this.journal.post(
+      {
+        date: new Date(),
+        source: { type: 'order', id: order._id as Types.ObjectId, number: order.orderNumber, event: 'reserved' },
+        lines: [
+          { account: ACCOUNT.GOODS_AWAITING_DELIVERY, debitMinor: total, order: order._id as Types.ObjectId },
+          { account: ACCOUNT.INVENTORY, creditMinor: total, order: order._id as Types.ObjectId },
+        ],
+        memo: `${this.reference(order.orderNumber)} placed — goods set aside at cost`,
+      },
+      session,
+    );
   }
 
   // ── Reading ─────────────────────────────────────────────────────────────────
@@ -668,7 +880,7 @@ export class OrdersService {
     page: number;
     limit: number;
   }> {
-    return this.paginate(this.buildFilter(query), query, true);
+    return this.paginate(await this.buildFilter(query), query, true);
   }
 
   async findOne(id: string): Promise<Order> {
@@ -707,28 +919,54 @@ export class OrdersService {
 
   /**
    * Every order matching the list filters as CSV, one row per order — for
-   * accounting and delivery spreadsheets. Capped so a careless "all time"
-   * export can't take the server down.
+   * accounting and delivery spreadsheets. Streamed row by row from a cursor,
+   * so a long range comes out whole instead of being cut off at a cap.
+   * Amounts are exact decimals ("315.00"); dates are ISO instants.
    */
-  async exportCsv(query: ExportOrdersDto): Promise<string> {
+  async exportCsv(query: ExportOrdersDto, write: (chunk: string) => Promise<void>): Promise<void> {
     const lang = query.lang ?? 'en';
     const name = (field?: LocalizedField) => field?.[lang] || field?.en || field?.ar || '';
-    const orders = await this.orderModel
-      .find(this.buildFilter(query))
+    const cursor = this.orderModel
+      .find(await this.buildFilter(query))
       .sort({ createdAt: -1 })
-      .limit(EXPORT_LIMIT)
       .populate<{ customer: Customer }>('customer', 'name email')
       .lean()
-      .exec();
+      .cursor();
 
     const header = [
       'order_number', 'date', 'status', 'customer_name', 'customer_email', 'phone',
       'zone', 'sub_zone', 'address', 'items', 'item_count', 'subtotal', 'discount',
       'coupon', 'shipping_fee', 'total', 'refunded', 'payment_method', 'notes',
+      'delivered_at', 'payment_status', 'collected', 'outstanding',
     ];
-    const rows = orders.map((o) => {
+    await write(CSV_BOM + header.map(csvCell).join(',') + '\r\n');
+
+    for await (const o of cursor) {
       const a = o.shippingAddress;
-      return [
+      // Amounts from minor units where the order has them; older orders are
+      // converted from their pounds, which are whole piastres.
+      let money: { subtotal: string; discount: string; fee: string; total: string; collected: string; outstanding: string };
+      try {
+        const m = orderAmounts(o);
+        money = {
+          subtotal: formatMinor(m.subtotalMinor),
+          discount: formatMinor(m.discountMinor),
+          fee: formatMinor(m.shippingFeeMinor),
+          total: formatMinor(m.totalMinor),
+          collected: o.bookedAt ? formatMinor(o.money?.collectedMinor ?? 0) : '',
+          outstanding: o.bookedAt ? formatMinor(outstandingOf(m.totalMinor, o.money)) : '',
+        };
+      } catch {
+        money = {
+          subtotal: String(o.subtotal),
+          discount: String(o.discount ?? 0),
+          fee: String(o.shippingFee),
+          total: String(o.total),
+          collected: '',
+          outstanding: '',
+        };
+      }
+      const row = [
         o.orderNumber,
         (o as unknown as { createdAt: Date }).createdAt,
         o.status,
@@ -742,17 +980,21 @@ export class OrdersService {
           .map((i) => `${i.quantity} × ${name(i.name)}${i.variantLabel ? ` (${i.variantLabel})` : ''}`)
           .join('; '),
         o.items.reduce((sum, i) => sum + i.quantity, 0),
-        o.subtotal,
-        o.discount ?? 0,
+        money.subtotal,
+        money.discount,
         o.coupon?.code ?? '',
-        o.shippingFee,
-        o.total,
+        money.fee,
+        money.total,
         o.refundedTotal ?? 0,
         o.paymentMethod,
         o.notes ?? '',
+        o.deliveredAt ?? '',
+        o.paymentStatus ?? '',
+        money.collected,
+        money.outstanding,
       ];
-    });
-    return toCsv(header, rows);
+      await write(row.map(csvCell).join(',') + '\r\n');
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -781,6 +1023,7 @@ export class OrdersService {
         variantId: item.variantId,
         quantity: item.quantity,
         lineTotal: 0,
+        lineTotalMinor: 0,
         available: null,
         tracksStock: false,
       };
@@ -798,7 +1041,16 @@ export class OrdersService {
         return { ...base, name: product.name, slug: product.slug, issue: 'unavailable' };
       }
 
-      const unitPrice = variant?.price ?? product.price;
+      const price = variant?.price ?? product.price;
+      // A price stored before validation with more than two decimals can't be
+      // charged exactly, so it reads as unpriced rather than being rounded.
+      let unitPriceMinor: number | undefined;
+      try {
+        unitPriceMinor = price != null ? priceToMinor(price) : undefined;
+      } catch (error) {
+        if (!(error instanceof MoneyError)) throw error;
+      }
+      const unitPrice = unitPriceMinor !== undefined ? toMajor(unitPriceMinor) : undefined;
       const limited = product.trackStock && !product.allowBackorder;
       const available = limited ? (variant ? variant.stock : product.stock) ?? 0 : null;
 
@@ -810,12 +1062,14 @@ export class OrdersService {
         image: product.images?.[0],
         slug: product.slug,
         unitPrice,
-        lineTotal: unitPrice != null ? unitPrice * item.quantity : 0,
+        unitPriceMinor,
+        lineTotal: unitPriceMinor !== undefined ? toMajor(unitPriceMinor * item.quantity) : 0,
+        lineTotalMinor: unitPriceMinor !== undefined ? unitPriceMinor * item.quantity : 0,
         available,
         tracksStock: product.trackStock,
       };
 
-      if (unitPrice == null) return { ...line, issue: 'no_price' };
+      if (unitPriceMinor === undefined) return { ...line, issue: 'no_price' };
       if (available !== null && available < item.quantity) {
         return { ...line, issue: 'insufficient_stock' };
       }
@@ -825,24 +1079,29 @@ export class OrdersService {
 
   private async getCheckoutSettings(): Promise<{
     currency?: LocalizedField;
+    currencyCode: string;
     storeName?: LocalizedField;
+    timezone: string;
   }> {
     const settings = await this.settingModel
       .findOne()
-      .select('currency siteTitle')
+      .select('currency currencyCode siteTitle timezone')
       .exec();
     return {
       currency: settings?.currency,
+      currencyCode: settings?.currencyCode ?? DEFAULT_CURRENCY,
       storeName: settings?.siteTitle,
+      timezone: safeTimeZone(settings?.timezone),
     };
   }
 
-  private async nextOrderNumber(): Promise<number> {
+  /** Inside the checkout's transaction, so an order that never commits never takes a number. */
+  private async nextOrderNumber(session: ClientSession): Promise<number> {
     const counter = await this.counterModel
       .findOneAndUpdate(
         { name: ORDER_COUNTER },
         { $inc: { seq: 1 } },
-        { upsert: true, returnDocument: 'after' },
+        { upsert: true, returnDocument: 'after', session },
       )
       .exec();
     return ORDER_NUMBER_BASE + counter!.seq;
@@ -852,18 +1111,21 @@ export class OrdersService {
     return `Order #${orderNumber}`;
   }
 
-  private buildFilter(query: Pick<QueryOrdersDto, 'status' | 'search' | 'from' | 'to'>): QueryFilter<Order> {
+  /**
+   * `from` and `to` are calendar days in the store's own time zone, both
+   * inclusive — the same days the dashboard means, whatever zone the server
+   * runs in.
+   */
+  private async buildFilter(query: Pick<QueryOrdersDto, 'status' | 'search' | 'from' | 'to'>): Promise<QueryFilter<Order>> {
     const filter: QueryFilter<Order> = {};
     if (query.status) filter.status = query.status;
 
     if (query.from || query.to) {
+      const { timezone } = await this.getCheckoutSettings();
+      const { start, end } = zonedDayRange(query.from, query.to, timezone);
       filter.createdAt = {};
-      if (query.from) filter.createdAt.$gte = new Date(query.from);
-      if (query.to) {
-        const to = new Date(query.to);
-        to.setHours(23, 59, 59, 999);
-        filter.createdAt.$lte = to;
-      }
+      if (start) filter.createdAt.$gte = start;
+      if (end) filter.createdAt.$lt = end;
     }
 
     const search = query.search?.trim().replace(/^#/, '');

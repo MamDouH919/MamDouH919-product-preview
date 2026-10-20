@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { LocalizedField, LocalizedFieldSchema } from '../../common/schemas/localized-field.schema';
 
 // Variants carry their own `_id` so stock movements can reference one
@@ -19,6 +19,14 @@ export class ProductVariant {
 
   @Prop({ default: 0 })
   stock!: number;
+
+  /** Total cost of the stock on hand (minor units). Unset until its cost is known. */
+  @Prop({ type: Number, required: false })
+  inventoryValueMinor?: number | null;
+
+  /** Cost of one unit at the last receipt — what units sold short are estimated at. */
+  @Prop({ type: Number, required: false })
+  lastUnitCostMinor?: number | null;
 }
 
 export const ProductVariantSchema = SchemaFactory.createForClass(ProductVariant);
@@ -43,10 +51,10 @@ export class Product extends Document {
   @Prop({ required: false })
   sku?: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Category', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Category', required: true })
   category!: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'SubCategory', required: false })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'SubCategory', required: false })
   subCategory?: Types.ObjectId;
 
   @Prop({ required: true, unique: true })
@@ -73,6 +81,14 @@ export class Product extends Document {
   // each variant and `totalStock` sums them.
   @Prop({ default: 0 })
   stock!: number;
+
+  // Cost of `stock`, for a product without variants (variants carry their own).
+  // Changed only by InventoryService, with the stock, so the two always agree.
+  @Prop({ type: Number, required: false })
+  inventoryValueMinor?: number | null;
+
+  @Prop({ type: Number, required: false })
+  lastUnitCostMinor?: number | null;
 
   @Prop({ default: 0 })
   lowStockThreshold!: number;

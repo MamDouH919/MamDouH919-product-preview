@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { tenantSchemas } from '../tenant/tenant-schemas';
+import { supportsTransactions } from '../tenant/with-transaction';
 
 /** Per-tenant configuration, keyed by hostname in config.json / TENANT_MAP. */
 export interface TenantConfig {
@@ -11,6 +12,55 @@ export interface TenantConfig {
     /** Public frontend origin, e.g. "https://ranoshka.com". Used for CORS and
      *  for building links in emails (password reset, etc.). */
     frontendUrl: string;
+    /**
+     * Set on a second host for the same store (e.g. "www.example.com" with
+     * aliasOf "example.com"). It must use the same database as that host.
+     * Without it two hosts on one database are refused, because jobs that
+     * visit each store would visit that one twice.
+     */
+    aliasOf?: string;
+}
+
+/**
+ * Which database a URI points at, for spotting two hosts that share one:
+ * the server list (sorted, lower-case) plus the database name. Only catches
+ * identical spellings — "localhost" and "127.0.0.1" read as different.
+ */
+export function databaseKey(mongoUri: string): string {
+    const match = /^mongodb(\+srv)?:\/\/(?:[^@/]*@)?([^/?]+)(?:\/([^?]*))?/i.exec(mongoUri.trim());
+    if (!match) throw new Error(`Not a MongoDB connection string: ${mongoUri.slice(0, 20)}…`);
+    const [, srv, hosts, db] = match;
+    const servers = hosts.toLowerCase().split(',').sort().join(',');
+    return `${srv ? 'srv:' : ''}${servers}/${decodeURIComponent(db || 'test')}`;
+}
+
+/**
+ * Refuses a tenant map in which two stores would share a database, or an
+ * alias points at a host that isn't there, uses another database, or is
+ * itself an alias. Thrown at boot, so a bad map never serves a request.
+ */
+export function validateTenantMap(map: Record<string, TenantConfig>): void {
+    const owners = new Map<string, string>();
+    for (const [host, cfg] of Object.entries(map)) {
+        if (cfg.aliasOf !== undefined) {
+            const target = Object.prototype.hasOwnProperty.call(map, cfg.aliasOf) ? map[cfg.aliasOf] : undefined;
+            if (!target) throw new Error(`Tenant map: ${host} is an alias of unknown host ${cfg.aliasOf}`);
+            if (target.aliasOf !== undefined) throw new Error(`Tenant map: ${host} is an alias of an alias (${cfg.aliasOf})`);
+            if (databaseKey(target.mongoUri) !== databaseKey(cfg.mongoUri)) {
+                throw new Error(`Tenant map: ${host} is an alias of ${cfg.aliasOf} but uses a different database`);
+            }
+            continue;
+        }
+        const key = databaseKey(cfg.mongoUri);
+        const owner = owners.get(key);
+        if (owner) {
+            throw new Error(
+                `Tenant map: ${owner} and ${host} use the same database. ` +
+                    `Give each store its own database, or mark one with "aliasOf".`,
+            );
+        }
+        owners.set(key, host);
+    }
 }
 
 @Injectable()
@@ -27,7 +77,9 @@ export class TenantConnectionService {
         // development only.
         const fromEnv = process.env.TENANT_MAP;
         if (fromEnv) {
-            this.tenantMap = JSON.parse(fromEnv);
+            const map = JSON.parse(fromEnv);
+            validateTenantMap(map);
+            this.tenantMap = map;
             return this.tenantMap!;
         }
 
@@ -45,7 +97,9 @@ export class TenantConnectionService {
             return {};
         }
 
-        this.tenantMap = JSON.parse(readFileSync(configPath, 'utf-8'));
+        const map = JSON.parse(readFileSync(configPath, 'utf-8'));
+        validateTenantMap(map);
+        this.tenantMap = map;
         return this.tenantMap!;
     }
 
@@ -79,9 +133,20 @@ export class TenantConnectionService {
             .filter((url): url is string => Boolean(url));
     }
 
-    /** Every configured tenant host — for background jobs that visit each store. */
+    /** Every configured tenant host, aliases included. */
     getHosts(): string[] {
         return Object.keys(this.loadTenantMap());
+    }
+
+    /**
+     * One host per store — aliases left out — for background jobs that visit
+     * each store. Iterating every host would run a job twice for a store
+     * reachable under two names.
+     */
+    getStoreHosts(): string[] {
+        return Object.entries(this.loadTenantMap())
+            .filter(([, cfg]) => cfg.aliasOf === undefined)
+            .map(([host]) => host);
     }
 
     async getConnection(host: string): Promise<Connection> {
@@ -102,6 +167,15 @@ export class TenantConnectionService {
         }
 
         this.connections.set(host, connection);
+
+        // Finance writes run as transactions and refuse a database that can't;
+        // say so once, at connect, rather than at the first refused write.
+        if (!(await supportsTransactions(connection))) {
+            this.logger.warn(
+                `${host}: database is not a replica set member, so transactions are unavailable. ` +
+                    'See README → "MongoDB replica set".',
+            );
+        }
 
         return connection;
     }

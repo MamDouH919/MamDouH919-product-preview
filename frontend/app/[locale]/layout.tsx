@@ -5,6 +5,14 @@ import "../globals.css";
 import Providers from "@/lib/Providers";
 import config from "@/config.json";
 import { resolveTenantSeo } from "@/lib/tenantSeo";
+import { fetchBackend, requestBackendUrl } from "@/lib/seo";
+
+type Localized = Partial<Record<"en" | "ar", string>>;
+type StoreSettings = { siteTitle?: Localized; siteDescription?: Localized; favicon?: string };
+
+/** The store's text in this language, or the other one; `undefined` when unset. */
+const pick = (field: Localized | undefined, lang: "en" | "ar") =>
+  field?.[lang]?.trim() || field?.[lang === "en" ? "ar" : "en"]?.trim() || undefined;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,11 +40,27 @@ export async function generateMetadata(
   const tenant = resolveTenantSeo(host);
 
   const lang = locale === "ar" ? "ar" : "en";
-  const { title, titleTemplate, description, keywords } = tenant[lang];
+  const seo = tenant[lang];
+
+  // What the store set in Settings wins over the built-in per-host defaults:
+  // a store renamed in the admin must not keep showing the template's name.
+  const [settings, backendUrl] = await Promise.all([
+    fetchBackend<StoreSettings>("/settings", 60),
+    requestBackendUrl(),
+  ]);
+  const storeTitle = pick(settings?.siteTitle, lang);
+  const siteName = storeTitle ?? tenant.siteName;
+  const title = storeTitle ?? seo.title;
+  const titleTemplate = storeTitle ? `%s | ${storeTitle}` : seo.titleTemplate;
+  const description = pick(settings?.siteDescription, lang) ?? seo.description;
+  const { keywords } = seo;
+  const icons = settings?.favicon && backendUrl
+    ? { icon: `${backendUrl}${settings.favicon}`, shortcut: `${backendUrl}${settings.favicon}`, apple: `${backendUrl}${settings.favicon}` }
+    : tenant.icons;
 
   return {
     metadataBase: new URL(tenant.siteUrl),
-    applicationName: tenant.siteName,
+    applicationName: siteName,
 
     title: {
       default: title,
@@ -46,7 +70,7 @@ export async function generateMetadata(
     description,
     keywords,
 
-    authors: [{ name: tenant.siteName }],
+    authors: [{ name: siteName }],
     category: "Perfumes & Fragrances",
 
     robots: {
@@ -55,13 +79,13 @@ export async function generateMetadata(
       googleBot: { index: true, follow: true },
     },
 
-    icons: tenant.icons,
+    icons,
 
     manifest: tenant.manifest,
 
     openGraph: {
       type: "website",
-      siteName: tenant.siteName,
+      siteName,
       title,
       description,
       locale: locale === "ar" ? "ar_SA" : "en_US",

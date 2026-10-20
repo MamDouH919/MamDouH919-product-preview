@@ -21,6 +21,7 @@ import { OrderNotificationsService } from './order-notifications.service';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
 import { PriceListModule } from '../price-list/price-list.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
+import { FinanceModule } from '../finance/finance.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
     CouponsModule,
     PriceListModule,
     MailModule,
+    FinanceModule,
   ],
   // Order matters: `/orders/quote`, `/orders/guest` and `/orders/me` must
   // register before `GET /orders/:id`, or "me" would be read as an order id.

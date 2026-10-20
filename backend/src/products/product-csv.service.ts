@@ -8,6 +8,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { parseCsv, toCsv, unguard } from '../common/helpers/csv';
+import { MoneyError, parseMoney, westernDigits } from '../common/money/money';
 
 /**
  * The spreadsheet layout. One row per product, or one per variant — product
@@ -71,9 +72,6 @@ interface Plan {
 }
 
 /** Western digits for Arabic-Indic ones, so "١٢٠" reads as 120. */
-const westernDigits = (text: string) =>
-  text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
-
 const sameId = (a: unknown, b: unknown) => String((a as { _id?: unknown })?._id ?? a ?? '') === String((b as { _id?: unknown })?._id ?? b ?? '');
 
 @Injectable()
@@ -248,6 +246,19 @@ export class ProductCsvService {
       }
       return n;
     };
+    // Prices are money: whole piastres only, so "12.345" is refused, not rounded.
+    const money = (value: string | undefined, field: string, ln = line) => {
+      const n = num(value, field, ln);
+      if (n === undefined) return undefined;
+      try {
+        parseMoney(n);
+      } catch (error) {
+        if (!(error instanceof MoneyError)) throw error;
+        err(ln, `${field} may have at most 2 decimal places`);
+        return undefined;
+      }
+      return n;
+    };
     const bool = (value: string | undefined, field: string) => {
       if (!value) return undefined;
       const v = value.toLowerCase();
@@ -266,7 +277,7 @@ export class ProductCsvService {
     if (first.short_description_ar) wanted['shortDescription.ar'] = first.short_description_ar;
     if (first.tags) wanted.tags = first.tags.split(/[|;]/).map((t) => t.trim()).filter(Boolean);
     if (first.sku) wanted.sku = first.sku;
-    const price = num(first.price, 'price');
+    const price = money(first.price, 'price');
     if (price !== undefined) wanted.price = price;
     const isActive = bool(first.is_active, 'is_active');
     if (isActive !== undefined) wanted.isActive = isActive;
@@ -309,7 +320,7 @@ export class ProductCsvService {
 
     for (const row of variantRows) {
       const c = row.cells;
-      const vPrice = num(c.variant_price, 'variant_price', row.line);
+      const vPrice = money(c.variant_price, 'variant_price', row.line);
       const counted = stockCell(row);
       const match = existing?.variants?.find((v) =>
         c.variant_id ? String(v._id) === c.variant_id : !!c.variant_label && v.label.toLowerCase() === c.variant_label.toLowerCase(),

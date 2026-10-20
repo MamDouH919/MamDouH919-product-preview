@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { LocalizedField, LocalizedFieldSchema } from '../../common/schemas/localized-field.schema';
 
 /**
@@ -22,10 +22,10 @@ export class Address {
   phone!: string;
 
   /** The price-list zone and subzone, chosen from where the store delivers. */
-  @Prop({ type: Types.ObjectId, ref: 'Zone', required: false })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Zone', required: false })
   zone?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'SubZone', required: false })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'SubZone', required: false })
   subZone?: Types.ObjectId;
 
   /** Names copied in when saved, so showing an address needs no lookup. */
@@ -64,10 +64,10 @@ export const AddressSchema = SchemaFactory.createForClass(Address);
 /** One basket line as saved for a signed-in customer — what and how many, never a price. */
 @Schema({ _id: false })
 export class SavedCartItem {
-  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Product', required: true })
   product!: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, required: false })
+  @Prop({ type: SchemaTypes.ObjectId, required: false })
   variantId?: Types.ObjectId;
 
   @Prop({ required: true, min: 1 })
@@ -142,7 +142,7 @@ export class Customer extends Document {
   addresses!: Address[];
 
   /** Saved products, most recent last. */
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }], default: [] })
+  @Prop({ type: [{ type: SchemaTypes.ObjectId, ref: 'Product' }], default: [] })
   wishlist!: Types.ObjectId[];
 
   /** Left out of every query unless asked for, so profile responses stay small. */

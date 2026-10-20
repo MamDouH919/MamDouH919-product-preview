@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 
 /**
  * Customers get their own token collections rather than sharing the admin
@@ -13,7 +13,7 @@ export class CustomerRefreshToken extends Document {
   @Prop({ required: true })
   token!: string;
 
-  @Prop({ required: true, type: Types.ObjectId })
+  @Prop({ required: true, type: SchemaTypes.ObjectId })
   customerId!: Types.ObjectId;
 
   @Prop({ required: true })
@@ -28,7 +28,7 @@ export class CustomerResetToken extends Document {
   @Prop({ required: true })
   token!: string;
 
-  @Prop({ required: true, type: Types.ObjectId })
+  @Prop({ required: true, type: SchemaTypes.ObjectId })
   customerId!: Types.ObjectId;
 
   @Prop({ required: true })

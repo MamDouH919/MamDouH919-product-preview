@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { InventoryService } from './inventory.service';
 import {
@@ -7,6 +7,8 @@ import {
   StockTakeDto,
 } from './dto/adjust-stock.dto';
 import { QueryInventoryDto, QueryMovementsDto } from './dto/query-inventory.dto';
+import { SetOpeningCostDto } from '../purchasing/dto/purchasing.dto';
+import { parseMoney } from '../common/money/money';
 import { AuthenticationGuard } from '../guards/authentication.guard';
 import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
@@ -58,6 +60,26 @@ export class InventoryController {
   @Post('bulk-adjust')
   bulkAdjust(@Body() dto: BulkAdjustStockDto, @Req() req: Request & { userId?: string }) {
     return this.inventoryService.adjustMany(dto.items, req.userId);
+  }
+
+  /** Stock value at cost, item by item — the inventory valuation report. */
+  @Permissions([{ resource: Resource.FINANCE_REPORTS, actions: [Action.READ] }])
+  @Get('valuation')
+  valuation() {
+    return this.inventoryService.getValuation();
+  }
+
+  /** Gives uncosted stock its first cost, from what it was really bought for. */
+  @Permissions([{ resource: Resource.INVENTORY, actions: [Action.UPDATE] }])
+  @Post('opening-cost')
+  setOpeningCost(@Body() dto: SetOpeningCostDto, @Req() req: { userId?: string }) {
+    let unitCostMinor: number;
+    try {
+      unitCostMinor = parseMoney(dto.unitCost);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+    return this.inventoryService.setOpeningCost(dto.productId, dto.variantId, unitCostMinor, req.userId);
   }
 
   @Permissions([{ resource: Resource.INVENTORY, actions: [Action.UPDATE] }])

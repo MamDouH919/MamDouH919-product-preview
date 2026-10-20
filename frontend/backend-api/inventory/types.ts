@@ -10,6 +10,8 @@ export enum MovementType {
   ORDER_CANCELLED = "order_cancelled",
   ADJUSTMENT_IN = "adjustment_in",
   ADJUSTMENT_OUT = "adjustment_out",
+  PURCHASE_RETURN = "purchase_return",
+  COST_SET = "cost_set",
 }
 
 /**
@@ -38,6 +40,12 @@ export type StockLevel = {
   lowStockThreshold: number;
   status: StockStatus;
   price?: number;
+  /** Whether the stock has a cost yet — stock from before the books has none until it is set. */
+  valued: boolean;
+  /** Cost of the stock on hand, minor units; null until it has a cost. */
+  valueMinor: number | null;
+  /** Average cost of one unit, minor units. */
+  unitCostMinor: number | null;
 };
 
 export type StockMovement = {
@@ -64,7 +72,12 @@ export type StockMovement = {
 export type InventorySummary = {
   trackedItems: number;
   totalUnits: number;
+  /** At selling prices — what the stock would fetch. */
   stockValue: number;
+  /** At cost, minor units — what the books carry. Uncosted stock isn't in it. */
+  costValueMinor: number;
+  /** Items with stock on hand but no cost yet. */
+  uncostedItems: number;
   lowStockCount: number;
   outOfStockCount: number;
 };

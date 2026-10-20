@@ -9,6 +9,7 @@ import {
 } from "@/Store/slices/bread-crumb";
 import {
   Box,
+  Button,
   Chip,
   IconButton,
   MenuItem,
@@ -32,6 +33,9 @@ import SimpleTable from "@/components/Table/SimpleTable";
 import AdjustStockDialog from "@/features/Inventory/AdjustStockDialog";
 import ProductMovementsDialog from "@/features/Inventory/ProductMovementsDialog";
 import StockStatusChip from "@/features/Inventory/StockStatusChip";
+import OpeningCostDialog from "@/features/Inventory/OpeningCostDialog";
+import { formatMinorMoney } from "@/features/Order/format";
+import { useCurrency } from "@/Hooks/useCurrency";
 
 const SummaryTile = ({
   label,
@@ -61,6 +65,8 @@ const InventoryPage = () => {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockLevel | null>(null);
   const [historyRow, setHistoryRow] = useState<StockLevel | null>(null);
+  const [costRow, setCostRow] = useState<StockLevel | null>(null);
+  const currency = useCurrency();
 
   // Keeps the table from refetching on every keystroke.
   useEffect(() => {
@@ -152,6 +158,26 @@ const InventoryPage = () => {
         ),
       },
       {
+        id: "cost",
+        header: t("unitCost"),
+        render: (row: StockLevel) =>
+          !row.trackStock ? (
+            "—"
+          ) : row.valued ? (
+            formatMinorMoney(row.unitCostMinor ?? 0, currency)
+          ) : (
+            // Stock from before the books: no cost until someone says what it was.
+            <Button size="small" color="warning" onClick={() => setCostRow(row)}>
+              {t("setCost")}
+            </Button>
+          ),
+      },
+      {
+        id: "value",
+        header: t("valueAtCost"),
+        render: (row: StockLevel) => (row.valued && row.valueMinor !== null ? formatMinorMoney(row.valueMinor, currency) : "—"),
+      },
+      {
         id: "lowStockThreshold",
         header: t("lowStockThreshold"),
         render: (row: StockLevel) =>
@@ -187,7 +213,7 @@ const InventoryPage = () => {
         ),
       },
     ],
-    [t, lang]
+    [t, lang, currency]
   );
 
   return (
@@ -196,9 +222,16 @@ const InventoryPage = () => {
         <SummaryTile label={t("trackedItems")} value={summary?.trackedItems ?? 0} />
         <SummaryTile label={t("totalUnits")} value={summary?.totalUnits ?? 0} />
         <SummaryTile
-          label={t("stockValue")}
+          label={t("stockValueAtCost")}
+          value={formatMinorMoney(summary?.costValueMinor ?? 0, currency)}
+        />
+        <SummaryTile
+          label={t("stockValueAtPrice")}
           value={(summary?.stockValue ?? 0).toLocaleString()}
         />
+        {!!summary?.uncostedItems && (
+          <SummaryTile label={t("uncostedItems")} value={summary.uncostedItems} color="warning.main" />
+        )}
         <SummaryTile
           label={t("lowStock")}
           value={summary?.lowStockCount ?? 0}
@@ -268,6 +301,7 @@ const InventoryPage = () => {
 
       <AdjustStockDialog row={selected} onClose={() => setSelected(null)} />
       <ProductMovementsDialog row={historyRow} onClose={() => setHistoryRow(null)} />
+      <OpeningCostDialog row={costRow} onClose={() => setCostRow(null)} />
     </Stack>
   );
 };

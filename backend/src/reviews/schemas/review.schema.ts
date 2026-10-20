@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 
 export enum ReviewStatus {
   /** Written by the customer, not yet seen by the store. Not public. */
@@ -16,10 +16,10 @@ export enum ReviewStatus {
  */
 @Schema({ timestamps: true })
 export class Review extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Product', required: true })
   product!: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Customer', required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Customer', required: true, index: true })
   customer!: Types.ObjectId;
 
   /**

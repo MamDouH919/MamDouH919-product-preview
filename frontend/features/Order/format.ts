@@ -29,6 +29,13 @@ export const formatAddress = (
 export const formatMoney = (amount: number, currency: string): string =>
   `${amount.toLocaleString()} ${currency}`.trim();
 
+/** An amount in minor units (piastres), always with its two decimals: 31500 → "315.00". */
+export const formatMinorMoney = (minor: number, currency: string): string =>
+  `${(minor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`.trim();
+
+/** Minor units as the decimal string the API takes for an amount: 4550 → "45.50". */
+export const minorToInput = (minor: number): string => (minor / 100).toFixed(2);
+
 export const formatDateTime = (iso: string, lang: string): string =>
   new Date(iso).toLocaleString(lang === "ar" ? "ar-EG" : "en-GB", {
     dateStyle: "medium",

@@ -1,6 +1,7 @@
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { MongoErrorFilter } from './common/filters/mongo-error.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { TenantConnectionService } from './common/helpers/dynamic-connection';
@@ -57,6 +58,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  // ✅ Malformed ids → 400, duplicate unique keys → 409 (instead of 500)
+  app.useGlobalFilters(new MongoErrorFilter(app.get(HttpAdapterHost).httpAdapter));
 
   await app.listen(process.env.PORT ?? 3023);
 }

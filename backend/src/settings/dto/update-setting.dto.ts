@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
+import { CURRENCIES } from '../../common/money/money';
 import { SUPPORTED_COUNTRIES } from '../../price-list/data';
 
 export class SocialMediaItemDto {
@@ -68,6 +69,15 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsIn(SUPPORTED_COUNTRIES)
   country?: string;
+
+  @IsOptional()
+  @IsIn(Object.keys(CURRENCIES))
+  currencyCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
 
   // Arrives as a form-data string; validated as a number, stored by Mongoose's cast.
   @IsOptional()

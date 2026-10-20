@@ -8,6 +8,8 @@ import {
     Package,
     Settings,
     ShoppingCart,
+    Truck,
+    Wallet,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
@@ -40,9 +42,29 @@ export const useLinksList = () => {
             children: [
                 { primary: t("orders"), pathname: "/admin/orders" },
                 { primary: t("returns"), pathname: "/admin/returns" },
+                { primary: t("refunds"), pathname: "/admin/refunds" },
                 { primary: t("coupons"), pathname: "/admin/coupons" },
                 { primary: t("priceList"), pathname: "/admin/price-list" },
                 { primary: t("customers"), pathname: "/admin/customers" },
+            ],
+        },
+        {
+            primary: t("navFinance"),
+            icon: Wallet,
+            children: [
+                { primary: t("reports"), pathname: "/admin/reports" },
+                { primary: t("moneyAccounts"), pathname: "/admin/money-accounts" },
+                { primary: t("expenses"), pathname: "/admin/expenses" },
+                { primary: t("couriers"), pathname: "/admin/couriers" },
+                { primary: t("books"), pathname: "/admin/books" },
+            ],
+        },
+        {
+            primary: t("navPurchasing"),
+            icon: Truck,
+            children: [
+                { primary: t("purchases"), pathname: "/admin/purchases" },
+                { primary: t("suppliers"), pathname: "/admin/suppliers" },
             ],
         },
         {

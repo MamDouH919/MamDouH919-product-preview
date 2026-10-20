@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -19,17 +18,13 @@ import { Order } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { Counter } from '../orders/schemas/counter.schema';
 import { Customer } from '../customers/schemas/customer.schema';
-import { Product } from '../products/schemas/product.schema';
 import { Setting } from '../settings/schemas/setting.schema';
-import { InventoryService } from '../inventory/inventory.service';
-import { MovementType } from '../inventory/enums/movement-type.enum';
-import { CreateReturnDto, QueryReturnsDto, RefundReturnDto } from './dto/return.dto';
+import { CreateReturnDto, QueryReturnsDto } from './dto/return.dto';
 import { ReturnNotificationsService } from './return-notifications.service';
 
 const RETURN_COUNTER = 'return';
 const RETURN_NUMBER_BASE = 2000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const round2 = (n: number) => Math.round(n * 100) / 100;
 const num = (v: unknown) => (v === undefined || v === '' ? undefined : Number(v));
 
 export interface ReturnableLine {
@@ -52,9 +47,7 @@ export class ReturnsService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Counter.name) private counterModel: Model<Counter>,
     @InjectModel(Customer.name) private customerModel: Model<Customer>,
-    @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
-    private readonly inventoryService: InventoryService,
     private readonly notifications: ReturnNotificationsService,
   ) {}
 
@@ -130,7 +123,7 @@ export class ReturnsService {
     return { data, total, page, limit, statusCounts };
   }
 
-  /** One return with what refunding it needs: the order's money and a suggested amount. */
+  /** One return, with the order's figures beside it. Refunding it is the refunds service's job. */
   async findOne(id: string) {
     const ret = await this.returnModel
       .findById(this.oid(id, 'Return not found'))
@@ -141,16 +134,10 @@ export class ReturnsService {
 
     const order = await this.orderModel
       .findById(ret.order)
-      .select('orderNumber status subtotal discount shippingFee total refundedTotal currency createdAt')
+      .select('orderNumber status subtotal discount shippingFee total refundedTotal currency createdAt bookedAt paymentStatus')
       .lean()
       .exec();
-    const remaining = order ? round2(order.total - (order.refundedTotal ?? 0)) : 0;
-    // Line prices less the order's discount share — shipping isn't refunded by default.
-    const linesTotal = ret.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    const discountShare = order?.subtotal ? (order.discount ?? 0) / order.subtotal : 0;
-    const suggestedRefund = Math.max(0, Math.min(remaining, round2(linesTotal * (1 - discountShare))));
-
-    return { ...ret.toObject(), orderSummary: order, refundableRemaining: remaining, suggestedRefund };
+    return { ...ret.toObject(), orderSummary: order };
   }
 
   /** Every return on one order, for the order page. */
@@ -164,108 +151,6 @@ export class ReturnsService {
 
   async reject(id: string, note: string | undefined, userId: string | undefined, host: string) {
     return this.transition(id, ReturnStatus.REJECTED, { note, userId, host });
-  }
-
-  /**
-   * Gives money back and, for the lines chosen, puts stock back on the shelf.
-   * The status is claimed first, atomically, so a double click can't refund
-   * twice; the amount is then added to the order with a conditional `$inc`
-   * that refuses to take refunds past what was paid. Any failure after the
-   * claim puts everything back as it was.
-   */
-  async refund(id: string, dto: RefundReturnDto, userId: string | undefined, host: string) {
-    const amount = round2(Number(dto.amount));
-    const restock = [...new Set((dto.restock ?? []).map(Number))];
-
-    const before = await this.returnModel.findById(this.oid(id, 'Return not found')).exec();
-    if (!before) throw new NotFoundException('Return not found');
-    if (!RETURN_TRANSITIONS[before.status].includes(ReturnStatus.REFUNDED)) {
-      throw new BadRequestException(`A ${before.status} return can't be refunded`);
-    }
-    if (restock.some((i) => i >= before.items.length)) throw new BadRequestException('Unknown line to restock');
-
-    const order = await this.orderModel.findById(before.order).exec();
-    if (!order) throw new NotFoundException('Order not found');
-
-    // Only lines whose sale actually took stock, of products still tracking it, can go back.
-    const products = await this.productModel
-      .find({ _id: { $in: restock.map((i) => before.items[i].product) } })
-      .select('trackStock')
-      .lean()
-      .exec();
-    const tracking = new Set(products.filter((p) => p.trackStock).map((p) => String(p._id)));
-    const restockable = restock.filter((i) => {
-      const item = before.items[i];
-      return order.items[item.lineIndex]?.stockDeducted && tracking.has(String(item.product));
-    });
-
-    const claimed = await this.returnModel
-      .findOneAndUpdate(
-        { _id: before._id, status: before.status },
-        {
-          $set: { status: ReturnStatus.REFUNDED, refundAmount: amount },
-          $push: { history: { status: ReturnStatus.REFUNDED, note: dto.note, by: this.userOid(userId), at: new Date() } },
-        },
-        { returnDocument: 'after' },
-      )
-      .exec();
-    if (!claimed) throw new ConflictException('This return was just changed by someone else — reload it');
-
-    const undoClaim = () =>
-      this.returnModel
-        .updateOne(
-          { _id: before._id },
-          { $set: { status: before.status }, $unset: { refundAmount: 1 }, $pop: { history: 1 } },
-        )
-        .exec();
-
-    if (amount > 0) {
-      const paid = await this.orderModel
-        .updateOne(
-          {
-            _id: order._id,
-            $expr: { $lte: [{ $add: [{ $ifNull: ['$refundedTotal', 0] }, amount] }, '$total'] },
-          },
-          { $inc: { refundedTotal: amount } },
-        )
-        .exec();
-      if (!paid.modifiedCount) {
-        await undoClaim();
-        throw new BadRequestException(
-          `Refunds on order #${order.orderNumber} can't exceed what was paid (${round2(order.total - (order.refundedTotal ?? 0))} left)`,
-        );
-      }
-    }
-
-    if (restockable.length) {
-      try {
-        await this.inventoryService.adjustMany(
-          restockable.map((i) => ({
-            productId: String(claimed.items[i].product),
-            variantId: claimed.items[i].variantId ? String(claimed.items[i].variantId) : undefined,
-            type: MovementType.RETURN,
-            quantity: claimed.items[i].quantity,
-            reference: `Return #${claimed.returnNumber} (Order #${order.orderNumber})`,
-          })),
-          userId,
-        );
-      } catch (error) {
-        // adjustMany already undid its own movements; undo the money and the claim.
-        if (amount > 0) await this.orderModel.updateOne({ _id: order._id }, { $inc: { refundedTotal: -amount } }).exec();
-        await undoClaim();
-        throw new BadRequestException(`Stock couldn't be returned: ${(error as Error).message}`);
-      }
-      await this.returnModel
-        .updateOne(
-          { _id: claimed._id },
-          { $set: Object.fromEntries(restockable.map((i) => [`items.${i}.restocked`, true])) },
-        )
-        .exec();
-    }
-
-    const saved = (await this.returnModel.findById(claimed._id).exec())!;
-    this.notify(saved, order, host, dto.note);
-    return saved;
   }
 
   // ── Internals ───────────────────────────────────────────────────────────────

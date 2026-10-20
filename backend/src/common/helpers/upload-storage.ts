@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { mkdirSync } from 'fs';
@@ -17,6 +18,30 @@ function tenantFolder(req: Request): string {
 }
 
 /**
+ * Raster formats only. SVG is refused outright: it is a document that can
+ * carry script, and it would be served from the API's own origin.
+ */
+const IMAGE_TYPES: Record<string, string[]> = {
+  '.jpg': ['image/jpeg'],
+  '.jpeg': ['image/jpeg'],
+  '.png': ['image/png'],
+  '.webp': ['image/webp'],
+  '.avif': ['image/avif'],
+  '.gif': ['image/gif'],
+  '.tif': ['image/tiff'],
+  '.tiff': ['image/tiff'],
+};
+
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+  'image/gif': '.gif',
+  'image/tiff': '.tiff',
+};
+
+/**
  * Multer disk storage that writes uploads under a per-tenant folder:
  *
  *   ./uploads/<tenant>/<subdir>/<unique>.<ext>
@@ -32,8 +57,16 @@ export function tenantImageStorage(subdir: string) {
       cb(null, dir);
     },
     filename: (_req, file, cb) => {
+      // Browser-compressed images arrive as a nameless "blob": take the
+      // extension from the type then. Otherwise both must agree. The content
+      // itself is checked when sharp reads it.
+      const named = extname(file.originalname).toLowerCase();
+      const ext = named || EXT_BY_TYPE[file.mimetype];
+      if (!ext || !IMAGE_TYPES[ext]?.includes(file.mimetype)) {
+        return cb(new BadRequestException(`"${file.originalname}" is not a supported image (JPG, PNG, WebP, AVIF, GIF)`), '');
+      }
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + (extname(file.originalname) || '.jpg'));
+      cb(null, uniqueSuffix + ext);
     },
   });
 }

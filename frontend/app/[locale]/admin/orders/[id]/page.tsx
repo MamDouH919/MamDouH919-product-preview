@@ -38,6 +38,11 @@ import { createStoreReturn } from "@/backend-api/returns/mutations";
 import ReturnStatusChip from "@/features/Return/ReturnStatusChip";
 import ReturnRequestDialog from "@/features/Return/ReturnRequestDialog";
 import { returnableLines } from "@/features/Return/returnableLines";
+import OrderPaymentPanel from "@/features/Order/OrderPaymentPanel";
+import RefundsCard from "@/features/Refund/RefundsCard";
+import RefundRequestDialog from "@/features/Refund/RefundRequestDialog";
+import { REFUNDS_QUERY_KEY } from "@/backend-api/refunds/hooks";
+import { ORDER_FINANCE_QUERY_KEY } from "@/backend-api/finance/hooks";
 
 const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = use(params);
@@ -53,6 +58,7 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { data: order, isLoading } = useOrderByIdQuery(id);
   const { data: returns } = useOrderReturnsQuery(id);
   const [returnDialog, setReturnDialog] = useState(0);
+  const [refundDialog, setRefundDialog] = useState(0);
 
   useEffect(() => {
     dispatch(
@@ -76,6 +82,8 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
       queryClient.invalidateQueries({ queryKey: [ORDERS_QUERY_KEY] });
       // Cancelling returns stock, so the inventory screens are stale too.
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      // Delivering books the sale, which opens the payment panel.
+      queryClient.invalidateQueries({ queryKey: [ORDER_FINANCE_QUERY_KEY, id] });
       setTarget(null);
       setNote("");
       toast.success(t("saveSuccessfully"));
@@ -229,6 +237,20 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
+          <OrderPaymentPanel orderId={order._id} currency={currency} />
+
+          {order.bookedAt && (
+            <RefundsCard
+              orderId={order._id}
+              currency={currency}
+              action={
+                <Button size="small" onClick={() => setRefundDialog((n) => n + 1)}>
+                  {t("refundOrder")}
+                </Button>
+              }
+            />
+          )}
+
           {(order.status === "delivered" || !!returns?.length) && (
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={returns?.length ? 1.5 : 0}>
@@ -270,6 +292,21 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
           </Paper>
         </Stack>
       </Stack>
+
+      {/* A refund without goods coming back (goodwill, a late delivery): an amount on the lines, nothing restocked. */}
+      <RefundRequestDialog
+        key={`refund-${refundDialog}`}
+        open={refundDialog > 0}
+        onClose={() => setRefundDialog(0)}
+        onDone={() => {
+          setRefundDialog(0);
+          queryClient.invalidateQueries({ queryKey: [REFUNDS_QUERY_KEY] });
+        }}
+        orderId={order._id}
+        lines={order.items.map((item, i) => ({ lineIndex: i, quantity: 0, label: localized(item.name, lang) }))}
+        defaultReason="goodwill"
+        currency={currency}
+      />
 
       <ReturnRequestDialog
         key={returnDialog}

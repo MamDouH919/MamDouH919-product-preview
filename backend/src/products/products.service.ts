@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, PipelineStage, Types } from 'mongoose';
+import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
 import { Product } from './schemas/product.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
@@ -11,6 +11,7 @@ import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compr
 import { tenantImageStorage } from '../common/helpers/upload-storage';
 import { InventoryService } from '../inventory/inventory.service';
 import { MovementType } from '../inventory/enums/movement-type.enum';
+import { withTransaction } from '../common/tenant/with-transaction';
 
 export const productImageStorage = tenantImageStorage('products');
 
@@ -41,6 +42,7 @@ export class ProductsService {
       catch { createProductDto.variants = []; }
     }
 
+    const preexisting = new Set(createProductDto.images ?? []);
     if (files.length > 0) {
       const compressed = await Promise.all(
         files.map(async (f) => toPublicPath(await compressImage(f))),
@@ -69,12 +71,44 @@ export class ProductsService {
       stock: 0,
     }));
 
-    const product = new this.productModel(createProductDto);
-    await product.save();
+    await this.assertSkusFree(createProductDto);
 
-    await this.recordOpeningStock(product, opening.product, opening.variants, userId);
+    // One transaction: a product whose opening stock failed must not be left
+    // behind at zero, or every retry of the form adds a duplicate.
+    let productId: string;
+    try {
+      productId = await withTransaction(this.productModel.db, async (session) => {
+        const product = new this.productModel(createProductDto);
+        await product.save({ session });
+        await this.recordOpeningStock(product, opening.product, opening.variants, userId, session);
+        return product._id!.toString();
+      });
+    } catch (error) {
+      await Promise.all((createProductDto.images ?? []).filter((img) => !preexisting.has(img)).map(deleteFile));
+      throw error;
+    }
 
-    return this.findOne(product._id!.toString());
+    return this.findOne(productId);
+  }
+
+  /** A SKU names one sellable item, so it can't repeat across products or variants. */
+  private async assertSkusFree(dto: { sku?: string; variants?: { sku?: string }[] }, exceptId?: string) {
+    const skus = [dto.sku, ...(dto.variants ?? []).map((v) => v.sku)].filter((s): s is string => !!s?.trim());
+    if (new Set(skus).size !== skus.length) {
+      throw new ConflictException('The same SKU is used twice in this product');
+    }
+    if (!skus.length) return;
+    const clash = await this.productModel
+      .findOne({
+        ...(exceptId ? { _id: { $ne: exceptId } } : {}),
+        $or: [{ sku: { $in: skus } }, { 'variants.sku': { $in: skus } }],
+      })
+      .select('name sku')
+      .lean()
+      .exec();
+    if (clash) {
+      throw new ConflictException(`SKU already used by "${clash.name?.en ?? clash.name?.ar ?? clash.sku}"`);
+    }
   }
 
   async findAll(): Promise<Product[]> {
@@ -118,12 +152,10 @@ export class ProductsService {
     const maxPrice = num(query.maxPrice);
     const inStock = String(query.inStock) === 'true';
 
-    // `category`/`subCategory` are declared with `type: Types.ObjectId`, which
-    // Mongoose treats as Mixed, so stored ids may be strings or ObjectIds.
-    const anyId = (id: string) => ({ $in: [id, new Types.ObjectId(id)] });
+    // An aggregation doesn't cast, so the ids are ObjectIds here, as stored.
     const match: Record<string, unknown> = { isActive: true };
-    if (query.categoryId) match.category = anyId(query.categoryId);
-    if (query.subCategoryId) match.subCategory = anyId(query.subCategoryId);
+    if (query.categoryId) match.category = new Types.ObjectId(query.categoryId);
+    if (query.subCategoryId) match.subCategory = new Types.ObjectId(query.subCategoryId);
 
     const term = query.q?.trim();
     if (term) {
@@ -364,16 +396,28 @@ export class ProductsService {
       addedVariants = added;
     }
 
-    // Delete images removed by the client (were in DB but not in the new kept list)
-    const keptImages = updateProductDto.images ?? [];
-    const removedImages = (existing.images ?? []).filter((img) => !keptImages.includes(img));
-    await Promise.all(removedImages.map(deleteFile));
+    if (updateProductDto.sku !== undefined || updateProductDto.variants) {
+      await this.assertSkusFree(
+        { sku: updateProductDto.sku ?? existing.sku, variants: updateProductDto.variants ?? existing.variants },
+        id,
+      );
+    }
+
+    // `images` is the list to keep. Absent means "leave the images alone" — a
+    // price-only edit must never touch them. Only this product's own paths
+    // count, so a client can't get another product's files deleted.
+    const current = existing.images ?? [];
+    const imagesSent = updateProductDto.images !== undefined;
+    const keptImages = imagesSent ? updateProductDto.images!.filter((img) => current.includes(img)) : current;
+    const removedImages = current.filter((img) => !keptImages.includes(img));
 
     if (files.length > 0) {
       const compressed = await Promise.all(
         files.map(async (f) => toPublicPath(await compressImage(f))),
       );
       updateProductDto.images = [...keptImages, ...compressed];
+    } else if (imagesSent) {
+      updateProductDto.images = keptImages;
     }
 
     const updated = (await this.productModel
@@ -381,6 +425,9 @@ export class ProductsService {
       .populate('category', 'name slug')
       .populate('subCategory', 'name slug')
       .exec()) as Product;
+
+    // Files go only once the product no longer points at them.
+    await Promise.all(removedImages.map(deleteFile));
 
     // Variants added during this edit get their opening stock through the
     // ledger too. They were stored at zero above, so this is what fills them.
@@ -413,9 +460,27 @@ export class ProductsService {
     return product;
   }
 
+  /**
+   * Only a product nothing refers to can be deleted. Once it has been ordered
+   * or has stock history, deleting it would orphan order lines and ledger
+   * rows — and with them its cost history — so it can only be deactivated.
+   */
   async remove(id: string): Promise<Product> {
-    const product = await this.productModel.findByIdAndDelete(id).exec();
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException(`Product with id ${id} not found`);
+    const product = await this.productModel.findById(id).exec();
     if (!product) throw new NotFoundException(`Product with id ${id} not found`);
+
+    const [ordered, moved] = await Promise.all([
+      this.orderModel.exists({ 'items.product': product._id }).exec(),
+      this.inventoryService.hasMovements(id),
+    ]);
+    if (ordered || moved) {
+      throw new ConflictException(
+        'This product has orders or stock history, so it cannot be deleted. Deactivate it instead.',
+      );
+    }
+
+    await this.productModel.deleteOne({ _id: product._id }).exec();
     return product;
   }
 
@@ -451,6 +516,7 @@ export class ProductsService {
     productStock: number,
     variants: { label: string; stock: number }[],
     userId?: string,
+    session?: ClientSession,
   ): Promise<void> {
     if (!product.trackStock) return;
 
@@ -466,6 +532,7 @@ export class ProductsService {
           reason: 'Opening stock',
         },
         userId,
+        session,
       );
       return;
     }
@@ -487,6 +554,7 @@ export class ProductsService {
           reason: 'Opening stock',
         },
         userId,
+        session,
       );
     }
   }

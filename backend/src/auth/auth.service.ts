@@ -150,7 +150,13 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is invalid or has expired');
     }
 
-    return this.generateUserTokens(token._id, tenant);
+    // The token row's own `_id` is not the user — signing with it gave an
+    // access token whose every permission lookup failed.
+    if (!(await this.UserModel.exists({ _id: token.userId }))) {
+      throw new UnauthorizedException('Refresh token is invalid or has expired');
+    }
+
+    return this.generateUserTokens(token.userId, tenant);
   }
 
   async changePassword(userId, newPassword: string, oldPassword: string) {

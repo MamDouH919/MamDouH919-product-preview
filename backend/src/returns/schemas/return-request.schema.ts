@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { LocalizedField, LocalizedFieldSchema } from '../../common/schemas/localized-field.schema';
 
 export enum ReturnStatus {
@@ -36,10 +36,10 @@ export class ReturnItem {
   @Prop({ required: true })
   lineIndex!: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Product', required: true })
   product!: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, required: false })
+  @Prop({ type: SchemaTypes.ObjectId, required: false })
   variantId?: Types.ObjectId;
 
   @Prop({ type: LocalizedFieldSchema, required: true })
@@ -72,7 +72,7 @@ export class ReturnStatusChange {
   note?: string;
 
   /** The admin who made the change. Absent when the customer did it. */
-  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', required: false })
   by?: Types.ObjectId;
 
   @Prop({ type: Date, default: Date.now })
@@ -86,13 +86,13 @@ export class ReturnRequest extends Document {
   @Prop({ required: true, unique: true })
   returnNumber!: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'Order', required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Order', required: true, index: true })
   order!: Types.ObjectId;
 
   @Prop({ required: true })
   orderNumber!: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'Customer', required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Customer', required: true, index: true })
   customer!: Types.ObjectId;
 
   @Prop({ type: [ReturnItemSchema], required: true })

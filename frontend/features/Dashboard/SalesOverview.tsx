@@ -153,9 +153,14 @@ const SalesOverview = () => {
           <Typography variant="h6" fontWeight={800}>
             {t("salesOverview")}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.secondary" component="p">
             {t("salesOverviewHint")}
           </Typography>
+          {data?.booksStartedAt && new Date(data.booksStartedAt) > new Date(data.periodStart) && (
+            <Typography variant="caption" color="warning.main" component="p">
+              {t("booksStarted", { date: formatDateTime(data.booksStartedAt, lang) })}
+            </Typography>
+          )}
         </Box>
         <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
           {!!data?.pendingReviews && (
@@ -188,7 +193,7 @@ const SalesOverview = () => {
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <KpiTile
-            label={t("revenue")}
+            label={t("netRevenue")}
             value={money(data?.current.revenue ?? 0)}
             loading={isLoading}
             footer={data && <Delta current={data.current.revenue} previous={data.previous.revenue} />}
@@ -196,10 +201,20 @@ const SalesOverview = () => {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <KpiTile
-            label={t("orders")}
+            label={t("deliveredOrders")}
             value={(data?.current.orders ?? 0).toLocaleString()}
             loading={isLoading}
-            footer={data && <Delta current={data.current.orders} previous={data.previous.orders} />}
+            footer={
+              data && (
+                <Stack spacing={0.25}>
+                  <Delta current={data.current.orders} previous={data.previous.orders} />
+                  {/* The pipeline, kept apart from revenue: placed is not sold. */}
+                  <Typography variant="caption" color="text.secondary">
+                    {t("placedOrdersCount", { count: data.current.placed })} · {money(data.current.placedValue)}
+                  </Typography>
+                </Stack>
+              )
+            }
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
@@ -222,7 +237,7 @@ const SalesOverview = () => {
             footer={
               data && (
                 <Typography variant="caption" color="text.secondary">
-                  {t("ordersCount", { count: data.today.orders })} · {t("newCustomersCount", { count: data.newCustomers })}
+                  {t("deliveredCount", { count: data.today.orders })} · {t("newCustomersCount", { count: data.newCustomers })}
                 </Typography>
               )
             }

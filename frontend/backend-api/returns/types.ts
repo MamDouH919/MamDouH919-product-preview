@@ -53,11 +53,10 @@ export type ReturnDetail = ReturnRequest & {
     total: number;
     refundedTotal?: number;
     currency?: LocalizedField;
+    /** Set when the sale is in the books — only then can it be refunded. */
+    bookedAt?: string;
+    paymentStatus?: string;
   };
-  /** What can still be refunded on the order. */
-  refundableRemaining: number;
-  /** Line prices less the order's discount share, capped at what's left. */
-  suggestedRefund: number;
 };
 
 export type ReturnableLine = {

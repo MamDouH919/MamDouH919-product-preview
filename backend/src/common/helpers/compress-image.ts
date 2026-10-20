@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
 import { extname } from 'path';
 
@@ -26,7 +27,9 @@ const EXT_MAP: Record<string, string> = {
 
 /**
  * Compresses an uploaded image file in-place using sharp.
- * Preserves the original file extension. Skips GIF and SVG files.
+ * Preserves the original file extension. GIFs are kept as they are once
+ * confirmed to be images (re-encoding would drop animation). A file sharp
+ * can't read is removed and reported as a 400, not left to become a 500.
  * Returns the file path to save in the database.
  */
 export async function compressImage(
@@ -34,9 +37,22 @@ export async function compressImage(
   options: CompressOptions = {},
 ): Promise<string> {
   const { maxWidth = 1280, quality = 100 } = options;
-  const ext = extname(file.originalname).toLowerCase();
+  // The stored name carries the checked extension (an upload named "blob" has none of its own).
+  const ext = (extname(file.path) || extname(file.originalname)).toLowerCase();
 
-  if (ext === '.gif' || ext === '.svg') {
+  if (ext === '.svg') {
+    await discard(file.path);
+    throw new BadRequestException(`"${file.originalname}" is an SVG; upload a JPG, PNG, WebP or GIF`);
+  }
+
+  if (ext === '.gif') {
+    try {
+      const { format: actual } = await sharp(file.path).metadata();
+      if (actual !== 'gif') throw new Error(`content is ${actual}`);
+    } catch {
+      await discard(file.path);
+      throw new BadRequestException(`"${file.originalname}" is not a valid image`);
+    }
     return file.path;
   }
 
@@ -49,10 +65,15 @@ export async function compressImage(
   const outputPath = basePath + outputExt;
   const tmpPath = outputPath + '.tmp';
 
-  await sharp(file.path)
-    .resize({ width: maxWidth, withoutEnlargement: true })
-    .toFormat(format, { quality })
-    .toFile(tmpPath);
+  try {
+    await sharp(file.path)
+      .resize({ width: maxWidth, withoutEnlargement: true })
+      .toFormat(format, { quality })
+      .toFile(tmpPath);
+  } catch {
+    await Promise.all([discard(file.path), discard(tmpPath)]);
+    throw new BadRequestException(`"${file.originalname}" is not a valid image`);
+  }
 
   const fs = await import('fs/promises');
   await fs.unlink(file.path).catch(() => null);
@@ -78,4 +99,9 @@ export async function deleteFile(publicPath: string): Promise<void> {
   if (!publicPath) return;
   const fs = await import('fs/promises');
   await fs.unlink('.' + publicPath).catch(() => null);
+}
+
+async function discard(path: string): Promise<void> {
+  const fs = await import('fs/promises');
+  await fs.unlink(path).catch(() => null);
 }

@@ -35,6 +35,7 @@ import { LocalizedField } from "@/backend-api/globalTypes";
 import { SUPPORTED_COUNTRIES } from "@/backend-api/price-list/types";
 import { PRICE_LIST_QUERY_KEY, ZONES_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import config from "@/config.json";
+import RefundRulesCard from "@/features/Refund/RefundRulesCard";
 
 const SOCIAL_KEYS = ["FACEBOOK", "INSTAGRAM", "TWITTER", "LINKEDIN", "YOUTUBE", "TIKTOK", "WHATSAPP", "TELEGRAM"];
 
@@ -172,296 +173,301 @@ const SettingsPage = () => {
   }
 
   return (
-    <Box component="form" onSubmit={handleSubmit((d) => mutate(d))}>
-      <Stack spacing={3}>
+    <Stack spacing={3}>
+      <Box component="form" onSubmit={handleSubmit((d) => mutate(d))}>
+        <Stack spacing={3}>
 
-        {/* ── Super admin only ── */}
-        {isSuper && (
-          <>
-            {/* Site Info */}
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("siteInfo")}
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
+          {/* ── Super admin only ── */}
+          {isSuper && (
+            <>
+              {/* Site Info */}
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                  {t("siteInfo")}
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
 
-              <Tabs
-                value={activeTab}
-                onChange={(_, v) => setActiveTab(v)}
-                variant="fullWidth"
-                sx={{ mb: 2 }}
-              >
-                {LANGS.map((lang) => (
-                  <Tab
-                    key={lang}
-                    label={t(lang)}
-                    iconPosition="end"
-                    icon={tabHasError(lang) ? (
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8, height: 8, borderRadius: "50%",
-                          bgcolor: "error.main", display: "inline-block", ml: 0.5,
-                        }}
-                      />
-                    ) : undefined}
-                  />
-                ))}
-              </Tabs>
-
-              {LANGS.map((lang, i) => (
-                <Stack
-                  key={lang}
-                  spacing={2}
-                  sx={{ display: activeTab === i ? "flex" : "none" }}
+                <Tabs
+                  value={activeTab}
+                  onChange={(_, v) => setActiveTab(v)}
+                  variant="fullWidth"
+                  sx={{ mb: 2 }}
                 >
-                  <TextInputComponent
-                    name={`siteTitle.${lang}`}
-                    label={t("siteTitle")}
-                    control={control}
-                  />
-                  <TextInputComponent
-                    name={`siteDescription.${lang}`}
-                    label={t("siteDescription")}
-                    control={control}
-                    multiline
-                    rows={3}
-                  />
-                  <TextInputComponent
-                    name={`currency.${lang}`}
-                    label={t("currency")}
-                    control={control}
-                    placeholder={lang === "ar" ? "ر.س" : "SAR"}
-                  />
-                </Stack>
-              ))}
-            </Paper>
+                  {LANGS.map((lang) => (
+                    <Tab
+                      key={lang}
+                      label={t(lang)}
+                      iconPosition="end"
+                      icon={tabHasError(lang) ? (
+                        <Box
+                          component="span"
+                          sx={{
+                            width: 8, height: 8, borderRadius: "50%",
+                            bgcolor: "error.main", display: "inline-block", ml: 0.5,
+                          }}
+                        />
+                      ) : undefined}
+                    />
+                  ))}
+                </Tabs>
 
-            {/* Images */}
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("siteImages")}
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-              <Grid container spacing={4}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="body2" color="text.secondary" mb={1}>
-                    {t("logo")}
-                  </Typography>
-                  <ImageInput
-                    name="logo"
-                    control={control as any}
-                    imagePath={settings?.logo ? getBackendUri(settings.logo) ?? undefined : undefined}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="body2" color="text.secondary" mb={1}>
-                    {t("favicon")}
-                  </Typography>
-                  <ImageInput
-                    name="favicon"
-                    control={control as any}
-                    imagePath={settings?.favicon ? getBackendUri(settings.favicon) ?? undefined : undefined}
-                    accept={{ "image/*": [], "image/x-icon": [".ico"] }}
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
-
-            {/* Delivery country */}
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("deliveryCountry")}
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Controller
-                name="country"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    select
-                    size="small"
-                    label={t("country")}
-                    value={field.value}
-                    onChange={field.onChange}
-                    helperText={t("deliveryCountryHint")}
-                    sx={{ maxWidth: 360 }}
-                    fullWidth
+                {LANGS.map((lang, i) => (
+                  <Stack
+                    key={lang}
+                    spacing={2}
+                    sx={{ display: activeTab === i ? "flex" : "none" }}
                   >
-                    {SUPPORTED_COUNTRIES.map((code) => (
-                      <MenuItem key={code} value={code}>
-                        {t(`countries.${code}`)}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-            </Paper>
+                    <TextInputComponent
+                      name={`siteTitle.${lang}`}
+                      label={t("siteTitle")}
+                      control={control}
+                    />
+                    <TextInputComponent
+                      name={`siteDescription.${lang}`}
+                      label={t("siteDescription")}
+                      control={control}
+                      multiline
+                      rows={3}
+                    />
+                    <TextInputComponent
+                      name={`currency.${lang}`}
+                      label={t("currency")}
+                      control={control}
+                      placeholder={lang === "ar" ? "ر.س" : "SAR"}
+                    />
+                  </Stack>
+                ))}
+              </Paper>
 
-            {/* Returns */}
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("returns")}
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Controller
-                name="returnWindowDays"
-                control={control}
-                rules={{ validate: (v) => v === "" || (/^\d+$/.test(v) && Number(v) <= 365) }}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    {...field}
-                    type="number"
-                    size="small"
-                    label={t("returnWindowDays")}
-                    error={!!fieldState.error}
-                    helperText={t("returnWindowDaysHint")}
-                    slotProps={{ htmlInput: { min: 0, max: 365 } }}
-                    sx={{ maxWidth: 360 }}
-                    fullWidth
-                  />
-                )}
-              />
-            </Paper>
-
-            {/* Appearance */}
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("appearance")}
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-              <Controller
-                name="primaryColor"
-                control={control}
-                render={({ field }) => (
-                  <Stack spacing={1.5}>
-                    <Typography variant="body2" fontWeight={600} color="text.secondary">
-                      {t("primaryColor")}
+              {/* Images */}
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                  {t("siteImages")}
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+                <Grid container spacing={4}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2" color="text.secondary" mb={1}>
+                      {t("logo")}
                     </Typography>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <Box
-                        sx={{
-                          width: 44, height: 44, borderRadius: 1.5,
-                          border: "2px solid", borderColor: "divider",
-                          overflow: "hidden", cursor: "pointer", flexShrink: 0,
-                          "& input[type='color']": {
-                            width: "200%", height: "200%",
-                            border: "none", padding: 0, cursor: "pointer",
-                            transform: "translate(-25%, -25%)",
-                          },
-                        }}
-                      >
-                        <input
-                          type="color"
+                    <ImageInput
+                      name="logo"
+                      control={control as any}
+                      imagePath={settings?.logo ? getBackendUri(settings.logo) ?? undefined : undefined}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2" color="text.secondary" mb={1}>
+                      {t("favicon")}
+                    </Typography>
+                    <ImageInput
+                      name="favicon"
+                      control={control as any}
+                      imagePath={settings?.favicon ? getBackendUri(settings.favicon) ?? undefined : undefined}
+                      accept={{ "image/*": [], "image/x-icon": [".ico"] }}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Delivery country */}
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                  {t("deliveryCountry")}
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Controller
+                  name="country"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      select
+                      size="small"
+                      label={t("country")}
+                      value={field.value}
+                      onChange={field.onChange}
+                      helperText={t("deliveryCountryHint")}
+                      sx={{ maxWidth: 360 }}
+                      fullWidth
+                    >
+                      {SUPPORTED_COUNTRIES.map((code) => (
+                        <MenuItem key={code} value={code}>
+                          {t(`countries.${code}`)}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+              </Paper>
+
+              {/* Returns */}
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                  {t("returns")}
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Controller
+                  name="returnWindowDays"
+                  control={control}
+                  rules={{ validate: (v) => v === "" || (/^\d+$/.test(v) && Number(v) <= 365) }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      type="number"
+                      size="small"
+                      label={t("returnWindowDays")}
+                      error={!!fieldState.error}
+                      helperText={t("returnWindowDaysHint")}
+                      slotProps={{ htmlInput: { min: 0, max: 365 } }}
+                      sx={{ maxWidth: 360 }}
+                      fullWidth
+                    />
+                  )}
+                />
+              </Paper>
+
+              {/* Appearance */}
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                  {t("appearance")}
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+                <Controller
+                  name="primaryColor"
+                  control={control}
+                  render={({ field }) => (
+                    <Stack spacing={1.5}>
+                      <Typography variant="body2" fontWeight={600} color="text.secondary">
+                        {t("primaryColor")}
+                      </Typography>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Box
+                          sx={{
+                            width: 44, height: 44, borderRadius: 1.5,
+                            border: "2px solid", borderColor: "divider",
+                            overflow: "hidden", cursor: "pointer", flexShrink: 0,
+                            "& input[type='color']": {
+                              width: "200%", height: "200%",
+                              border: "none", padding: 0, cursor: "pointer",
+                              transform: "translate(-25%, -25%)",
+                            },
+                          }}
+                        >
+                          <input
+                            type="color"
+                            value={field.value ?? "#1976d2"}
+                            onChange={(e) => {
+                              field.onChange(e.target.value);
+                              dispatch(updateColor(e.target.value));
+                            }}
+                          />
+                        </Box>
+                        <TextField
+                          size="small"
                           value={field.value ?? "#1976d2"}
                           onChange={(e) => {
                             field.onChange(e.target.value);
                             dispatch(updateColor(e.target.value));
                           }}
+                          sx={{ width: 140 }}
+                          placeholder="#1976d2"
                         />
-                      </Box>
-                      <TextField
-                        size="small"
-                        value={field.value ?? "#1976d2"}
-                        onChange={(e) => {
-                          field.onChange(e.target.value);
-                          dispatch(updateColor(e.target.value));
-                        }}
-                        sx={{ width: 140 }}
-                        placeholder="#1976d2"
-                      />
-                      <Box
-                        sx={{
-                          flex: 1, height: 44, borderRadius: 1.5,
-                          background: field.value ?? "#1976d2",
-                          border: "1px solid", borderColor: "divider",
-                        }}
-                      />
+                        <Box
+                          sx={{
+                            flex: 1, height: 44, borderRadius: 1.5,
+                            background: field.value ?? "#1976d2",
+                            border: "1px solid", borderColor: "divider",
+                          }}
+                        />
+                      </Stack>
                     </Stack>
-                  </Stack>
-                )}
-              />
-            </Paper>
-          </>
-        )}
-
-        {/* Contact Info — visible to all admins */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>
-            {t("contactInfo")}
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          <Stack spacing={2}>
-            <TextField size="small" label={t("phone")} placeholder="+966 55 000 0000" {...register("phone")} />
-            <TextField size="small" label={t("whatsapp")} placeholder="+966 55 000 0000" {...register("whatsapp")} />
-            <TextField size="small" label={t("landLine")} placeholder="+966 1 000 0000" {...register("landLine")} />
-            <TextInputComponent name="email" label={t("email")} control={control} />
-            <TextInputComponent name="address" label={t("address")} control={control} multiline rows={2} />
-          </Stack>
-        </Paper>
-
-        {/* Social Media — visible to all admins */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-            <Typography variant="subtitle1" fontWeight={700}>
-              {t("socialMedia")}
-            </Typography>
-            <Button
-              size="small"
-              startIcon={<Add />}
-              onClick={() => appendSocial({ key: "INSTAGRAM", value: "" })}
-              variant="outlined"
-            >
-              {t("add")}
-            </Button>
-          </Stack>
-          <Divider sx={{ mb: 2 }} />
-
-          {socialFields.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              {t("noSocialMedia")}
-            </Typography>
-          ) : (
-            <Stack spacing={2}>
-              {socialFields.map((field, index) => (
-                <Stack key={field.id} direction="row" spacing={1.5} alignItems="center">
-                  <Select
-                    size="small"
-                    defaultValue={field.key}
-                    {...register(`socialMedia.${index}.key`)}
-                    sx={{ minWidth: 150 }}
-                  >
-                    {SOCIAL_KEYS.map((k) => (
-                      <MenuItem key={k} value={k}>{k}</MenuItem>
-                    ))}
-                  </Select>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    placeholder="https://..."
-                    {...register(`socialMedia.${index}.value`)}
-                  />
-                  <IconButton color="error" onClick={() => removeSocial(index)} size="small">
-                    <Delete />
-                  </IconButton>
-                </Stack>
-              ))}
-            </Stack>
+                  )}
+                />
+              </Paper>
+            </>
           )}
-        </Paper>
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          disabled={isPending}
-          startIcon={isPending ? <CircularProgress size={18} /> : null}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          {t("save")}
-        </Button>
-      </Stack>
-    </Box>
+          {/* Contact Info — visible to all admins */}
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={2}>
+              {t("contactInfo")}
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <Stack spacing={2}>
+              <TextField size="small" label={t("phone")} placeholder="+966 55 000 0000" {...register("phone")} />
+              <TextField size="small" label={t("whatsapp")} placeholder="+966 55 000 0000" {...register("whatsapp")} />
+              <TextField size="small" label={t("landLine")} placeholder="+966 1 000 0000" {...register("landLine")} />
+              <TextInputComponent name="email" label={t("email")} control={control} />
+              <TextInputComponent name="address" label={t("address")} control={control} multiline rows={2} />
+            </Stack>
+          </Paper>
+
+          {/* Social Media — visible to all admins */}
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+              <Typography variant="subtitle1" fontWeight={700}>
+                {t("socialMedia")}
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<Add />}
+                onClick={() => appendSocial({ key: "INSTAGRAM", value: "" })}
+                variant="outlined"
+              >
+                {t("add")}
+              </Button>
+            </Stack>
+            <Divider sx={{ mb: 2 }} />
+
+            {socialFields.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                {t("noSocialMedia")}
+              </Typography>
+            ) : (
+              <Stack spacing={2}>
+                {socialFields.map((field, index) => (
+                  <Stack key={field.id} direction="row" spacing={1.5} alignItems="center">
+                    <Select
+                      size="small"
+                      defaultValue={field.key}
+                      {...register(`socialMedia.${index}.key`)}
+                      sx={{ minWidth: 150 }}
+                    >
+                      {SOCIAL_KEYS.map((k) => (
+                        <MenuItem key={k} value={k}>{k}</MenuItem>
+                      ))}
+                    </Select>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="https://..."
+                      {...register(`socialMedia.${index}.value`)}
+                    />
+                    <IconButton color="error" onClick={() => removeSocial(index)} size="small">
+                      <Delete />
+                    </IconButton>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            disabled={isPending}
+            startIcon={isPending ? <CircularProgress size={18} /> : null}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {t("save")}
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* Its own card and save: refund rules are finance settings, not part of this form. */}
+      {isSuper && <RefundRulesCard />}
+    </Stack>
   );
 };
 

@@ -20,7 +20,7 @@ import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ProductCsvService } from './product-csv.service';
 import { LogActivity } from '../activity-log/activity-log.decorator';
 import { ProductsService, productImageStorage } from './products.service';
-import { parseNestedBody } from '../common/helpers/parse-nested-body';
+import { discardUploads, toProductDto } from './product-body';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { SearchProductsDto } from './dto/search-products.dto';
@@ -41,12 +41,12 @@ export class ProductsController {
   @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.CREATE] }])
   @Post()
   @UseInterceptors(AnyFilesInterceptor({ storage: productImageStorage }))
-  create(
+  async create(
     @Body() body: any,
     @Req() req: Request & { userId?: string },
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    const createProductDto = parseNestedBody(body) as CreateProductDto;
+    const createProductDto = await toProductDto(body, CreateProductDto).catch(discardUploads(files));
     return this.productsService.create(createProductDto, files ?? [], req.userId);
   }
 
@@ -136,13 +136,13 @@ export class ProductsController {
   @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.UPDATE] }])
   @Patch(':id')
   @UseInterceptors(AnyFilesInterceptor({ storage: productImageStorage }))
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: any,
     @Req() req: Request & { userId?: string },
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    const updateProductDto = parseNestedBody(body) as UpdateProductDto;
+    const updateProductDto = await toProductDto(body, UpdateProductDto).catch(discardUploads(files));
     return this.productsService.update(id, updateProductDto, files ?? [], req.userId);
   }
 

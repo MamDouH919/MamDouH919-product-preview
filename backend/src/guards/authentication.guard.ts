@@ -1,15 +1,19 @@
 import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
-import { Observable } from "rxjs";
+import { Types } from "mongoose";
 import { CUSTOMER_TOKEN_TYPE } from "./customer-auth.guard";
+import { TenantConnectionService } from "../common/helpers/dynamic-connection";
+import { RefreshToken } from "../auth/schemas/refresh-schema.schema";
 
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
-  constructor(private jwtService: JwtService) { }
-  canActivate(
-    context: ExecutionContext
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  constructor(
+    private jwtService: JwtService,
+    private tenantConnection: TenantConnectionService,
+  ) { }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
     if (!token) {
@@ -29,6 +33,11 @@ export class AuthenticationGuard implements CanActivate {
       if (payload.type === CUSTOMER_TOKEN_TYPE) {
         throw new UnauthorizedException("Invalid token");
       }
+      // An access token outlives logout unless it is tied to a live session:
+      // logout deletes the user's refresh-token row, and that ends every token.
+      if (!(await this.hasLiveSession(request, payload.userId))) {
+        throw new UnauthorizedException("Invalid token");
+      }
       request.userId = payload.userId;
     } catch (error) {
       Logger.error(error);
@@ -37,6 +46,15 @@ export class AuthenticationGuard implements CanActivate {
     return true;
   }
 
+  private async hasLiveSession(request: Request, userId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(userId)) return false;
+    const connection = await this.tenantConnection.getConnection(request['tenant'] ?? request.hostname);
+    const session = await connection.model(RefreshToken.name).exists({
+      userId: new Types.ObjectId(userId),
+      expiryDate: { $gte: new Date() },
+    });
+    return !!session;
+  }
 
   private extractTokenFromHeader(request: Request) {
     return request.headers.authorization?.split(" ")[1];

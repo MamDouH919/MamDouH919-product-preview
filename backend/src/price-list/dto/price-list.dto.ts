@@ -9,7 +9,7 @@ export class CreateDeliveryPriceDto {
 
   @ApiProperty({ minimum: 0 })
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price!: number;
 
@@ -24,7 +24,7 @@ export class UpdateDeliveryPriceDto {
   @ApiProperty({ required: false, minimum: 0 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price?: number;
 
@@ -42,7 +42,7 @@ export class SetZonePriceDto {
 
   @ApiProperty({ minimum: 0 })
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price!: number;
 }

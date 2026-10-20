@@ -22,3 +22,9 @@ export const stockTake = async (
   const response = await api.post("/inventory/stock-take", data);
   return response.data;
 };
+
+/** Gives stock with no cost its first one. `unitCost` is a decimal string ("90.00"). */
+export const setOpeningCost = async (data: { productId: string; variantId?: string; unitCost: string }) => {
+  const response = await api.post("/inventory/opening-cost", data);
+  return response.data;
+};

@@ -132,19 +132,19 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         if (data.shortDescription?.[l]) formData.append(`shortDescription[${l}]`, data.shortDescription[l]!);
       });
 
-      // Images: existing string paths go in images[], new File objects go as productImages
+      // Images: existing paths are sent as one JSON list (so an empty list can
+      // mean "remove them all"), new File objects go as productImages
+      const keptPaths: string[] = [];
       for (const item of data.images) {
         if (item.file instanceof File) {
           const compressed = await handleCompression(item.file);
           if (compressed) formData.append("productImages", compressed);
         } else if (typeof item.file === "string" && item.file) {
           // strip the base URL so we store the path only
-          const path = item.file.startsWith("http")
-            ? new URL(item.file).pathname
-            : item.file;
-          formData.append("images[]", path);
+          keptPaths.push(item.file.startsWith("http") ? new URL(item.file).pathname : item.file);
         }
       }
+      formData.append("images", JSON.stringify(keptPaths));
 
       if (data.variants?.length) {
         formData.append(
@@ -197,8 +197,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
       queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
       router.back();
     },
-    onError: () => {
-      toast.error(t("somethingWentWrong"));
+    onError: (error: any) => {
+      const message = error?.response?.data?.message;
+      toast.error((Array.isArray(message) ? message.join(", ") : message) ?? t("somethingWentWrong"));
     },
   });
 

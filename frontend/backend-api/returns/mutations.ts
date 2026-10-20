@@ -24,17 +24,4 @@ export const rejectReturn = async ({ id, note }: { id: string; note?: string }):
   return response.data;
 };
 
-export const refundReturn = async ({
-  id,
-  amount,
-  restock,
-  note,
-}: {
-  id: string;
-  amount: number;
-  restock: number[];
-  note?: string;
-}): Promise<ReturnRequest> => {
-  const response = await api.post(`/returns/${id}/refund`, { amount, restock, note });
-  return response.data;
-};
+// Refunding a return goes through `requestRefund` (backend-api/refunds) with its `returnId`.
