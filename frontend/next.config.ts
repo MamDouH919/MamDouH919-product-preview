@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
       ...Array.from(new Set(imageBackends)).map(parseRemotePattern),
       // Uploaded images on Cloudflare R2 (public r2.dev bucket URL)
       { protocol: "https", hostname: "*.r2.dev" },
+      // Placeholder images on demo products (backend `npm run seed:products`)
+      { protocol: "https", hostname: "picsum.photos" },
     ],
   },
   async redirects() {
