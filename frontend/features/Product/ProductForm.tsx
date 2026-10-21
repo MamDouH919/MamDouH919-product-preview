@@ -37,6 +37,7 @@ import { useCategoriesQuery } from "@/backend-api/categories/hooks";
 import { useSubCategoriesQuery } from "@/backend-api/sub-categories/hooks";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
+import { getBackendUrl } from "@/lib/getBackendUrl";
 
 type ImageItem = { file: File | string | null };
 
@@ -140,8 +141,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
           const compressed = await handleCompression(item.file);
           if (compressed) formData.append("productImages", compressed);
         } else if (typeof item.file === "string" && item.file) {
-          // strip the base URL so we store the path only
-          keptPaths.push(item.file.startsWith("http") ? new URL(item.file).pathname : item.file);
+          // strip the backend URL so a local image keeps its stored path; an R2 URL is stored whole
+          const backend = getBackendUrl();
+          keptPaths.push(backend && item.file.startsWith(backend + "/") ? item.file.slice(backend.length) : item.file);
         }
       }
       formData.append("images", JSON.stringify(keptPaths));

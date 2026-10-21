@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
 import { extname } from 'path';
+import { deleteFromR2, keyForLocalPath, keyForUrl, r2Enabled, uploadToR2 } from './r2-storage';
 
 interface CompressOptions {
   maxWidth?: number;
@@ -30,7 +31,8 @@ const EXT_MAP: Record<string, string> = {
  * Preserves the original file extension. GIFs are kept as they are once
  * confirmed to be images (re-encoding would drop animation). A file sharp
  * can't read is removed and reported as a 400, not left to become a 500.
- * Returns the file path to save in the database.
+ * Returns the file path to save in the database — or, when R2 is configured,
+ * the file's public R2 URL (the local copy is removed once it's uploaded).
  */
 export async function compressImage(
   file: Express.Multer.File,
@@ -53,7 +55,7 @@ export async function compressImage(
       await discard(file.path);
       throw new BadRequestException(`"${file.originalname}" is not a valid image`);
     }
-    return file.path;
+    return store(file.path);
   }
 
   const format = FORMAT_MAP[ext] ?? 'jpeg';
@@ -79,24 +81,43 @@ export async function compressImage(
   await fs.unlink(file.path).catch(() => null);
   await fs.rename(tmpPath, outputPath);
 
-  return outputPath;
+  return store(outputPath);
+}
+
+/** Moves a finished file to R2 when it's configured; otherwise leaves it on disk. */
+async function store(filePath: string): Promise<string> {
+  if (!r2Enabled()) return filePath;
+  try {
+    return await uploadToR2(filePath, keyForLocalPath(filePath));
+  } finally {
+    await discard(filePath);
+  }
 }
 
 /**
  * Returns the public URL path for a compressed image.
  * e.g. "./uploads/teams/123.webp" → "/uploads/teams/123.webp"
+ * An R2 URL is already public and is returned as it is.
  */
 export function toPublicPath(filePath: string): string {
+  if (/^https?:\/\//i.test(filePath)) return filePath;
   return '/' + filePath.replace(/^\.\//, '');
 }
 
 /**
- * Deletes a file from disk given its stored public path.
- * e.g. "/uploads/banners/foo.webp" → deletes "./uploads/banners/foo.webp"
+ * Deletes a file given its stored public path.
+ * e.g. "/uploads/banners/foo.webp" → deletes "./uploads/banners/foo.webp",
+ * and an R2 URL deletes that object.
  * Silently ignores missing files.
  */
 export async function deleteFile(publicPath: string): Promise<void> {
   if (!publicPath) return;
+  const key = keyForUrl(publicPath);
+  if (key) {
+    await deleteFromR2(key).catch(() => null);
+    return;
+  }
+  if (!publicPath.startsWith('/uploads/')) return;
   const fs = await import('fs/promises');
   await fs.unlink('.' + publicPath).catch(() => null);
 }

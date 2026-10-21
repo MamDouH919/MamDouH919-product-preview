@@ -25,7 +25,11 @@ function parseRemotePattern(url: string) {
 const nextConfig: NextConfig = {
   images: {
     unoptimized: process.env.NODE_ENV === "development",
-    remotePatterns: Array.from(new Set(imageBackends)).map(parseRemotePattern),
+    remotePatterns: [
+      ...Array.from(new Set(imageBackends)).map(parseRemotePattern),
+      // Uploaded images on Cloudflare R2 (public r2.dev bucket URL)
+      { protocol: "https", hostname: "*.r2.dev" },
+    ],
   },
   async redirects() {
     return [

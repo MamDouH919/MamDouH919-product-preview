@@ -11,6 +11,7 @@ import { CreatePageDto } from './dto/create-page.dto';
 import { UpdatePageDto } from './dto/update-page.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
+import { keyForUrl } from '../common/helpers/r2-storage';
 import { sanitizeDeep } from '../common/helpers/sanitize-html';
 
 export const pageImageStorage = tenantImageStorage('pages');
@@ -63,7 +64,9 @@ function normalizeSlug(raw: string): string {
 /** Every file under this module's upload folder referenced anywhere in `value`. */
 function collectAssets(value: unknown, out = new Set<string>()): Set<string> {
   if (typeof value === 'string') {
-    if (value.startsWith('/uploads/') && value.includes('/pages/')) out.add(value);
+    const local = value.startsWith('/uploads/') && value.includes('/pages/');
+    const remote = keyForUrl(value)?.split('/')[1] === 'pages';
+    if (local || remote) out.add(value);
   } else if (Array.isArray(value)) {
     value.forEach((v) => collectAssets(v, out));
   } else if (value && typeof value === 'object') {

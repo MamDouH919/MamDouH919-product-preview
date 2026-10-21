@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { DEFAULT_LOCALE, fetchBackend, languageAlternates, requestBackendUrl, requestOrigin } from "@/lib/seo";
+import { withBackend } from "@/lib/getBackendUrl";
 
 type Entry = { slug: string; updatedAt?: string; image?: string };
 type SitemapData = { products: Entry[]; categories: Entry[]; pages: Entry[] };
@@ -45,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: lastModified(p),
         changeFrequency: "weekly",
         priority: 0.8,
-        images: p.image && backendUrl ? [`${backendUrl}${p.image}`] : undefined,
+        images: p.image && backendUrl ? [withBackend(backendUrl, p.image)] : undefined,
       })
     ),
     ...(data?.pages ?? []).map((p) =>

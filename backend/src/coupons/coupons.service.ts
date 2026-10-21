@@ -182,19 +182,29 @@ export class CouponsService {
     return Math.min(capped, subtotalMinor);
   }
 
-  /** Amounts must be whole piastres; a percentage may carry up to 4 decimals. */
+  /**
+   * Amounts must be whole piastres; a percentage may carry up to 4 decimals.
+   * Null clears an optional limit, so only values that are present are parsed.
+   * Messages start with the field name, like class-validator's, so the form can
+   * show each one under its field.
+   */
   private assertAmounts(dto: Partial<CreateCouponDto>, type: CouponType | undefined): void {
-    try {
-      if (dto.value !== undefined) {
-        if (type === CouponType.PERCENTAGE) parseDecimal(dto.value, 4, 'percentage');
-        else parseMoney(dto.value);
+    const check = (field: keyof CreateCouponDto, parse: () => unknown) => {
+      try {
+        parse();
+      } catch (error) {
+        if (error instanceof MoneyError) throw new BadRequestException([`${field}: ${error.message}`]);
+        throw error;
       }
-      if (dto.minSubtotal !== undefined) parseMoney(dto.minSubtotal);
-      if (dto.maxDiscount !== undefined) parseMoney(dto.maxDiscount);
-    } catch (error) {
-      if (error instanceof MoneyError) throw new BadRequestException(error.message);
-      throw error;
+    };
+    const { value, minSubtotal, maxDiscount } = dto;
+    if (value != null) {
+      check('value', () =>
+        type === CouponType.PERCENTAGE ? parseDecimal(value, 4, 'percentage') : parseMoney(value),
+      );
     }
+    if (minSubtotal != null) check('minSubtotal', () => parseMoney(minSubtotal));
+    if (maxDiscount != null) check('maxDiscount', () => parseMoney(maxDiscount));
   }
 
   // ── Admin ───────────────────────────────────────────────────────────────────

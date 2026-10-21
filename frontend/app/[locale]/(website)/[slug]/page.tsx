@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import CustomPageClient from "./_CustomPageClient"
+import { withBackend } from "@/lib/getBackendUrl"
 
 interface PageProps {
   params: Promise<{ slug: string; locale: string }>
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const title = loc(page.metaTitle, locale) || loc(page.title, locale)
     const rawDesc = loc(page.metaDescription, locale)
     const description = rawDesc.length > 160 ? rawDesc.slice(0, 157) + "…" : rawDesc
-    const imageUrl = page.ogImage ? `${backendUrl}${page.ogImage}` : undefined
+    const imageUrl = page.ogImage ? withBackend(backendUrl, page.ogImage) : undefined
 
     return {
       title,

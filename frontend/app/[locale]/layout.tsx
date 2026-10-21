@@ -6,6 +6,7 @@ import Providers from "@/lib/Providers";
 import config from "@/config.json";
 import { resolveTenantSeo } from "@/lib/tenantSeo";
 import { fetchBackend, requestBackendUrl } from "@/lib/seo";
+import { withBackend } from "@/lib/getBackendUrl";
 
 type Localized = Partial<Record<"en" | "ar", string>>;
 type StoreSettings = { siteTitle?: Localized; siteDescription?: Localized; favicon?: string };
@@ -55,7 +56,7 @@ export async function generateMetadata(
   const description = pick(settings?.siteDescription, lang) ?? seo.description;
   const { keywords } = seo;
   const icons = settings?.favicon && backendUrl
-    ? { icon: `${backendUrl}${settings.favicon}`, shortcut: `${backendUrl}${settings.favicon}`, apple: `${backendUrl}${settings.favicon}` }
+    ? { icon: withBackend(backendUrl, settings.favicon), shortcut: withBackend(backendUrl, settings.favicon), apple: withBackend(backendUrl, settings.favicon) }
     : tenant.icons;
 
   return {

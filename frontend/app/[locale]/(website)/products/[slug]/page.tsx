@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import ProductDetailClient from "./_ProductDetailClient"
 import type { Product } from "@/backend-api/products/types"
 import { fetchBackend, isoCurrency, languageAlternates, requestBackendUrl, requestOrigin } from "@/lib/seo"
+import { withBackend } from "@/lib/getBackendUrl"
 
 interface PageProps {
   params: Promise<{ slug: string; locale: string }>
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const name = loc(product.name, locale)
   const rawDesc = plainText(loc(product.description, locale) || loc(product.shortDescription, locale))
   const description = rawDesc.length > 160 ? rawDesc.slice(0, 157) + "…" : rawDesc
-  const imageUrl = product.images?.[0] ? `${backendUrl}${product.images[0]}` : undefined
+  const imageUrl = product.images?.[0] ? withBackend(backendUrl, product.images[0]) : undefined
   const keywords = (product.tags ?? []) as string[]
 
   const ogImage = imageUrl
@@ -106,7 +107,7 @@ async function ProductJsonLd({ slug, locale }: { slug: string; locale: string })
     "@type": "Product",
     name,
     description: plainText(loc(product.description, locale) || loc(product.shortDescription, locale)) || undefined,
-    image: (product.images ?? []).map((img) => `${backendUrl}${img}`),
+    image: (product.images ?? []).map((img) => withBackend(backendUrl, img)),
     sku: product.sku || undefined,
     category: loc(product.category?.name, locale) || undefined,
     url,

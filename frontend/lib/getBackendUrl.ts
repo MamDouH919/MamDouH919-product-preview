@@ -36,6 +36,14 @@ export function backendUrlForHost(host?: string | null): string {
   return api[host?.split(":")[0] ?? ""] ?? "";
 }
 
+/**
+ * A stored image as an absolute URL. Images on R2 are stored as full URLs and
+ * are returned as they are; older ones are backend paths ("/uploads/...").
+ */
+export function withBackend(base: string, path: string): string {
+  return /^https?:\/\//i.test(path) ? path : `${base}${path}`;
+}
+
 export function getTenantKey(): string {
   if (typeof window !== "undefined") {
     return window.location.hostname ?? "";

@@ -3,6 +3,7 @@ import { getBackendUrl, getTenantKey } from '@/lib/getBackendUrl';
 
 export const getBackendUri = (imgPath: string | undefined | null): string => {
     if (!imgPath) return "/images/placeholder.png";
+    if (/^https?:\/\//i.test(imgPath)) return imgPath;
     const domain = getBackendUrl();
     const key = getTenantKey()
     if (!domain) return "/images/placeholder.png";

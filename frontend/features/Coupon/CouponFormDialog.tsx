@@ -90,6 +90,28 @@ const toPayload = (f: FormState): CouponPayload => ({
   isActive: f.isActive,
 });
 
+type FieldErrors = Partial<Record<keyof FormState, string>>;
+
+/**
+ * Splits a backend error into messages for fields and the rest. Validation
+ * messages start with the field name ("usageLimit must be…", "maxDiscount: …"),
+ * and a 409 is always the code being taken.
+ */
+const parseServerError = (error: any): { fields: FieldErrors; rest: string[] } => {
+  const data = error?.response?.data;
+  const messages: string[] = (Array.isArray(data?.message) ? data.message : [data?.message]).filter(Boolean);
+  if (error?.response?.status === 409) return { fields: { code: messages[0] }, rest: [] };
+
+  const fields: FieldErrors = {};
+  const rest: string[] = [];
+  for (const message of messages) {
+    const field = /^(\w+)/.exec(message)?.[1];
+    if (field && field in EMPTY) fields[field as keyof FormState] ??= message;
+    else rest.push(message);
+  }
+  return { fields, rest };
+};
+
 const CouponFormDialog = ({
   open,
   coupon,
@@ -106,9 +128,13 @@ const CouponFormDialog = ({
   // Mounted fresh each time it opens (see the coupons page), so this is the reset.
   const [form, setForm] = useState<FormState>(() => (coupon ? fromCoupon(coupon) : EMPTY));
   const [submitted, setSubmitted] = useState(false);
+  const [serverErrors, setServerErrors] = useState<FieldErrors>({});
 
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  // Editing a field clears the backend's complaint about it.
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setServerErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
 
   const mutation = useMutation({
     mutationFn: (payload: CouponPayload) =>
@@ -119,8 +145,9 @@ const CouponFormDialog = ({
       onClose();
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message;
-      toast.error(Array.isArray(message) ? message[0] : message ?? t("somethingWentWrong"));
+      const { fields, rest } = parseServerError(error);
+      setServerErrors(fields);
+      if (rest.length || !Object.keys(fields).length) toast.error(rest[0] ?? t("somethingWentWrong"));
     },
   });
 
@@ -146,6 +173,9 @@ const CouponFormDialog = ({
   };
 
   const show = (key: keyof typeof errors) => (submitted ? errors[key] : "");
+  // Client-side errors first, then whatever the backend said about the field.
+  const fieldError = (key: keyof FormState) =>
+    (key in errors ? show(key as keyof typeof errors) : "") || serverErrors[key] || "";
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -160,8 +190,8 @@ const CouponFormDialog = ({
                 label={t("couponCode")}
                 value={form.code}
                 onChange={(e) => set("code", e.target.value.toUpperCase())}
-                error={!!show("code")}
-                helperText={show("code") || t("couponCodeHint")}
+                error={!!fieldError("code")}
+                helperText={fieldError("code") || t("couponCodeHint")}
                 slotProps={{ htmlInput: { maxLength: 50, dir: "ltr" } }}
               />
             </Grid>
@@ -179,6 +209,8 @@ const CouponFormDialog = ({
                 label={t("descriptionOptional")}
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
+                error={!!fieldError("description")}
+                helperText={fieldError("description")}
                 slotProps={{ htmlInput: { maxLength: 200 } }}
               />
             </Grid>
@@ -204,8 +236,8 @@ const CouponFormDialog = ({
                 label={t("discountValue")}
                 value={form.value}
                 onChange={(e) => set("value", e.target.value)}
-                error={!!show("value")}
-                helperText={show("value")}
+                error={!!fieldError("value")}
+                helperText={fieldError("value")}
                 slotProps={{
                   htmlInput: { min: 0, step: "any" },
                   input: {
@@ -225,6 +257,8 @@ const CouponFormDialog = ({
                 label={t("minOrderOptional")}
                 value={form.minSubtotal}
                 onChange={(e) => set("minSubtotal", e.target.value)}
+                error={!!fieldError("minSubtotal")}
+                helperText={fieldError("minSubtotal")}
                 slotProps={{ htmlInput: { min: 0, step: "any" } }}
               />
             </Grid>
@@ -237,6 +271,8 @@ const CouponFormDialog = ({
                   label={t("maxDiscountOptional")}
                   value={form.maxDiscount}
                   onChange={(e) => set("maxDiscount", e.target.value)}
+                  error={!!fieldError("maxDiscount")}
+                  helperText={fieldError("maxDiscount")}
                   slotProps={{ htmlInput: { min: 0, step: "any" } }}
                 />
               </Grid>
@@ -250,6 +286,8 @@ const CouponFormDialog = ({
                 label={t("startsOn")}
                 value={form.startsAt}
                 onChange={(e) => set("startsAt", e.target.value)}
+                error={!!fieldError("startsAt")}
+                helperText={fieldError("startsAt")}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
@@ -261,8 +299,8 @@ const CouponFormDialog = ({
                 label={t("expiresOn")}
                 value={form.expiresAt}
                 onChange={(e) => set("expiresAt", e.target.value)}
-                error={!!show("dates")}
-                helperText={show("dates")}
+                error={!!(show("dates") || fieldError("expiresAt"))}
+                helperText={show("dates") || fieldError("expiresAt")}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
@@ -275,7 +313,8 @@ const CouponFormDialog = ({
                 label={t("usageLimitOptional")}
                 value={form.usageLimit}
                 onChange={(e) => set("usageLimit", e.target.value)}
-                helperText={t("usageLimitHint")}
+                error={!!fieldError("usageLimit")}
+                helperText={fieldError("usageLimit") || t("usageLimitHint")}
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />
             </Grid>
@@ -287,6 +326,8 @@ const CouponFormDialog = ({
                 label={t("perCustomerLimitOptional")}
                 value={form.perCustomerLimit}
                 onChange={(e) => set("perCustomerLimit", e.target.value)}
+                error={!!fieldError("perCustomerLimit")}
+                helperText={fieldError("perCustomerLimit")}
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />
             </Grid>
