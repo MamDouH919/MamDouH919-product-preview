@@ -1,11 +1,26 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsMongoId, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsMongoId,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
+/** Prices one or more subzones at the same price; none of them may be priced yet. */
 export class CreateDeliveryPriceDto {
-  @ApiProperty()
-  @IsMongoId()
-  subZoneId!: string;
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsMongoId({ each: true })
+  subZoneIds!: string[];
 
   @ApiProperty({ minimum: 0 })
   @Type(() => Number)
@@ -45,6 +60,16 @@ export class SetZonePriceDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price!: number;
+}
+
+/** One price for every area; null switches back to the per-area price list. */
+export class SetFlatPriceDto {
+  @ApiProperty({ minimum: 0, nullable: true, type: Number })
+  @ValidateIf((_, value) => value !== null)
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  price!: number | null;
 }
 
 export class QueryDeliveryPricesDto {

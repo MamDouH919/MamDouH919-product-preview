@@ -36,6 +36,7 @@ import { deleteDeliveryPrice, updateDeliveryPrice } from "@/backend-api/price-li
 import { DeliveryPrice } from "@/backend-api/price-list/types";
 import { useCurrency } from "@/Hooks/useCurrency";
 import SimpleTable from "@/components/Table/SimpleTable";
+import FlatPriceCard from "@/features/PriceList/FlatPriceCard";
 import PriceFormDialog from "@/features/PriceList/PriceFormDialog";
 import { formatMoney, localized } from "@/features/Order/format";
 
@@ -155,6 +156,8 @@ const PriceListPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
+      <FlatPriceCard />
+
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between">
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
           <TextField

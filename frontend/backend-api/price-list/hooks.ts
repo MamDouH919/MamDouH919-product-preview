@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchDeliveryAreas, fetchDeliveryPrices, fetchZones } from "./queries";
+import { fetchDeliveryAreas, fetchDeliveryPrices, fetchFlatPrice, fetchZones } from "./queries";
 import { DeliveryPriceFilters } from "./types";
 
 export const PRICE_LIST_QUERY_KEY = "price-list";
 export const ZONES_QUERY_KEY = "price-list-zones";
 export const DELIVERY_AREAS_QUERY_KEY = "delivery-areas";
+export const FLAT_PRICE_QUERY_KEY = "price-list-flat-price";
 
 export const useDeliveryPricesQuery = (filters?: DeliveryPriceFilters) => {
   return useQuery({
@@ -25,5 +26,12 @@ export const useDeliveryAreasQuery = () => {
   return useQuery({
     queryKey: [DELIVERY_AREAS_QUERY_KEY],
     queryFn: fetchDeliveryAreas,
+  });
+};
+
+export const useFlatPriceQuery = () => {
+  return useQuery({
+    queryKey: [FLAT_PRICE_QUERY_KEY],
+    queryFn: fetchFlatPrice,
   });
 };

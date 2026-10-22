@@ -117,6 +117,9 @@ export class AuthService {
   async login(createAuthDto: LoginDto, tenant: string) {
     const { email, password } = createAuthDto;
     const user = await this.UserModel.findOne({ email });
+
+    console.log({ email, password });
+    
     if (!user) {
       throw new BadRequestException('wrong credentials');
     }

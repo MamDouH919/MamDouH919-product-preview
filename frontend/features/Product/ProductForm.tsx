@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  Alert,
+  Avatar,
   Box,
   Button,
   CircularProgress,
   Divider,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
@@ -82,7 +85,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
   const { data: categories = [] } = useCategoriesQuery();
 
-  const { control, handleSubmit, register, watch, setValue, formState: { errors } } =
+  const { control, handleSubmit, watch, setValue, formState: { errors } } =
     useForm<ProductFormValues>({
       defaultValues: {
         name: { ar: defaultData?.name?.ar ?? "", en: defaultData?.name?.en ?? "" },
@@ -112,7 +115,6 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
     });
 
   const selectedCategory = watch("category");
-  const isActiveValue = watch("isActive");
 
   const { data: subCategories = [] } = useSubCategoriesQuery(selectedCategory || undefined);
 
@@ -208,31 +210,66 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
   const tabHasError = (l: string) =>
     ["name", "description", "shortDescription"].some((f) => !!(errors as any)[f]?.[l]);
 
+  const trackStock = watch("trackStock");
+  const hasVariants = variantFields.length > 0;
+
   return (
     <Box component="form" onSubmit={handleSubmit((data) => mutation.mutate(data))}>
-      <Stack spacing={3}>
+      <Stack spacing={3} sx={{ maxWidth: 960, mx: "auto" }}>
 
-        {/* ── Images ── */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-            <Typography variant="subtitle1" fontWeight={700}>
-              {t("images")}
-            </Typography>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Add />}
-              onClick={() => appendImage({ file: null })}
-            >
-              {t("add")}
+        {/* ── 1. Basic info: what the customer reads ── */}
+        <FormSection step={1} title={t("productBasicInfo")} hint={t("productBasicInfoHint")}>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth" sx={{ mb: 2 }}>
+            {LANGS.map((l) => (
+              <Tab
+                key={l}
+                label={t(l === "ar" ? "arabic" : "english")}
+                iconPosition="end"
+                icon={
+                  tabHasError(l) ? (
+                    <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", display: "inline-block", ml: 0.5 }} />
+                  ) : undefined
+                }
+              />
+            ))}
+          </Tabs>
+
+          {LANGS.map((l, i) => (
+            <Stack key={l} spacing={2} sx={{ display: activeTab === i ? "flex" : "none" }}>
+              <TextInputComponent name={`name.${l}`} label={t("name")} control={control} required />
+              <TextInputComponent
+                name={`shortDescription.${l}`}
+                label={t("shortDescription")}
+                control={control}
+                multiline
+                rows={2}
+                helperText={t("shortDescriptionHint")}
+              />
+              <TextInputComponent
+                name={`description.${l}`}
+                label={t("description")}
+                control={control}
+                multiline
+                rows={5}
+                helperText={t("descriptionHint")}
+              />
+            </Stack>
+          ))}
+        </FormSection>
+
+        {/* ── 2. Images ── */}
+        <FormSection
+          step={2}
+          title={t("images")}
+          hint={t("productImagesHint")}
+          action={
+            <Button size="small" variant="outlined" startIcon={<Add />} onClick={() => appendImage({ file: null })}>
+              {t("addImage")}
             </Button>
-          </Stack>
-          <Divider sx={{ mb: 2 }} />
-
+          }
+        >
           {imageFields.length === 0 ? (
-            <Typography variant="body2" color="text.disabled">
-              {t("noImages")}
-            </Typography>
+            <EmptyHint text={t("noImages")} />
           ) : (
             <Grid container spacing={2}>
               {imageFields.map((field, index) => (
@@ -268,272 +305,313 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               ))}
             </Grid>
           )}
-        </Paper>
+        </FormSection>
 
+        {/* ── 3. Category, sub category & tags ── */}
+        <FormSection step={3} title={t("productClassification")} hint={t("productClassificationHint")}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth required disabled={isEditing} size="small" error={!!errors.category}>
+                <InputLabel>{t("category")}</InputLabel>
+                <Controller
+                  name="category"
+                  control={control}
+                  rules={{ required: !isEditing }}
+                  render={({ field }) => (
+                    <Select
+                      {...field}
+                      label={t("category")}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        setValue("subCategory", "");
+                      }}
+                    >
+                      {categories.map((cat) => (
+                        <MenuItem key={cat._id} value={cat._id}>
+                          {cat.name[lang] ?? cat.name.en ?? cat.name.ar}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  )}
+                />
+                {isEditing && <FormHelperText>{t("categoryLockedHint")}</FormHelperText>}
+              </FormControl>
+            </Grid>
 
-        {/* ── Category & SubCategory ── */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <FormControl fullWidth required disabled={isEditing}>
-              <InputLabel>{t("category")}</InputLabel>
-              <Controller
-                name="category"
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth disabled={!selectedCategory} size="small">
+                <InputLabel>{t("subCategory")}</InputLabel>
+                <Controller
+                  name="subCategory"
+                  control={control}
+                  render={({ field }) => (
+                    <Select {...field} label={t("subCategory")}>
+                      <MenuItem value="">{t("none")}</MenuItem>
+                      {subCategories.map((sub) => (
+                        <MenuItem key={sub._id} value={sub._id}>
+                          {sub.name[lang] ?? sub.name.en ?? sub.name.ar}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  )}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid size={12}>
+              <TextInputComponent name="tags" label={t("tags")} control={control} helperText={t("tagsHint")} />
+            </Grid>
+          </Grid>
+        </FormSection>
+
+        {/* ── 4. Price & SKU ── */}
+        <FormSection step={4} title={t("productPricing")} hint={t("productPricingHint")}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextInputComponent
+                name="price"
+                label={t("price")}
                 control={control}
-                rules={{ required: !isEditing }}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    label={t("category")}
-                    error={!!errors.category}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      setValue("subCategory", "");
-                    }}
-                  >
-                    {categories.map((cat) => (
-                      <MenuItem key={cat._id} value={cat._id}>
-                        {cat.name[lang] ?? cat.name.en ?? cat.name.ar}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                )}
+                type="number"
+                helperText={t("priceHint")}
               />
-            </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextInputComponent name="sku" label={t("sku")} control={control} helperText={t("skuHint")} />
+            </Grid>
           </Grid>
+        </FormSection>
 
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <FormControl fullWidth disabled={!selectedCategory}>
-              <InputLabel>{t("subCategory")}</InputLabel>
-              <Controller
-                name="subCategory"
-                control={control}
-                render={({ field }) => (
-                  <Select {...field} label={t("subCategory")}>
-                    <MenuItem value="">{t("none")}</MenuItem>
-                    {subCategories.map((sub) => (
-                      <MenuItem key={sub._id} value={sub._id}>
-                        {sub.name[lang] ?? sub.name.en ?? sub.name.ar}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                )}
-              />
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        {/* ── Price, SKU, Order ── */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextInputComponent name="price" label={t("price")} control={control} type="number" />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextInputComponent name="sku" label={t("sku")} control={control} />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextInputComponent name="order" label={t("order")} control={control} type="number" />
-          </Grid>
-        </Grid>
-
-        {/* ── Variants ── */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-            <Typography variant="subtitle1" fontWeight={700}>
-              {t("variants")}
-            </Typography>
+        {/* ── 5. Variants ── */}
+        <FormSection
+          step={5}
+          title={t("variants")}
+          hint={t("productVariantsHint")}
+          action={
             <Button
               size="small"
               variant="outlined"
               startIcon={<Add />}
               onClick={() => appendVariant({ label: "", price: "", sku: "", stock: "0" })}
             >
-              {t("add")}
+              {t("addVariant")}
             </Button>
-          </Stack>
-          <Divider sx={{ mb: 2 }} />
-
-          {variantFields.length === 0 ? (
-            <Typography variant="body2" color="text.disabled">
-              {t("noData")}
-            </Typography>
+          }
+        >
+          {!hasVariants ? (
+            <EmptyHint text={t("noVariantsHint")} />
           ) : (
             <Stack spacing={2}>
               {variantFields.map((field, index) => (
-                <Stack key={field.id} direction="row" spacing={2} alignItems="flex-start">
-                  <TextInputComponent
-                    name={`variants.${index}.label`}
-                    label={t("label")}
-                    control={control}
-                    required
-                  />
-                  <TextInputComponent
-                    name={`variants.${index}.price`}
-                    label={t("price")}
-                    control={control}
-                    type="number"
-                  />
-                  <TextInputComponent
-                    name={`variants.${index}.sku`}
-                    label={t("sku")}
-                    control={control}
-                  />
-                  <TextInputComponent
-                    name={`variants.${index}.stock`}
-                    label={variantFields[index]?._id ? t("currentStock") : t("openingStock")}
-                    control={control}
-                    type="number"
-                    readOnly={!!variantFields[index]?._id}
-                    helperText={
-                      variantFields[index]?._id ? t("stockEditedInInventory") : undefined
-                    }
-                  />
-                  <Tooltip title={t("delete")}>
-                    <IconButton color="error" onClick={() => removeVariant(index)} sx={{ mt: 0.5 }}>
-                      <Delete />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
+                <Paper key={field.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Stack direction="row" spacing={1} alignItems="flex-start">
+                    <Grid container spacing={2} sx={{ flex: 1 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent
+                          name={`variants.${index}.label`}
+                          label={t("label")}
+                          control={control}
+                          required
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent
+                          name={`variants.${index}.price`}
+                          label={t("price")}
+                          control={control}
+                          type="number"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent
+                          name={`variants.${index}.sku`}
+                          label={t("sku")}
+                          control={control}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent
+                          name={`variants.${index}.stock`}
+                          label={field._id ? t("currentStock") : t("openingStock")}
+                          control={control}
+                          type="number"
+                          readOnly={!!field._id}
+                          helperText={field._id ? t("stockEditedInInventory") : undefined}
+                        />
+                      </Grid>
+                    </Grid>
+                    <Tooltip title={t("delete")}>
+                      <IconButton color="error" onClick={() => removeVariant(index)}>
+                        <Delete />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </Paper>
               ))}
             </Stack>
           )}
-        </Paper>
+        </FormSection>
 
-        {/* ── Inventory ── */}
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>
-            {t("inventory")}
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-
+        {/* ── 6. Inventory ── */}
+        <FormSection step={6} title={t("inventory")} hint={t("productInventoryHint")}>
           <Stack spacing={2}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={watch("trackStock")}
-                  onChange={(e) => setValue("trackStock", e.target.checked)}
-                />
-              }
+            <SwitchField
+              checked={trackStock}
+              onChange={(v) => setValue("trackStock", v)}
               label={t("trackStock")}
+              hint={t("trackStockHint")}
             />
 
-            {watch("trackStock") && (
-              <Grid container spacing={2}>
-                {/* With variants, stock lives per variant — there is nothing
-                    meaningful to type here. */}
-                {!isEditing && variantFields.length === 0 && (
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <TextInputComponent
-                      name="stock"
-                      label={t("openingStock")}
-                      control={control}
-                      type="number"
-                    />
-                  </Grid>
-                )}
-                {isEditing && variantFields.length === 0 && (
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <TextInputComponent
-                      name="stock"
-                      label={t("currentStock")}
-                      control={control}
-                      type="number"
-                      readOnly
-                      helperText={t("stockEditedInInventory")}
-                    />
-                  </Grid>
-                )}
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextInputComponent
-                    name="lowStockThreshold"
-                    label={t("lowStockThreshold")}
-                    control={control}
-                    type="number"
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={watch("allowBackorder")}
-                        onChange={(e) => setValue("allowBackorder", e.target.checked)}
+            {trackStock && (
+              <>
+                <Grid container spacing={2}>
+                  {/* With variants, stock lives per variant — there is nothing
+                      meaningful to type here. */}
+                  {!hasVariants && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextInputComponent
+                        name="stock"
+                        label={isEditing ? t("currentStock") : t("openingStock")}
+                        control={control}
+                        type="number"
+                        readOnly={isEditing}
+                        helperText={isEditing ? t("stockEditedInInventory") : t("openingStockHint")}
                       />
-                    }
-                    label={t("allowBackorder")}
-                  />
+                    </Grid>
+                  )}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextInputComponent
+                      name="lowStockThreshold"
+                      label={t("lowStockThreshold")}
+                      control={control}
+                      type="number"
+                      helperText={t("lowStockThresholdHint")}
+                    />
+                  </Grid>
                 </Grid>
-              </Grid>
+
+                {hasVariants && <Alert severity="info">{t("stockPerVariantHint")}</Alert>}
+
+                <SwitchField
+                  checked={watch("allowBackorder")}
+                  onChange={(v) => setValue("allowBackorder", v)}
+                  label={t("allowBackorder")}
+                  hint={t("allowBackorderHint")}
+                />
+              </>
             )}
           </Stack>
-        </Paper>
+        </FormSection>
 
-        {/* ── Slug & Tags ── */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextInputComponent name="slug" label={t("slug")} control={control} />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextInputComponent name="tags" label={t("tags")} control={control} helperText={t("tagsHint")} />
-          </Grid>
-        </Grid>
-
-        {/* ── Active ── */}
-        <FormControlLabel
-          control={
-            <Switch
-              checked={isActiveValue}
-              {...register("isActive")}
-              onChange={(e) => setValue("isActive", e.target.checked)}
+        {/* ── 7. Visibility, order & slug ── */}
+        <FormSection step={7} title={t("productVisibility")} hint={t("productVisibilityHint")}>
+          <Stack spacing={2}>
+            <SwitchField
+              checked={watch("isActive")}
+              onChange={(v) => setValue("isActive", v)}
+              label={t("active")}
+              hint={t("activeHint")}
             />
-          }
-          label={t("active")}
-        />
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextInputComponent name="slug" label={t("slug")} control={control} helperText={t("slugHint")} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextInputComponent
+                  name="order"
+                  label={t("order")}
+                  control={control}
+                  type="number"
+                  helperText={t("orderHint")}
+                />
+              </Grid>
+            </Grid>
+          </Stack>
+        </FormSection>
 
-        {/* ── Localized content tabs ── */}
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth">
-          <Tab
-            label={t("arabic")}
-            iconPosition="end"
-            icon={
-              tabHasError("ar") ? (
-                <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", display: "inline-block", ml: 0.5 }} />
-              ) : undefined
-            }
-          />
-          <Tab
-            label={t("english")}
-            iconPosition="end"
-            icon={
-              tabHasError("en") ? (
-                <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", display: "inline-block", ml: 0.5 }} />
-              ) : undefined
-            }
-          />
-        </Tabs>
-
-        <Stack spacing={2} sx={{ display: activeTab === 0 ? "flex" : "none" }}>
-          <TextInputComponent name="name.ar" label={t("name")} control={control} required />
-          <TextInputComponent name="shortDescription.ar" label={t("shortDescription")} control={control} multiline rows={2} />
-          <TextInputComponent name="description.ar" label={t("description")} control={control} multiline rows={5} />
-        </Stack>
-
-        <Stack spacing={2} sx={{ display: activeTab === 1 ? "flex" : "none" }}>
-          <TextInputComponent name="name.en" label={t("name")} control={control} required />
-          <TextInputComponent name="shortDescription.en" label={t("shortDescription")} control={control} multiline rows={2} />
-          <TextInputComponent name="description.en" label={t("description")} control={control} multiline rows={5} />
-        </Stack>
-
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          disabled={mutation.isPending}
-          startIcon={mutation.isPending ? <CircularProgress size={20} /> : null}
+        {/* ── Actions ── */}
+        <Paper
+          elevation={3}
+          sx={{ position: "sticky", bottom: 16, zIndex: 2, p: 2, borderRadius: 2 }}
         >
-          {t("save")}
-        </Button>
+          <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button variant="text" onClick={() => router.back()} disabled={mutation.isPending}>
+              {t("cancel")}
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={mutation.isPending}
+              startIcon={mutation.isPending ? <CircularProgress size={20} /> : null}
+            >
+              {t("save")}
+            </Button>
+          </Stack>
+        </Paper>
       </Stack>
     </Box>
   );
 };
+
+interface FormSectionProps {
+  step: number;
+  title: string;
+  hint: string;
+  action?: ReactNode;
+  children: ReactNode;
+}
+
+// A numbered card with a title and a sentence on what the section is for.
+const FormSection = ({ step, title, hint, action, children }: FormSectionProps) => (
+  <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+    <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={2}>
+      <Avatar sx={{ width: 28, height: 28, fontSize: 14, fontWeight: 700, bgcolor: "primary.main" }}>
+        {step}
+      </Avatar>
+      <Box flex={1}>
+        <Typography variant="subtitle1" fontWeight={700} lineHeight={1.75}>
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {hint}
+        </Typography>
+      </Box>
+      {action && <Box flexShrink={0}>{action}</Box>}
+    </Stack>
+    <Divider sx={{ mb: 2 }} />
+    {children}
+  </Paper>
+);
+
+interface SwitchFieldProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  hint: string;
+}
+
+const SwitchField = ({ checked, onChange, label, hint }: SwitchFieldProps) => (
+  <FormControlLabel
+    sx={{ alignItems: "flex-start", mx: 0, gap: 1 }}
+    control={<Switch checked={checked} onChange={(e) => onChange(e.target.checked)} />}
+    label={
+      <Box pt={1}>
+        <Typography variant="body2" fontWeight={600}>
+          {label}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {hint}
+        </Typography>
+      </Box>
+    }
+  />
+);
+
+const EmptyHint = ({ text }: { text: string }) => (
+  <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
+    {text}
+  </Typography>
+);
 
 export default ProductForm;

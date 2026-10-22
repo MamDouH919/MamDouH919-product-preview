@@ -10,7 +10,7 @@ describe('price validation', () => {
   it.each([
     [CreateProductDto, { name: { en: 'Tea' }, category: '507f1f77bcf86cd799439011' }],
     [ProductVariantDto, { label: 'Large' }],
-    [CreateDeliveryPriceDto, { subZoneId: '507f1f77bcf86cd799439011' }],
+    [CreateDeliveryPriceDto, { subZoneIds: ['507f1f77bcf86cd799439011'] }],
     [SetZonePriceDto, { zoneId: '507f1f77bcf86cd799439011' }],
   ] as const)('%p takes whole piastres of 0 or more', async (cls, base) => {
     expect(await priceErrors(cls, { ...base, price: 12.5 })).toHaveLength(0);

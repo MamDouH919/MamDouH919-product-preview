@@ -146,6 +146,14 @@ export class Setting extends Document {
   @Prop({ required: false })
   country?: string;
 
+  /**
+   * One delivery fee for every area of `country`. While set, it replaces the
+   * price list: every subzone is deliverable at this price. Unset (null) means
+   * each area's own row in the price list applies.
+   */
+  @Prop({ type: Number, min: 0, required: false, default: null })
+  flatDeliveryPrice?: number | null;
+
   /** Days after delivery a customer may ask for a return from their account. 0 turns that off. */
   @Prop({ default: 14, min: 0, max: 365 })
   returnWindowDays!: number;

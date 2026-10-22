@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import { PriceListService } from './price-list.service';
 import {
   CreateDeliveryPriceDto,
   QueryDeliveryPricesDto,
+  SetFlatPriceDto,
   SetZonePriceDto,
   UpdateDeliveryPriceDto,
 } from './dto/price-list.dto';
@@ -42,6 +44,18 @@ export class PriceListController {
   @Get('zones')
   zones() {
     return this.priceListService.zones();
+  }
+
+  @Permissions([{ resource: Resource.PRICE_LIST, actions: [Action.READ] }])
+  @Get('flat-price')
+  flatPrice() {
+    return this.priceListService.flatPrice();
+  }
+
+  @Permissions([{ resource: Resource.PRICE_LIST, actions: [Action.UPDATE] }])
+  @Put('flat-price')
+  setFlatPrice(@Body() dto: SetFlatPriceDto) {
+    return this.priceListService.setFlatPrice(dto);
   }
 
   @Permissions([{ resource: Resource.PRICE_LIST, actions: [Action.READ] }])

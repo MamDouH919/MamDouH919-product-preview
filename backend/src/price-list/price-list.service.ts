@@ -14,6 +14,7 @@ import { COUNTRY_ZONES, subZoneCode } from './data';
 import {
   CreateDeliveryPriceDto,
   QueryDeliveryPricesDto,
+  SetFlatPriceDto,
   SetZonePriceDto,
   UpdateDeliveryPriceDto,
 } from './dto/price-list.dto';
@@ -92,10 +93,29 @@ export class PriceListService {
 
   /** Every place the store delivers to right now, grouped by zone. */
   async deliveryAreas(): Promise<DeliveryArea[]> {
-    const country = await this.currentCountry();
+    const { country, flatDeliveryPrice } = await this.deliverySettings();
     if (!country) return [];
 
     const zones = await this.zoneModel.find({ country }).sort({ sort: 1 }).exec();
+
+    // A flat price opens every area of the country, whatever the price list says.
+    if (flatDeliveryPrice != null) {
+      const subZones = await this.subZoneModel
+        .find({ zone: { $in: zones.map((z) => z._id) } })
+        .sort({ sort: 1 })
+        .select('zone name')
+        .exec();
+      return zones
+        .map((zone) => ({
+          _id: zone._id as Types.ObjectId,
+          name: zone.name,
+          subZones: subZones
+            .filter((s) => s.zone.equals(zone._id as Types.ObjectId))
+            .map((s) => ({ _id: s._id as Types.ObjectId, name: s.name, price: flatDeliveryPrice })),
+        }))
+        .filter((zone) => zone.subZones.length > 0);
+    }
+
     const prices = await this.priceModel
       .find({ isActive: true, zone: { $in: zones.map((z) => z._id) } })
       .populate<{ subZone: SubZone }>('subZone', 'name sort')
@@ -124,6 +144,22 @@ export class PriceListService {
   async resolve(subZoneId: string | Types.ObjectId | undefined): Promise<ResolvedDelivery | null> {
     if (!subZoneId || !Types.ObjectId.isValid(subZoneId)) return null;
 
+    const { country, flatDeliveryPrice } = await this.deliverySettings();
+    if (flatDeliveryPrice != null) {
+      const subZone = await this.subZoneModel
+        .findById(subZoneId)
+        .populate<{ zone: Zone }>('zone', 'name country')
+        .exec();
+      if (!subZone?.zone || subZone.zone.country !== country) return null;
+      return {
+        zone: subZone.zone._id as Types.ObjectId,
+        subZone: subZone._id as Types.ObjectId,
+        zoneName: subZone.zone.name,
+        subZoneName: subZone.name,
+        price: flatDeliveryPrice,
+      };
+    }
+
     const price = await this.priceModel
       .findOne({ subZone: new Types.ObjectId(subZoneId), isActive: true })
       .populate<{ zone: Zone; subZone: SubZone }>([
@@ -132,7 +168,7 @@ export class PriceListService {
       ])
       .exec();
     if (!price?.zone || !price.subZone) return null;
-    if (price.zone.country !== (await this.currentCountry())) return null;
+    if (price.zone.country !== country) return null;
 
     return {
       zone: price.zone._id as Types.ObjectId,
@@ -197,18 +233,32 @@ export class PriceListService {
       .sort((a, b) => a.zone.sort - b.zone.sort || a.subZone.sort - b.subZone.sort);
   }
 
-  async create(dto: CreateDeliveryPriceDto): Promise<DeliveryPrice> {
-    const subZone = await this.subZoneModel.findById(dto.subZoneId).exec();
-    if (!subZone) throw new NotFoundException('Area not found');
-    if (await this.priceModel.exists({ subZone: subZone._id })) {
-      throw new ConflictException('This area already has a delivery price.');
+  /** Adds a row per subzone, all or nothing: an unknown or already-priced area rejects the lot. */
+  async create(dto: CreateDeliveryPriceDto): Promise<{ created: number }> {
+    const subZones = await this.subZoneModel.find({ _id: { $in: dto.subZoneIds } }).select('_id zone').exec();
+    if (subZones.length !== dto.subZoneIds.length) throw new NotFoundException('Area not found');
+    if (await this.priceModel.exists({ subZone: { $in: subZones.map((s) => s._id) } })) {
+      throw new ConflictException('One of these areas already has a delivery price.');
     }
-    return this.priceModel.create({
-      zone: subZone.zone,
-      subZone: subZone._id,
-      price: dto.price,
-      isActive: dto.isActive ?? true,
-    });
+    await this.priceModel.insertMany(
+      subZones.map((s) => ({
+        zone: s.zone,
+        subZone: s._id,
+        price: dto.price,
+        isActive: dto.isActive ?? true,
+      })),
+    );
+    return { created: subZones.length };
+  }
+
+  /** The one price for every area, or null when each area is priced on its own. */
+  async flatPrice(): Promise<{ price: number | null }> {
+    return { price: (await this.deliverySettings()).flatDeliveryPrice ?? null };
+  }
+
+  async setFlatPrice(dto: SetFlatPriceDto): Promise<{ price: number | null }> {
+    await this.settingModel.updateOne({}, { $set: { flatDeliveryPrice: dto.price } }, { upsert: true }).exec();
+    return { price: dto.price };
   }
 
   /** Prices every subzone of a zone; rows that already exist take the new price. */
@@ -246,7 +296,11 @@ export class PriceListService {
   }
 
   private async currentCountry(): Promise<string | undefined> {
-    const settings = await this.settingModel.findOne().select('country').lean().exec();
-    return settings?.country;
+    return (await this.deliverySettings()).country;
+  }
+
+  private async deliverySettings(): Promise<{ country?: string; flatDeliveryPrice?: number | null }> {
+    const settings = await this.settingModel.findOne().select('country flatDeliveryPrice').lean().exec();
+    return { country: settings?.country, flatDeliveryPrice: settings?.flatDeliveryPrice };
   }
 }

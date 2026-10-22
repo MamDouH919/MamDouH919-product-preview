@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Alert,
+  Autocomplete,
   Button,
   Dialog,
   DialogActions,
@@ -14,7 +15,6 @@ import {
   FormControlLabel,
   Grid,
   InputAdornment,
-  MenuItem,
   Switch,
   TextField,
 } from "@mui/material";
@@ -49,7 +49,7 @@ const PriceFormDialog = ({
   const currency = useCurrency();
 
   const [zoneId, setZoneId] = useState(row?.zone._id ?? "");
-  const [subZoneId, setSubZoneId] = useState(row?.subZone._id ?? "");
+  const [subZoneIds, setSubZoneIds] = useState<string[]>(row ? [row.subZone._id] : []);
   const [price, setPrice] = useState(row ? String(row.price) : "");
   const [isActive, setIsActive] = useState(row?.isActive ?? true);
   const [submitted, setSubmitted] = useState(false);
@@ -61,7 +61,7 @@ const PriceFormDialog = ({
       const amount = Number(price);
       if (mode === "zone") return setZonePrice({ zoneId, price: amount });
       if (row) return updateDeliveryPrice({ id: row._id, data: { price: amount, isActive } });
-      return createDeliveryPrice({ subZoneId, price: amount, isActive });
+      return createDeliveryPrice({ subZoneIds, price: amount, isActive });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PRICE_LIST_QUERY_KEY] });
@@ -77,7 +77,7 @@ const PriceFormDialog = ({
 
   const errors = {
     zone: !zoneId ? t("required") : "",
-    subZone: mode === "single" && !subZoneId ? t("required") : "",
+    subZone: mode === "single" && !subZoneIds.length ? t("required") : "",
     price: price.trim() === "" || !(Number(price) >= 0) ? t("required") : "",
   };
   const show = (key: keyof typeof errors) => (submitted ? errors[key] : "");
@@ -98,52 +98,58 @@ const PriceFormDialog = ({
         <DialogContent>
           <Grid container spacing={2} sx={{ pt: 1 }}>
             <Grid size={{ xs: 12, sm: mode === "zone" ? 12 : 6 }}>
-              <TextField
-                select
+              <Autocomplete
                 fullWidth
                 size="small"
-                label={t("zone")}
-                value={zoneId}
+                options={zones}
+                value={zone ?? null}
                 disabled={!!row}
-                onChange={(e) => {
-                  setZoneId(e.target.value);
-                  setSubZoneId("");
+                isOptionEqualToValue={(a, b) => a._id === b._id}
+                getOptionLabel={(z) => localized(z.name, lang)}
+                onChange={(_, value) => {
+                  setZoneId(value?._id ?? "");
+                  setSubZoneIds([]);
                 }}
-                error={!!show("zone")}
-                helperText={show("zone")}
-              >
-                {zones.map((z) => (
-                  <MenuItem key={z._id} value={z._id}>
-                    {localized(z.name, lang)}
-                  </MenuItem>
-                ))}
-              </TextField>
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label={t("zone")}
+                    error={!!show("zone")}
+                    helperText={show("zone")}
+                  />
+                )}
+              />
             </Grid>
 
             {mode === "single" && (
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  select
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
                   fullWidth
                   size="small"
-                  label={t("subZone")}
-                  value={subZoneId}
+                  options={zone?.subZones ?? []}
+                  value={(zone?.subZones ?? []).filter((s) => subZoneIds.includes(s._id))}
                   disabled={!!row || !zone}
-                  onChange={(e) => setSubZoneId(e.target.value)}
-                  error={!!show("subZone")}
-                  helperText={show("subZone")}
-                >
-                  {(zone?.subZones ?? []).map((s) => (
-                    <MenuItem
-                      key={s._id}
-                      value={s._id}
-                      disabled={!row && pricedSubZones.has(s._id)}
-                    >
+                  isOptionEqualToValue={(a, b) => a._id === b._id}
+                  getOptionDisabled={(s) => !row && pricedSubZones.has(s._id)}
+                  getOptionLabel={(s) => localized(s.name, lang)}
+                  renderOption={({ key, ...props }, s) => (
+                    <li key={key} {...props}>
                       {localized(s.name, lang)}
                       {!row && pricedSubZones.has(s._id) ? ` (${t("alreadyPriced")})` : ""}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                    </li>
+                  )}
+                  onChange={(_, value) => setSubZoneIds(value.map((s) => s._id))}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t("subZone")}
+                      error={!!show("subZone")}
+                      helperText={show("subZone")}
+                    />
+                  )}
+                />
               </Grid>
             )}
 

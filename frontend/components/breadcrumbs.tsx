@@ -5,7 +5,10 @@ import { Box, IconButton, Stack, Tooltip, Typography, useTheme } from '@mui/mate
 import Add from '@mui/icons-material/Add';
 import ChevronLeft from '@mui/icons-material/ChevronLeft';
 import ChevronRight from '@mui/icons-material/ChevronRight';
+import HelpOutline from '@mui/icons-material/HelpOutline';
+import { usePathname } from 'next/navigation';
 import { useBreadcrumbs } from '@/Hooks/useBreadcrumbs';
+import { helpTopicFor } from '@/features/Help/guide';
 import { useAppSelector } from '@/Store/store';
 import CustomLink from './CustomLink';
 import { useTranslation } from 'react-i18next';
@@ -57,6 +60,8 @@ export function Breadcrumbs() {
     const { breadCrumbBtns } = useAppSelector(state => state.breadCrumb);
     const theme = useTheme()
     const { t, i18n } = useTranslation()
+    // The route without its locale, e.g. "/admin/returns/123".
+    const pagePath = usePathname().replace(/^\/[^/]+/, "")
 
     return (
         <Box sx={{
@@ -104,6 +109,11 @@ export function Breadcrumbs() {
                     ))}
                 </Stack>
                 <Stack spacing={0.5} direction="row">
+                    {pagePath !== "/admin/help" && (
+                        <BreadCrumbBtn link={`/${i18n.language}/admin/help?tab=${helpTopicFor(pagePath)}`} title={t("helpForThisPage")}>
+                            <HelpOutline />
+                        </BreadCrumbBtn>
+                    )}
                     {breadCrumbBtns && breadCrumbBtns.map((btn: any, index: number) => (
                         <BreadCrumbBtn
                             key={index}
