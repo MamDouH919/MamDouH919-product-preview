@@ -34,6 +34,7 @@ import { SitemapModule } from './sitemap/sitemap.module';
 import { CartModule } from './cart/cart.module';
 import { ReturnsModule } from './returns/returns.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
+import { PlatformModule } from './platform/platform.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -100,6 +101,7 @@ import { TenantModule } from './common/tenant/tenant.module';
     ReturnsModule,
     ActivityLogModule,
     TenantModule,
+    PlatformModule,
   ],
   controllers: [],
   providers: [],

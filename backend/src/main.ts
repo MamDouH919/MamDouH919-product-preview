@@ -19,22 +19,23 @@ async function bootstrap() {
   // past Express's 100kb default.
   app.useBodyParser('json', { limit: '2mb' });
 
-  // ✅ CORS allowlist — every tenant's frontendUrl from the tenant map, so
-  // `npm run add-tenant` is the only step needed to onboard a store. Extra
-  // origins (e.g. a second dev port) go in CORS_ORIGINS, comma-separated.
+  // ✅ CORS allowlist — every tenant's frontendUrl, read from the live tenant
+  // map on each request so a store added from the platform dashboard works
+  // without a restart. Extra origins (a second dev port, the platform
+  // dashboard itself) go in CORS_ORIGINS, comma-separated.
   const extraOrigins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
-    .map((o) => o.trim())
+    .map((o) => o.trim().replace(/\/+$/, ''))
     .filter(Boolean);
-  const allowedOrigins = [
-    ...new Set([
-      ...app.get(TenantConnectionService).getAllowedOrigins(),
-      ...extraOrigins,
-    ]),
-  ];
+  const tenants = app.get(TenantConnectionService);
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) =>
+      callback(
+        null,
+        Boolean(origin) &&
+          (extraOrigins.includes(origin!) || tenants.getAllowedOrigins().includes(origin!)),
+      ),
     credentials: true, // allow cookies or auth headers
   });
 

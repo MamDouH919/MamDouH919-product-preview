@@ -74,7 +74,9 @@ Tenants are identified by **host**. Each host gets its own MongoDB database, its
 
 Each store needs its own database: the API refuses to start if two hosts share one. A second name for the same store (`www.` plus the bare domain) is declared with `"aliasOf": "<primary host>"` on the second entry, so background jobs still visit that store once.
 
-In production, put the same JSON in the `TENANT_MAP` env var instead — it takes precedence over the file, so connection strings with credentials never reach source control. If neither exists the app still boots; it just logs a warning and every request 404s until a tenant is registered.
+**Platform dashboard.** With `PLATFORM_MONGO_URL` set, the tenant map is stored in that database instead (connection strings encrypted), and managed from the dashboard in `platform-dashboard/`: add, edit, disable, and remove stores without a restart. On first start, the tenants in `TENANT_MAP` / `config.json` are imported, and those two are ignored from then on. Each API instance re-reads the registry every 30 seconds. See `platform-dashboard/README.md`.
+
+Without it, in production put the same JSON in the `TENANT_MAP` env var instead — it takes precedence over the file, so connection strings with credentials never reach source control. If neither exists the app still boots; it just logs a warning and every request 404s until a tenant is registered.
 
 ### How a request is routed
 
@@ -411,6 +413,11 @@ MAIL_PASS=app-password
 # CORS_ORIGINS=http://localhost:3001     # extra origins beyond each tenant's frontendUrl
 # TRUST_PROXY=1                         # behind nginx etc. — real client IP for rate limits
 
+# Platform dashboard (optional): tenant registry + its single admin
+# PLATFORM_MONGO_URL=mongodb://127.0.0.1:27017/platform?replicaSet=rs0
+# PLATFORM_ADMIN_EMAIL=you@example.com
+# PLATFORM_ADMIN_PASSWORD_HASH='$2b$12$...'   # bcrypt hash of the password
+
 # Production: the tenant map lives here instead of src/config.json
 # TENANT_MAP={"example.com":{"mongoUri":"mongodb+srv://…","frontendUrl":"https://example.com"}}
 
@@ -519,11 +526,11 @@ frontend/
 ## Notes
 
 - `backend/src/config.json` and both env files are git-ignored — every tenant map is deployment-specific. Prefer `TENANT_MAP` in production.
-- CORS origins come from each tenant's `frontendUrl` in the tenant map (read at boot — restart after `add-tenant`). Extra origins go in `CORS_ORIGINS`, comma-separated.
+- CORS origins come from each tenant's `frontendUrl` in the live tenant map, checked per request, so a store added from the platform dashboard needs no restart. Extra origins (the platform dashboard itself) go in `CORS_ORIGINS`, comma-separated.
 - Credential endpoints are rate-limited (`AuthThrottlerGuard`): login/register/subscribe 10 per minute, forgot-password 5 per 15 minutes, keyed by tenant + IP + submitted email. Behind a reverse proxy set `TRUST_PROXY` (hop count, e.g. `1`) so the real client IP is used. Counters are in memory, so they reset on restart and aren't shared between instances.
 - Behind a reverse proxy with `TRUST_PROXY` set, Express takes the host from `X-Forwarded-Host`, and that host picks the store. The proxy must overwrite both headers rather than pass through the client's: in nginx, `proxy_set_header Host $host;` and `proxy_set_header X-Forwarded-Host $host;`.
 - The in-app database tool is not a backup — take those at the database layer (`mongodump --db <store db>`, or Atlas backups). Its export is one store's data as Extended JSON, keeping ObjectIds and dates as real types, with login tokens left out. Import accepts only an export of the same store, only into a store with no orders, returns or stock history, and only with the super admin's password plus the store's host typed to confirm. It checks the file first (dry run), validates every document against its schema, and writes all collections in one transaction.
 - Every price is validated as 0 or more with at most 2 decimals (piastres), in the API and the product CSV import. Settings carry the store's `currencyCode` (ISO 4217, `EGP`) and `timezone` (`Africa/Cairo`); only that store's super admin changes them, and the currency is frozen once the store has orders.
 - A product that has been ordered or has stock history can't be deleted (`409`) — deactivate it instead.
-- `MONGO_URL` is no longer used to open connections (every connection comes from the tenant map); it survives only as an unused entry in `config/config.ts`.
+- `MONGO_URL` is no longer used to open connections (every connection comes from the tenant map); it survives only as an unused entry in `config/config.ts`. The tenant registry uses its own `PLATFORM_MONGO_URL`, and refuses any store on that same database.
 - Uploaded images are compressed to a max width of 1280px and normalized to jpeg/png/webp/avif; GIF and SVG pass through untouched.

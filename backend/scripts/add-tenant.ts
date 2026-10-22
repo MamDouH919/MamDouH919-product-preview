@@ -53,6 +53,17 @@ async function main() {
   try {
     console.log('\n=== Add a new tenant ===\n');
 
+    // Once the platform registry is in use, config.json is no longer read.
+    const envFile = join(process.cwd(), '.env');
+    const usesRegistry =
+      Boolean(process.env.PLATFORM_MONGO_URL) ||
+      (existsSync(envFile) && /^\s*PLATFORM_MONGO_URL\s*=\s*\S/m.test(readFileSync(envFile, 'utf-8')));
+    if (usesRegistry) {
+      console.log('PLATFORM_MONGO_URL is set: tenants live in the platform registry, and config.json is ignored.');
+      console.log('Add the store from the platform dashboard instead (platform-dashboard/).');
+      return;
+    }
+
     // 1. Hostname (the key used everywhere: DB routing, JWT, frontend).
     const host = await ask('Tenant hostname (no port, e.g. ranoshka.com)');
     if (!host) throw new Error('Hostname is required.');

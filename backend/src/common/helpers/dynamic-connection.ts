@@ -1,9 +1,22 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    NotFoundException,
+    OnModuleDestroy,
+    OnModuleInit,
+    ServiceUnavailableException,
+} from '@nestjs/common';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { tenantSchemas } from '../tenant/tenant-schemas';
 import { supportsTransactions } from '../tenant/with-transaction';
+import { TenantRecord, TenantRegistry } from '../tenant/tenant-registry';
+
+/** How often each instance re-reads the registry, so edits made on another instance arrive. */
+const REGISTRY_REFRESH_MS = 30_000;
+/** Grace period before closing a connection a registry edit replaced, for requests still using it. */
+const CONNECTION_DRAIN_MS = 30_000;
 
 /** Per-tenant configuration, keyed by hostname in config.json / TENANT_MAP. */
 export interface TenantConfig {
@@ -63,15 +76,93 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
     }
 }
 
+/**
+ * The live map: every enabled store, plus the aliases of enabled stores.
+ * Validation runs on the whole registry first, disabled stores included.
+ */
+export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
+    const all: Record<string, TenantConfig> = {};
+    for (const { host, mongoUri, frontendUrl, aliasOf } of records) {
+        all[host] = { mongoUri, frontendUrl, ...(aliasOf ? { aliasOf } : {}) };
+    }
+    validateTenantMap(all);
+    const disabled = new Set(records.filter((r) => r.disabled).map((r) => r.host));
+    return Object.fromEntries(
+        Object.entries(all).filter(([host, cfg]) => !disabled.has(host) && !(cfg.aliasOf && disabled.has(cfg.aliasOf))),
+    );
+}
+
 @Injectable()
-export class TenantConnectionService {
+export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(TenantConnectionService.name);
     private connections = new Map<string, Connection>();
     private tenantMap: Record<string, TenantConfig> | null = null;
+    private registry: TenantRegistry | null = null;
+    private refreshTimer?: NodeJS.Timeout;
+
+    /**
+     * With PLATFORM_MONGO_URL set, the tenant map lives in that database and is
+     * managed from the platform dashboard. An empty registry is filled once from
+     * TENANT_MAP / config.json, which are ignored from then on.
+     */
+    async onModuleInit(): Promise<void> {
+        const uri = process.env.PLATFORM_MONGO_URL;
+        if (!uri) return;
+
+        this.registry = await TenantRegistry.open(uri);
+        if (await this.registry.isEmpty()) {
+            const legacy = this.loadStaticMap();
+            if (Object.keys(legacy).length) {
+                await this.registry.importMap(legacy);
+                this.logger.log(`Imported ${Object.keys(legacy).length} tenant(s) into the platform registry.`);
+            }
+        }
+        await this.reload();
+        this.refreshTimer = setInterval(() => {
+            this.reload().catch((err) => this.logger.error(`Tenant registry refresh failed: ${err.message}`));
+        }, REGISTRY_REFRESH_MS).unref();
+    }
+
+    async onModuleDestroy(): Promise<void> {
+        clearInterval(this.refreshTimer);
+        await this.registry?.close();
+    }
+
+    /** The platform registry, or 503 when this deployment still uses TENANT_MAP / config.json. */
+    getRegistry(): TenantRegistry {
+        if (!this.registry) {
+            throw new ServiceUnavailableException(
+                'Tenant registry is not configured. Set PLATFORM_MONGO_URL to manage tenants from the dashboard.',
+            );
+        }
+        return this.registry;
+    }
+
+    /** Re-reads the registry into the live map and retires connections whose store changed. */
+    async reload(): Promise<void> {
+        const next = liveTenantMap(await this.getRegistry().list());
+        for (const [host, connection] of this.connections) {
+            if (next[host]?.mongoUri === this.tenantMap?.[host]?.mongoUri) continue;
+            this.connections.delete(host);
+            setTimeout(() => void connection.close(), CONNECTION_DRAIN_MS).unref();
+        }
+        this.tenantMap = next;
+    }
+
+    /** Whether this instance holds an open connection to the host's database. */
+    isConnected(host: string): boolean {
+        return this.connections.get(host)?.readyState === 1;
+    }
 
     private loadTenantMap(): Record<string, TenantConfig> {
         if (this.tenantMap) return this.tenantMap;
+        const map = this.loadStaticMap();
+        if (Object.keys(map).length) this.tenantMap = map;
+        return map;
+    }
 
+    /** TENANT_MAP, else src/config.json, else empty. */
+    private loadStaticMap(): Record<string, TenantConfig> {
         // Prefer the env var so production connection strings (with credentials)
         // are never committed to source control. Fall back to the local file for
         // development only.
@@ -79,8 +170,7 @@ export class TenantConnectionService {
         if (fromEnv) {
             const map = JSON.parse(fromEnv);
             validateTenantMap(map);
-            this.tenantMap = map;
-            return this.tenantMap!;
+            return map;
         }
 
         const configPath = join(process.cwd(), 'src', 'config.json');
@@ -99,8 +189,7 @@ export class TenantConnectionService {
 
         const map = JSON.parse(readFileSync(configPath, 'utf-8'));
         validateTenantMap(map);
-        this.tenantMap = map;
-        return this.tenantMap!;
+        return map;
     }
 
     /** Returns the tenant config for a host, or throws 404 if unknown. */
