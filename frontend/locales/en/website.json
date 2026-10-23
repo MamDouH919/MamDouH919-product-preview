@@ -41,6 +41,11 @@
     "home": "Home",
     "noTeams": "No team members found.",
     "banners": "Banners",
+    "bannerStyle": "Slider style",
+    "bannerStyles": {
+        "peek": "Centered with peeks",
+        "fade": "Full width fade"
+    },
     "createBanner": "Create Banner",
     "editBanner": "Edit Banner",
     "title": "Title",
@@ -1403,5 +1408,6 @@
     "helpForThisPage": "How does this page work?",
     "openPage": "Open page",
     "helpQuestion": "Q",
-    "helpNextTopic": "Next"
+    "helpNextTopic": "Next",
+    "homeSections": "Home page sections"
 }

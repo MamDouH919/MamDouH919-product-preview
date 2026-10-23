@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Setting } from './schemas/setting.schema';
+import { BannerStyle, Setting } from './schemas/setting.schema';
 import { User } from '../auth/schemas/user.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { CURRENCIES, DEFAULT_CURRENCY } from '../common/money/money';
@@ -68,6 +68,9 @@ export class SettingsService {
     }
     if (dto.timezone !== undefined && !isValidTimeZone(dto.timezone)) {
       throw new BadRequestException(`Unknown time zone "${dto.timezone}"`);
+    }
+    if (dto.bannerStyle !== undefined && !Object.values(BannerStyle).includes(dto.bannerStyle)) {
+      throw new BadRequestException(`Unknown banner style "${dto.bannerStyle}"`);
     }
 
     let seedCountry: string | undefined;

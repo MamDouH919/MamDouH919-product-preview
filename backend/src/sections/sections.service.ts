@@ -6,6 +6,7 @@ import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
+import { sanitizeDeep } from '../common/helpers/sanitize-html';
 
 export const sectionImageStorage = tenantImageStorage('sections');
 
@@ -30,6 +31,9 @@ export class SectionsService {
 
   async create(createSectionDto: CreateSectionDto, files: Express.Multer.File[]): Promise<Section> {
     const { image, highlightFiles, galleryFiles } = filesByField(files);
+
+    // The description is rich text rendered on the storefront.
+    if (createSectionDto.description) createSectionDto.description = sanitizeDeep(createSectionDto.description);
 
     if (image) {
       const compressed = await compressImage(image);
@@ -83,6 +87,8 @@ export class SectionsService {
     if (!existing) throw new NotFoundException(`Section with id ${id} not found`);
 
     const { image, highlightFiles, galleryFiles } = filesByField(files);
+
+    if (updateSectionDto.description) updateSectionDto.description = sanitizeDeep(updateSectionDto.description);
 
     if (image) {
       if (existing.image) await deleteFile(existing.image);

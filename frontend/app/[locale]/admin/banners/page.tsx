@@ -7,7 +7,7 @@ import { deleteBanner, toggleBannerActive, updateBannerWeight } from '@/backend-
 import { Banner } from '@/backend-api/banners/types';
 import Image from 'next/image';
 import { getBackendUri } from '@/utils/helperFunctions';
-import { IconButton, Stack, Switch } from '@mui/material';
+import { Box, IconButton, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
 import CustomLink from '@/components/CustomLink';
@@ -16,6 +16,9 @@ import { useAppDispatch } from '@/Store/store';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { BANNERS_QUERY_KEY } from '@/backend-api/banners/hooks';
 import { toast } from 'sonner';
+import { SETTINGS_QUERY_KEY, useSettingsQuery } from '@/backend-api/settings/hooks';
+import { updateSettings } from '@/backend-api/settings/mutations';
+import { BANNER_STYLES, BannerStyle } from '@/backend-api/settings/types';
 
 const getNestedValue = (obj: any, path: string) => {
   return path.split('.').reduce((acc, key) => acc?.[key], obj);
@@ -28,6 +31,23 @@ const BannersList = () => {
   const lang = i18n.language;
 
   const { data: banners, isLoading } = useBannersQuery();
+  const { data: settings } = useSettingsQuery();
+  const bannerStyle = settings?.bannerStyle ?? 'peek';
+
+  const bannerStyleMutation = useMutation({
+    mutationFn: (style: BannerStyle) => {
+      const formData = new FormData();
+      formData.append('bannerStyle', style);
+      return updateSettings(formData);
+    },
+    onSuccess: () => {
+      toast.success(t("saveSuccessfully"));
+      queryClient.invalidateQueries({ queryKey: [SETTINGS_QUERY_KEY] });
+    },
+    onError: () => {
+      toast.error(t("somethingWentWrong"));
+    },
+  });
 
   const bannersData = useMemo(
     () => banners?.map((banner: Banner) => ({ ...banner, id: banner._id })) ?? [],
@@ -146,14 +166,34 @@ const BannersList = () => {
   ], [t, lang, deleteMutation, toggleActiveMutation]);
 
   return (
-    <DragAndDropTable
-      columns={columns}
-      data={bannersData}
-      borderRadius={0}
-      onReorder={handleReorder}
-      height='100%'
-      loading={isLoading}
-    />
+    <Stack height='100%'>
+      <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap" px={2} py={1.5}>
+        <Typography variant="body2" fontWeight={600}>{t("bannerStyle")}</Typography>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={bannerStyle}
+          disabled={!settings || bannerStyleMutation.isPending}
+          onChange={(_, style: BannerStyle | null) => style && style !== bannerStyle && bannerStyleMutation.mutate(style)}
+        >
+          {BANNER_STYLES.map((style) => (
+            <ToggleButton key={style} value={style}>
+              {t(`bannerStyles.${style}`)}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Stack>
+      <Box flex={1} minHeight={0}>
+        <DragAndDropTable
+          columns={columns}
+          data={bannersData}
+          borderRadius={0}
+          onReorder={handleReorder}
+          height='100%'
+          loading={isLoading}
+        />
+      </Box>
+    </Stack>
   );
 };
 

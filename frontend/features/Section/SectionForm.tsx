@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -30,7 +31,7 @@ import { ImageInput } from "@/components/MUI/ImageInput";
 import Editor from "@/components/TextEditor";
 import { createSection, updateSection } from "@/backend-api/sections/mutations";
 import { SECTIONS_QUERY_KEY } from "@/backend-api/sections/hooks";
-import { Section, SectionType } from "@/backend-api/sections/types";
+import { HOME_SECTIONS, Section, SectionType } from "@/backend-api/sections/types";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 import { useAppSelector } from "@/Store/store";
@@ -76,7 +77,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
 
   const isEditing = !!defaultData;
 
-  const { control, handleSubmit, register, formState: { errors } } =
+  const { control, handleSubmit, register, setValue, formState: { errors } } =
     useForm<SectionFormValues>({
       defaultValues: {
         sectionName: defaultData?.sectionName || "",
@@ -202,12 +203,32 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
             <Typography variant="h6">{defaultData.sectionName}</Typography>
           </Box>
         ) : (
-          <TextInputComponent
-            name="sectionName"
-            label={t("sectionName")}
-            control={control}
-            required
-          />
+          <Box>
+            <TextInputComponent
+              name="sectionName"
+              label={t("sectionName")}
+              control={control}
+              required
+            />
+            {/* The home page looks these names up; picking one also sets the matching type. */}
+            <Typography variant="caption" color="text.secondary" display="block" mt={1.5} mb={1}>
+              {t("homeSections")}
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {HOME_SECTIONS.map((preset) => (
+                <Chip
+                  key={preset.name}
+                  label={preset.name}
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    setValue("sectionName", preset.name);
+                    setValue("type", preset.type);
+                  }}
+                />
+              ))}
+            </Stack>
+          </Box>
         )}
 
         {/* Type selector */}
@@ -229,8 +250,8 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
           />
         </Box>}
 
-        {/* Main image (only for DEFAULT type) */}
-        {["DEFAULT", "HIGHLIGHTS"].includes(sectionType) && (
+        {/* Main image (not used by GALLERY) */}
+        {sectionType !== "GALLERY" && (
           <ImageInput
             name="image"
             control={control as any}
@@ -238,9 +259,8 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
           />
         )}
 
-        {/* Language tabs — hidden for GALLERY and LINKS */}
-        {!["GALLERY", "LINKS"].includes(sectionType) && (
-          <>
+        {/* Language tabs */}
+        <>
             <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth">
               {tabs.map((tab, i) => (
                 <Tab
@@ -288,8 +308,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                 </Grid>
               </Stack>
             ))}
-          </>
-        )}
+        </>
 
         {/* Highlights (only for HIGHLIGHTS type) */}
         {sectionType === "HIGHLIGHTS" && (

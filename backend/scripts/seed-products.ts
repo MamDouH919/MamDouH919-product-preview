@@ -9,6 +9,7 @@
  * only adds products. Every product it makes is tagged `seed`, which is what
  * `--reset` removes — products added by hand are never touched.
  */
+import 'dotenv/config';
 import { TenantConnectionService } from '../src/common/helpers/dynamic-connection';
 import { Category, CategorySchema } from '../src/categories/schemas/category.schema';
 import { SubCategory, SubCategorySchema } from '../src/sub-categories/schemas/sub-category.schema';
@@ -166,7 +167,14 @@ async function main() {
   const count = Number(countArg ?? 50);
   if (!Number.isInteger(count) || count < 1) throw new Error(`Invalid count: ${countArg}`);
 
-  const db = await new TenantConnectionService().getConnection(host);
+  // Same tenant lookup the app does at boot: the platform registry when
+  // PLATFORM_MONGO_URL is set, otherwise TENANT_MAP / src/config.json.
+  const tenants = new TenantConnectionService();
+  await tenants.onModuleInit();
+  if (!tenants.getHosts().includes(host)) {
+    throw new Error(`Unknown tenant "${host}". Known hosts: ${tenants.getHosts().join(', ') || 'none'}`);
+  }
+  const db = await tenants.getConnection(host);
   const categoryModel = db.model(Category.name, CategorySchema);
   const subCategoryModel = db.model(SubCategory.name, SubCategorySchema);
   const productModel = db.model(Product.name, ProductSchema);
@@ -239,6 +247,7 @@ async function main() {
   await productModel.insertMany(products);
   console.log(`Created ${products.length} products`);
   await db.close();
+  await tenants.onModuleDestroy();
 }
 
 main().catch((err) => {

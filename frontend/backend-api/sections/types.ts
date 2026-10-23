@@ -19,3 +19,11 @@ export type Section = {
   gallery?: string[];
   links?: { label?: LocalizedField; url: string }[];
 };
+
+/** Sections the storefront home page renders, by the `sectionName` it looks them up with. */
+export const HOME_SECTIONS: { name: string; type: SectionType }[] = [
+  { name: 'home-story', type: 'DEFAULT' },
+  { name: 'home-stats', type: 'HIGHLIGHTS' },
+  { name: 'home-gallery', type: 'GALLERY' },
+  { name: 'home-cta', type: 'LINKS' },
+];

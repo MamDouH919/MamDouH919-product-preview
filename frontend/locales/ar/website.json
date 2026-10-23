@@ -41,6 +41,11 @@
     "home": "الرئيسية",
     "noTeams": "لا يوجد أعضاء",
     "banners": "البانرات",
+    "bannerStyle": "شكل السلايدر",
+    "bannerStyles": {
+        "peek": "منتصف مع جوانب ظاهرة",
+        "fade": "عرض كامل مع تلاشي"
+    },
     "createBanner": "إضافة بانر",
     "editBanner": "تعديل بانر",
     "title": "العنوان",
@@ -1397,5 +1402,6 @@
     "helpForThisPage": "إزاي الصفحة دي بتشتغل؟",
     "openPage": "افتح الصفحة",
     "helpQuestion": "س",
-    "helpNextTopic": "التالي"
+    "helpNextTopic": "التالي",
+    "homeSections": "أقسام الصفحة الرئيسية"
 }

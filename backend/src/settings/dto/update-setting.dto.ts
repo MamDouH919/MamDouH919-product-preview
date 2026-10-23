@@ -3,6 +3,7 @@ import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, Valida
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 import { CURRENCIES } from '../../common/money/money';
 import { SUPPORTED_COUNTRIES } from '../../price-list/data';
+import { BannerStyle } from '../schemas/setting.schema';
 
 export class SocialMediaItemDto {
   @IsString()
@@ -86,4 +87,8 @@ export class UpdateSettingDto {
   @Min(0)
   @Max(365)
   returnWindowDays?: number;
+
+  @IsOptional()
+  @IsIn(Object.values(BannerStyle))
+  bannerStyle?: BannerStyle;
 }

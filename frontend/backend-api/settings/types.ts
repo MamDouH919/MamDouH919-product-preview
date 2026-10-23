@@ -5,6 +5,11 @@ export type SocialMediaItem = {
   value: string;
 };
 
+/** How the home page banner slider moves: neighbours peeking and gliding, or full width cross-fading. */
+export type BannerStyle = "peek" | "fade";
+
+export const BANNER_STYLES: BannerStyle[] = ["peek", "fade"];
+
 export type Setting = {
   _id: string;
   siteTitle?: LocalizedField;
@@ -23,6 +28,7 @@ export type Setting = {
   country?: string;
   /** Days after delivery a customer may request a return; 0 turns customer requests off. */
   returnWindowDays?: number;
+  bannerStyle?: BannerStyle;
 };
 
 export type MailEncryption = "ssl" | "starttls" | "none";

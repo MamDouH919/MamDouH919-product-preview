@@ -21,6 +21,14 @@ export enum DeliveryFeeRefundPolicy {
   MANUAL = 'manual',
 }
 
+/** How the storefront's banner slider moves between slides. */
+export enum BannerStyle {
+  /** One slide centred with its neighbours peeking at the sides; slides glide. */
+  PEEK = 'peek',
+  /** Full width, one slide at a time; slides cross-fade. */
+  FADE = 'fade',
+}
+
 /** One change to the store's finance rules, with what it was and what it became. */
 @Schema({ _id: false })
 export class FinanceSettingChange {
@@ -157,6 +165,9 @@ export class Setting extends Document {
   /** Days after delivery a customer may ask for a return from their account. 0 turns that off. */
   @Prop({ default: 14, min: 0, max: 365 })
   returnWindowDays!: number;
+
+  @Prop({ type: String, enum: BannerStyle, default: BannerStyle.PEEK })
+  bannerStyle!: BannerStyle;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

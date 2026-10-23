@@ -23,5 +23,7 @@ export const useSectionByNameQuery = (sectionName: string) => {
         queryKey: [SECTIONS_QUERY_KEY, 'name', sectionName],
         queryFn: () => fetchSectionByName(sectionName),
         enabled: !!sectionName,
+        // A section the admin hasn't created yet is a 404, not a failure worth retrying.
+        retry: false,
     });
 };
