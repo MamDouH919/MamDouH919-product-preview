@@ -9,6 +9,7 @@ import {
   getCustomerTokenFromCookie,
   handleCustomerLogout,
 } from "@/actions/cookies";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 /**
  * Restores the storefront session on load — the customer equivalent of
@@ -18,9 +19,12 @@ import {
 const GetCustomerLogged = ({ children }: { children: React.ReactNode }) => {
   const dispatch = useAppDispatch();
   const initialized = useRef(false);
+  // A store without online orders has no customer accounts to restore.
+  const { has } = useStoreModules();
+  const accounts = has("orders");
 
   useEffect(() => {
-    if (initialized.current) return;
+    if (!accounts || initialized.current) return;
     initialized.current = true;
 
     (async () => {
@@ -42,7 +46,7 @@ const GetCustomerLogged = ({ children }: { children: React.ReactNode }) => {
         dispatch(resetCustomer());
       }
     })();
-  }, [dispatch]);
+  }, [dispatch, accounts]);
 
   return <>{children}</>;
 };

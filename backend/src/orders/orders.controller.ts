@@ -33,10 +33,13 @@ import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type CustomerRequest = Request & { customerId?: string };
 
 /** Pricing a basket. Public — the cart page uses it before anyone signs in. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('orders/quote')
 export class OrderQuoteController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -51,6 +54,7 @@ export class OrderQuoteController {
  * Public order lookup by number plus email or phone. Rate limited hard, since
  * order numbers are sequential and this is the one place they can be probed.
  */
+@RequireModules(StoreModule.ORDERS)
 @Controller('orders/track')
 export class OrderTrackingController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -67,6 +71,7 @@ export class OrderTrackingController {
  * Checkout without an account. Public, so each route is rate limited, and a
  * guest order is only ever readable with the secret token it was issued.
  */
+@RequireModules(StoreModule.ORDERS)
 @Controller('orders/guest')
 export class GuestOrdersController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -101,6 +106,7 @@ export class GuestOrdersController {
  * The customer's side. Every route acts on the customer in the token, so one
  * customer can never read or cancel another's order.
  */
+@RequireModules(StoreModule.ORDERS)
 @Controller('orders/me')
 @UseGuards(CustomerAuthGuard)
 export class CustomerOrdersController {
@@ -132,6 +138,7 @@ export class CustomerOrdersController {
 }
 
 /** The store's side. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('orders')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class OrdersController {

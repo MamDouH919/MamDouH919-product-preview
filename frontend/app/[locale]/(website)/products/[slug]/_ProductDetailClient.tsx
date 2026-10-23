@@ -18,6 +18,7 @@ import ProductReviews from "@/features/Review/ProductReviews"
 import Stars from "@/features/Review/Stars"
 import RecentlyViewed from "@/features/Product/RecentlyViewed"
 import { recordRecentlyViewed } from "@/features/Product/recentlyViewedStore"
+import { useStoreModules } from "@/Hooks/useStoreModules"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -63,6 +64,8 @@ export default function ProductDetailClient({ params }: Props) {
   const [selectedVariant, setSelectedVariant] = useState<number | null>(null)
   const currency = useCurrency()
   const theme = useTheme()
+  const { has, showPrices } = useStoreModules()
+  const sells = has("orders")
 
   const cssVars = {
     "--primary": theme.palette.primary.main,
@@ -231,7 +234,7 @@ export default function ProductDetailClient({ params }: Props) {
               const displayPrice = activeVariant !== null
                 ? product.variants?.[activeVariant]?.price
                 : product.price
-              return displayPrice != null ? (
+              return showPrices && displayPrice != null ? (
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-bold text-(--primary)">
                     {displayPrice.toLocaleString()} {currency}
@@ -255,7 +258,7 @@ export default function ProductDetailClient({ params }: Props) {
                       }`}
                     >
                       <span className="text-sm font-semibold">{variant.label}</span>
-                      {variant.price != null && (
+                      {showPrices && variant.price != null && (
                         <span className={`text-xs mt-0.5 ${activeVariant === i ? "text-white/80" : "text-(--primary)"}`}>
                           {variant.price.toLocaleString()} {currency}
                         </span>
@@ -306,8 +309,12 @@ export default function ProductDetailClient({ params }: Props) {
             </div>
 
             <div className="mt-auto pt-4 flex flex-col gap-3">
-              <AddToCart product={product} variantIndex={activeVariant} />
-              <WishlistButton productId={product._id} variant="full" />
+              {sells && (
+                <>
+                  <AddToCart product={product} variantIndex={activeVariant} />
+                  <WishlistButton productId={product._id} variant="full" />
+                </>
+              )}
               <WhatsAppButton
                 slug={product.slug}
                 productName={name}

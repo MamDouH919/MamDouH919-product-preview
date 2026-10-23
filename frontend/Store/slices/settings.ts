@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '../store';
+import type { StoreModule } from '@/lib/storeModules';
 
 export interface SettingsState {
     siteTitle?: Record<string, string>;
@@ -15,6 +16,9 @@ export interface SettingsState {
     email?: string;
     address?: string;
     socialMedia?: Record<string, string>[];
+    showPrices?: boolean;
+    /** Left unset until settings load, and when they fail to; read as every module. */
+    modules?: StoreModule[];
 }
 
 const initialState: SettingsState = {};

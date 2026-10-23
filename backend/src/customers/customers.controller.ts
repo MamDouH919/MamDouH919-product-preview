@@ -26,6 +26,8 @@ import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type CustomerRequest = Request & { customerId?: string };
 
@@ -34,6 +36,7 @@ type CustomerRequest = Request & { customerId?: string };
  * there is no id in any path, so one customer can never address another's
  * profile or addresses.
  */
+@RequireModules(StoreModule.ORDERS)
 @Controller('customers/me')
 @UseGuards(CustomerAuthGuard)
 export class CustomerProfileController {
@@ -101,6 +104,7 @@ export class CustomerProfileController {
 }
 
 /** Admin-side read and account suspension. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('customers')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class CustomersController {

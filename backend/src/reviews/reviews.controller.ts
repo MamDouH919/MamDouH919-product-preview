@@ -26,6 +26,8 @@ import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type CustomerRequest = Request & { customerId?: string };
 
@@ -41,6 +43,7 @@ export class ProductReviewsController {
 }
 
 /** The customer's own reviews. Every route acts on the customer in the token. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('reviews/me')
 @UseGuards(CustomerAuthGuard)
 export class CustomerReviewsController {

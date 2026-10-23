@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@mui/material';
-import type { Tenant } from '../api';
+import { PLAN_LABELS, type StorePlan, type Tenant } from '../api';
 import { useCreateTenant, useUpdateTenant } from '../hooks/useTenants';
 
 interface Props {
@@ -11,6 +11,11 @@ interface Props {
   onSaved: (message: string) => void;
 }
 
+const PLAN_HINTS: Record<StorePlan, string> = {
+  full: 'Online orders, customer accounts, stock and accounting.',
+  catalog: 'Products and the website only. Visitors ask on WhatsApp; nothing is ordered online.',
+};
+
 export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const editing = Boolean(tenant);
   const [host, setHost] = useState(tenant?.host ?? '');
@@ -18,6 +23,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const [urlTouched, setUrlTouched] = useState(editing);
   const [mongoUri, setMongoUri] = useState('');
   const [aliasOf, setAliasOf] = useState(tenant?.aliasOf ?? '');
+  const [plan, setPlan] = useState<StorePlan>(tenant?.plan ?? 'full');
   const create = useCreateTenant();
   const update = useUpdateTenant();
   const mutation = editing ? update : create;
@@ -40,12 +46,13 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
         patch: {
           frontendUrl,
           aliasOf: aliasOf || null,
+          ...(aliasOf ? {} : { plan }),
           ...(mongoUri.trim() ? { mongoUri: mongoUri.trim() } : {}),
         },
       });
       onSaved(`${tenant.host} updated`);
     } else {
-      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : {}) });
+      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan }) });
       onSaved(`${host} added`);
     }
     onClose();
@@ -105,6 +112,28 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
               </MenuItem>
             ))}
           </TextField>
+          {!aliasOf && (
+            <TextField
+              select
+              label="Plan"
+              helperText={PLAN_HINTS[plan]}
+              value={plan}
+              onChange={(e) => setPlan(e.target.value as StorePlan)}
+            >
+              {(Object.keys(PLAN_LABELS) as StorePlan[]).map((p) => (
+                <MenuItem key={p} value={p}>
+                  {PLAN_LABELS[p]}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+          {editing && !aliasOf && plan !== tenant!.plan && (
+            <Alert severity="info">
+              {plan === 'catalog'
+                ? 'Orders, stock and accounting are hidden from the store, not deleted. Switching back brings them back as they were.'
+                : 'The store gets online orders, stock and accounting, with any data it had before.'}
+            </Alert>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>

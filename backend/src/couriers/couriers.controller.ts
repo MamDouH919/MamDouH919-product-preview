@@ -7,7 +7,10 @@ import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { CouriersService } from './couriers.service';
 import { CreateCourierDto, SettleCourierDto, UpdateCourierDto } from './dto/courier.dto';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
+@RequireModules(StoreModule.ORDERS, StoreModule.FINANCE)
 @Controller('finance')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class CouriersController {

@@ -12,6 +12,7 @@ import mongoose, { Connection } from 'mongoose';
 import { tenantSchemas } from '../tenant/tenant-schemas';
 import { supportsTransactions } from '../tenant/with-transaction';
 import { TenantRecord, TenantRegistry } from '../tenant/tenant-registry';
+import { DEFAULT_PLAN, PLAN_MODULES, StoreModule, StorePlan } from '../tenant/store-plan';
 
 /** How often each instance re-reads the registry, so edits made on another instance arrive. */
 const REGISTRY_REFRESH_MS = 30_000;
@@ -32,6 +33,8 @@ export interface TenantConfig {
      * visit each store would visit that one twice.
      */
     aliasOf?: string;
+    /** Left out means DEFAULT_PLAN. An alias always follows its primary host's plan. */
+    plan?: StorePlan;
 }
 
 /**
@@ -82,8 +85,8 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
  */
 export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
     const all: Record<string, TenantConfig> = {};
-    for (const { host, mongoUri, frontendUrl, aliasOf } of records) {
-        all[host] = { mongoUri, frontendUrl, ...(aliasOf ? { aliasOf } : {}) };
+    for (const { host, mongoUri, frontendUrl, aliasOf, plan } of records) {
+        all[host] = { mongoUri, frontendUrl, plan, ...(aliasOf ? { aliasOf } : {}) };
     }
     validateTenantMap(all);
     const disabled = new Set(records.filter((r) => r.disabled).map((r) => r.host));
@@ -204,6 +207,25 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
         }
 
         return tenantMap[host];
+    }
+
+    /**
+     * The store's plan; an alias answers with its primary host's. An unknown
+     * host gets DEFAULT_PLAN — it has no database, so its request fails anyway.
+     */
+    getPlan(host: string): StorePlan {
+        const tenantMap = this.loadTenantMap();
+        const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
+        const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
+        return primary?.plan ?? DEFAULT_PLAN;
+    }
+
+    getModules(host: string): readonly StoreModule[] {
+        return PLAN_MODULES[this.getPlan(host)];
+    }
+
+    hasModule(host: string, module: StoreModule): boolean {
+        return this.getModules(host).includes(module);
     }
 
     /** Resolves a host to its frontend origin, or undefined if unknown. */

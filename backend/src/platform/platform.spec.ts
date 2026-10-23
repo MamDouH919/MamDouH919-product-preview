@@ -9,6 +9,7 @@ import { AuthenticationGuard } from '../guards/authentication.guard';
 import { PlatformAuthGuard } from '../guards/platform-auth.guard';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformTenantsService } from './platform-tenants.service';
+import { StoreModule, StorePlan } from '../common/tenant/store-plan';
 
 jest.setTimeout(120_000);
 
@@ -123,6 +124,21 @@ describe('Tenant registry', () => {
     await service.update('shop.test', { disabled: false });
     expect(tenants.getStoreHosts()).toContain('shop.test');
     expect(tenants.getHosts()).toContain('www.shop.test');
+  });
+
+  it('gives a new store every module, and changes its plan in place for it and its aliases', async () => {
+    expect(tenants.getPlan('legacy.test')).toBe(StorePlan.FULL);
+    expect((await service.list()).find((t) => t.host === 'shop.test')!.plan).toBe(StorePlan.FULL);
+
+    const view = await service.update('shop.test', { plan: StorePlan.CATALOG });
+    expect(view.plan).toBe(StorePlan.CATALOG);
+    expect(tenants.hasModule('shop.test', StoreModule.ORDERS)).toBe(false);
+    expect(tenants.hasModule('www.shop.test', StoreModule.ORDERS)).toBe(false);
+
+    await service.update('shop.test', { mongoUri: store('shop') });
+    expect(tenants.getPlan('shop.test')).toBe(StorePlan.CATALOG);
+    await service.update('shop.test', { plan: StorePlan.FULL });
+    expect(tenants.hasModule('shop.test', StoreModule.ORDERS)).toBe(true);
   });
 
   it('refuses to delete a store that still has aliases', async () => {

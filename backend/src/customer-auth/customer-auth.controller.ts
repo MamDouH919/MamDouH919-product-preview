@@ -24,9 +24,12 @@ import {
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
 import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
 import { Throttle } from '@nestjs/throttler';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type CustomerRequest = Request & { customerId?: string };
 
+@RequireModules(StoreModule.ORDERS)
 @Controller('customer-auth')
 export class CustomerAuthController {
   constructor(private readonly customerAuthService: CustomerAuthService) {}

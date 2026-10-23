@@ -14,6 +14,8 @@ import {
   ReverseRefundDto,
   UpdateRefundRulesDto,
 } from './dto/refund.dto';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type AdminRequest = Request & { userId?: string };
 
@@ -21,6 +23,7 @@ type AdminRequest = Request & { userId?: string };
  * Refunds have their own permissions, apart from order updates: who may ask
  * for one, who may approve it, and who may pay it out are separate actions.
  */
+@RequireModules(StoreModule.ORDERS, StoreModule.FINANCE)
 @Controller('finance')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class RefundsController {

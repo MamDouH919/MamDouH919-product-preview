@@ -7,7 +7,10 @@ import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { MoneyAccountsService } from './money-accounts.service';
 import { CreateMoneyAccountDto, TransferMoneyDto, UpdateMoneyAccountDto } from './dto/money-account.dto';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
+@RequireModules(StoreModule.FINANCE)
 @Controller('finance/money-accounts')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class MoneyAccountsController {

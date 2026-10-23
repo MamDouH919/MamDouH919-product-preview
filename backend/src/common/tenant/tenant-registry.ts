@@ -1,12 +1,14 @@
 import mongoose, { Connection, Model, Schema } from 'mongoose';
 import { decryptSecret, encryptSecret } from '../helpers/secret-box';
 import type { TenantConfig } from '../helpers/dynamic-connection';
+import { DEFAULT_PLAN, StorePlan } from './store-plan';
 
 /** One store as the platform dashboard sees it. `mongoUri` is plain text here. */
 export interface TenantRecord extends TenantConfig {
   host: string;
   /** A disabled store answers 404 everywhere, as if it weren't registered. */
   disabled: boolean;
+  plan: StorePlan;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -18,6 +20,8 @@ interface StoredTenant {
   frontendUrl: string;
   aliasOf?: string;
   disabled: boolean;
+  /** Missing on stores registered before plans existed; read as DEFAULT_PLAN. */
+  plan?: StorePlan;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +33,7 @@ const StoredTenantSchema = new Schema<StoredTenant>(
     frontendUrl: { type: String, required: true },
     aliasOf: { type: String },
     disabled: { type: Boolean, default: false },
+    plan: { type: String, enum: Object.values(StorePlan), default: DEFAULT_PLAN },
   },
   { timestamps: true, collection: 'tenants' },
 );
@@ -60,6 +65,7 @@ export class TenantRegistry {
       frontendUrl: doc.frontendUrl,
       ...(doc.aliasOf ? { aliasOf: doc.aliasOf } : {}),
       disabled: Boolean(doc.disabled),
+      plan: doc.plan ?? DEFAULT_PLAN,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     }));
@@ -87,7 +93,7 @@ export class TenantRegistry {
   /** Copies a TENANT_MAP / config.json map in — used once, into an empty registry. */
   async importMap(map: Record<string, TenantConfig>): Promise<void> {
     for (const [host, cfg] of Object.entries(map)) {
-      await this.create({ host, ...cfg, disabled: false });
+      await this.create({ host, ...cfg, plan: cfg.plan ?? DEFAULT_PLAN, disabled: false });
     }
   }
 

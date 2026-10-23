@@ -1,11 +1,21 @@
 const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3023').replace(/\/+$/, '');
 const TOKEN_KEY = 'platform-token';
 
+/** What a store is sold as. `catalog` shows products only; `full` adds online orders, stock and the books. */
+export type StorePlan = 'catalog' | 'full';
+
+export const PLAN_LABELS: Record<StorePlan, string> = {
+  full: 'Full shop',
+  catalog: 'Catalog only',
+};
+
 export interface Tenant {
   host: string;
   frontendUrl: string;
   aliasOf: string | null;
   disabled: boolean;
+  /** An alias's own plan is ignored: it serves its primary host's. */
+  plan: StorePlan;
   /** Connection string with credentials replaced by `***`. */
   database: string;
   connected: boolean;
@@ -18,6 +28,7 @@ export interface TenantInput {
   mongoUri: string;
   frontendUrl: string;
   aliasOf?: string;
+  plan?: StorePlan;
 }
 
 export interface TenantPatch {
@@ -25,6 +36,7 @@ export interface TenantPatch {
   frontendUrl?: string;
   aliasOf?: string | null;
   disabled?: boolean;
+  plan?: StorePlan;
 }
 
 export interface TenantCheck {

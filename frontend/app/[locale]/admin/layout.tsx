@@ -6,6 +6,7 @@ import { DashboardProvider } from "@/context/Dashboard";
 import Header from "@/layouts/Dashboard/Header";
 import Main from "@/layouts/Dashboard/Main";
 import NavDrawer from "@/layouts/Dashboard/NavDrawer";
+import ModuleRouteGate from "@/components/ModuleRouteGate";
 import { useAppSelector } from "@/Store/store";
 import { Box, CircularProgress, Stack } from "@mui/material";
 import { usePathname, useRouter } from "next/navigation";
@@ -54,7 +55,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
             height={isAdminDashboard ? "100%" : "calc(100% - 40px)"}
             overflow="auto"
           >
-            {children}
+            <ModuleRouteGate area="admin">{children}</ModuleRouteGate>
           </Stack>
         </Main>
       </Box>

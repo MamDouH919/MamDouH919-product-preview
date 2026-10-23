@@ -10,12 +10,14 @@ import {
   Button,
   CircularProgress,
   Divider,
+  FormControlLabel,
   Grid,
   IconButton,
   MenuItem,
   Paper,
   Select,
   Stack,
+  Switch,
   Tab,
   Tabs,
   TextField,
@@ -30,12 +32,13 @@ import { updateSettings } from "@/backend-api/settings/mutations";
 import { getBackendUri } from "@/utils/helperFunctions";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
-import { updateColor } from "@/Store/slices/settings";
+import { setSettings, updateColor } from "@/Store/slices/settings";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { SUPPORTED_COUNTRIES } from "@/backend-api/price-list/types";
 import { PRICE_LIST_QUERY_KEY, ZONES_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import config from "@/config.json";
 import RefundRulesCard from "@/features/Refund/RefundRulesCard";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 const SOCIAL_KEYS = ["FACEBOOK", "INSTAGRAM", "TWITTER", "LINKEDIN", "YOUTUBE", "TIKTOK", "WHATSAPP", "TELEGRAM"];
 
@@ -56,6 +59,7 @@ type SettingsFormValues = {
   primaryColor?: string;
   country: string;
   returnWindowDays: string;
+  showPrices: boolean;
 };
 
 const LANGS = config.app.languages as string[];
@@ -67,6 +71,9 @@ const SettingsPage = () => {
   const isSuper = useAppSelector((s) => s.auth.isSuper);
   const [activeTab, setActiveTab] = useState(0);
   const { data: settings, isLoading } = useSettingsQuery();
+  // Delivery, returns and refunds only mean something to a store that takes orders.
+  const { has } = useStoreModules();
+  const sells = has("orders");
 
   const { control, handleSubmit, reset, register, formState: { errors } } = useForm<SettingsFormValues>({
     defaultValues: {
@@ -84,6 +91,7 @@ const SettingsPage = () => {
       primaryColor: "#1976d2",
       country: "",
       returnWindowDays: "14",
+      showPrices: true,
     },
   });
 
@@ -118,6 +126,7 @@ const SettingsPage = () => {
         primaryColor: settings.primaryColor ?? "#1976d2",
         country: settings.country ?? "",
         returnWindowDays: String(settings.returnWindowDays ?? 14),
+        showPrices: settings.showPrices ?? true,
       });
     }
   }, [settings, reset]);
@@ -145,17 +154,19 @@ const SettingsPage = () => {
       if (data.address) formData.append("address", data.address);
       if (data.primaryColor) formData.append("primaryColor", data.primaryColor);
       // Only a super admin may set it; the server seeds the country's zones.
-      if (isSuper && data.country) formData.append("country", data.country);
-      if (data.returnWindowDays !== "") formData.append("returnWindowDays", data.returnWindowDays);
+      if (isSuper && sells && data.country) formData.append("country", data.country);
+      if (sells && data.returnWindowDays !== "") formData.append("returnWindowDays", data.returnWindowDays);
+      if (!sells) formData.append("showPrices", String(data.showPrices));
       (data.socialMedia ?? []).forEach((item, i) => {
         formData.append(`socialMedia[${i}][key]`, item.key);
         formData.append(`socialMedia[${i}][value]`, item.value);
       });
       return updateSettings(formData);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success(t("saveSuccessfully"));
       queryClient.invalidateQueries({ queryKey: [SETTINGS_QUERY_KEY] });
+      dispatch(setSettings({ showPrices: variables.showPrices }));
       queryClient.invalidateQueries({ queryKey: [ZONES_QUERY_KEY] });
       queryClient.invalidateQueries({ queryKey: [PRICE_LIST_QUERY_KEY] });
     },
@@ -271,60 +282,64 @@ const SettingsPage = () => {
               </Paper>
 
               {/* Delivery country */}
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  {t("deliveryCountry")}
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Controller
-                  name="country"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      select
-                      size="small"
-                      label={t("country")}
-                      value={field.value}
-                      onChange={field.onChange}
-                      helperText={t("deliveryCountryHint")}
-                      sx={{ maxWidth: 360 }}
-                      fullWidth
-                    >
-                      {SUPPORTED_COUNTRIES.map((code) => (
-                        <MenuItem key={code} value={code}>
-                          {t(`countries.${code}`)}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
-                />
-              </Paper>
+              {sells && (
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                    {t("deliveryCountry")}
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Controller
+                    name="country"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        select
+                        size="small"
+                        label={t("country")}
+                        value={field.value}
+                        onChange={field.onChange}
+                        helperText={t("deliveryCountryHint")}
+                        sx={{ maxWidth: 360 }}
+                        fullWidth
+                      >
+                        {SUPPORTED_COUNTRIES.map((code) => (
+                          <MenuItem key={code} value={code}>
+                            {t(`countries.${code}`)}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  />
+                </Paper>
+              )}
 
               {/* Returns */}
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  {t("returns")}
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Controller
-                  name="returnWindowDays"
-                  control={control}
-                  rules={{ validate: (v) => v === "" || (/^\d+$/.test(v) && Number(v) <= 365) }}
-                  render={({ field, fieldState }) => (
-                    <TextField
-                      {...field}
-                      type="number"
-                      size="small"
-                      label={t("returnWindowDays")}
-                      error={!!fieldState.error}
-                      helperText={t("returnWindowDaysHint")}
-                      slotProps={{ htmlInput: { min: 0, max: 365 } }}
-                      sx={{ maxWidth: 360 }}
-                      fullWidth
-                    />
-                  )}
-                />
-              </Paper>
+              {sells && (
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                    {t("returns")}
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Controller
+                    name="returnWindowDays"
+                    control={control}
+                    rules={{ validate: (v) => v === "" || (/^\d+$/.test(v) && Number(v) <= 365) }}
+                    render={({ field, fieldState }) => (
+                      <TextField
+                        {...field}
+                        type="number"
+                        size="small"
+                        label={t("returnWindowDays")}
+                        error={!!fieldState.error}
+                        helperText={t("returnWindowDaysHint")}
+                        slotProps={{ htmlInput: { min: 0, max: 365 } }}
+                        sx={{ maxWidth: 360 }}
+                        fullWidth
+                      />
+                    )}
+                  />
+                </Paper>
+              )}
 
               {/* Appearance */}
               <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
@@ -385,6 +400,31 @@ const SettingsPage = () => {
                 />
               </Paper>
             </>
+          )}
+
+          {/* Storefront — a store that takes no orders may sell on enquiry, without prices */}
+          {!sells && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("storefront")}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Controller
+                name="showPrices"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                    label={
+                      <Stack>
+                        <Typography variant="body2" fontWeight={600}>{t("showPrices")}</Typography>
+                        <Typography variant="caption" color="text.secondary">{t("showPricesHint")}</Typography>
+                      </Stack>
+                    }
+                  />
+                )}
+              />
+            </Paper>
           )}
 
           {/* Contact Info — visible to all admins */}
@@ -466,7 +506,7 @@ const SettingsPage = () => {
       </Box>
 
       {/* Its own card and save: refund rules are finance settings, not part of this form. */}
-      {isSuper && <RefundRulesCard />}
+      {isSuper && sells && has("finance") && <RefundRulesCard />}
     </Stack>
   );
 };

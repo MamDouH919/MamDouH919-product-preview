@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 import { CartReminderWorker } from './cart-reminder.worker';
+import { StoreModule } from '../common/tenant/store-plan';
 
 const MINUTE = 60_000;
 
@@ -51,6 +52,7 @@ export class CartReminderScheduler implements OnApplicationBootstrap, OnModuleDe
 
     try {
       for (const host of this.tenants.getStoreHosts()) {
+        if (!this.tenants.hasModule(host, StoreModule.ORDERS)) continue;
         try {
           const contextId = ContextIdFactory.create();
           this.moduleRef.registerRequestByContextId({ hostname: host, tenant: host }, contextId);

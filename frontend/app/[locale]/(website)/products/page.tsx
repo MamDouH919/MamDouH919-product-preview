@@ -12,6 +12,7 @@ import { ShoppingBag, SlidersHorizontal, X, ChevronRight, Search, LayoutGrid, Ar
 import CustomLink from "@/components/CustomLink"
 import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard"
 import { getBackendUri } from "@/utils/helperFunctions"
+import { useStoreModules } from "@/Hooks/useStoreModules"
 import { useCurrency } from "@/Hooks/useCurrency"
 import { useTheme, alpha } from "@mui/material/styles"
 import Image from "next/image"
@@ -106,20 +107,27 @@ interface FilterPanelProps {
   onPriceChange: (min: string, max: string) => void
   inStock: boolean
   onInStockChange: (value: boolean) => void
+  /** Off when the store hides prices or keeps no stock; the filter would mean nothing. */
+  showPrice: boolean
+  showStock: boolean
   t: T
 }
 
-function FilterPanel({ minPrice, maxPrice, onPriceChange, inStock, onInStockChange, t }: FilterPanelProps) {
+function FilterPanel({ minPrice, maxPrice, onPriceChange, inStock, onInStockChange, showPrice, showStock, t }: FilterPanelProps) {
   return (
     <div className="flex flex-col divide-y divide-gray-100">
-      <section className="pb-5">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">{t("price")}</h3>
-        <PriceFilter minPrice={minPrice} maxPrice={maxPrice} onApply={onPriceChange} t={t} />
-      </section>
-      <section className="pt-5">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">{t("availability")}</h3>
-        <Toggle checked={inStock} onChange={onInStockChange} label={t("inStockOnly")} />
-      </section>
+      {showPrice && (
+        <section className="pb-5 last:pb-0">
+          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t("price")}</h3>
+          <PriceFilter minPrice={minPrice} maxPrice={maxPrice} onApply={onPriceChange} t={t} />
+        </section>
+      )}
+      {showStock && (
+        <section className="pt-5 first:pt-0">
+          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t("availability")}</h3>
+          <Toggle checked={inStock} onChange={onInStockChange} label={t("inStockOnly")} />
+        </section>
+      )}
     </div>
   )
 }
@@ -190,6 +198,7 @@ function CategoryStrip({
 }
 
 const SORTS: ProductSort[] = ["featured", "newest", "price_asc", "price_desc"]
+const UNPRICED_SORTS: ProductSort[] = ["featured", "newest"]
 
 function ProductsPageContent() {
   const { t, i18n } = useTranslation()
@@ -200,16 +209,21 @@ function ProductsPageContent() {
   const searchParams = useSearchParams()
   const currency = useCurrency()
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const { has, showPrices } = useStoreModules()
+  const showStock = has("inventory")
+  const hasFilterPanel = showPrices || showStock
+  const sorts = showPrices ? SORTS : UNPRICED_SORTS
 
   // The URL is the source of truth, so a filtered view can be shared or bookmarked.
   const q = searchParams.get("q") ?? ""
   const selectedCategoryId = searchParams.get("category") ?? undefined
   const selectedSubCategoryId = searchParams.get("sub") ?? undefined
-  const minPrice = searchParams.get("min") ?? ""
-  const maxPrice = searchParams.get("max") ?? ""
-  const inStock = searchParams.get("stock") === "1"
+  // A filter the store doesn't offer is ignored, even in an old shared link.
+  const minPrice = showPrices ? searchParams.get("min") ?? "" : ""
+  const maxPrice = showPrices ? searchParams.get("max") ?? "" : ""
+  const inStock = showStock && searchParams.get("stock") === "1"
   const sortParam = searchParams.get("sort") as ProductSort | null
-  const sort: ProductSort = sortParam && SORTS.includes(sortParam) ? sortParam : "featured"
+  const sort: ProductSort = sortParam && sorts.includes(sortParam) ? sortParam : "featured"
 
   const setParams = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(searchParams.toString())
@@ -296,6 +310,8 @@ function ProductsPageContent() {
     },
     inStock,
     onInStockChange: (value) => setParams({ stock: value ? "1" : undefined }),
+    showPrice: showPrices,
+    showStock,
     t,
   }
 
@@ -425,7 +441,7 @@ function ProductsPageContent() {
 
         <div className="mt-8 flex gap-8">
           {/* Filters – desktop */}
-          <aside className="hidden w-64 shrink-0 lg:block">
+          <aside className={hasFilterPanel ? "hidden w-64 shrink-0 lg:block" : "hidden"}>
             <div className="sticky top-24 rounded-2xl bg-white p-5 ring-1 ring-black/5">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
@@ -459,19 +475,21 @@ function ProductsPageContent() {
               )}
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMobileFilterOpen(true)}
-                  className="relative flex h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-sm font-medium text-gray-700 ring-1 ring-black/10 transition hover:ring-(--primary-30) lg:hidden"
-                >
-                  <SlidersHorizontal className="h-4 w-4" />
-                  {t("filters")}
-                  {panelFilterCount > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-(--primary) px-1 text-[11px] font-semibold text-white">
-                      {panelFilterCount}
-                    </span>
-                  )}
-                </button>
+                {hasFilterPanel && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileFilterOpen(true)}
+                    className="relative flex h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-sm font-medium text-gray-700 ring-1 ring-black/10 transition hover:ring-(--primary-30) lg:hidden"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    {t("filters")}
+                    {panelFilterCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-(--primary) px-1 text-[11px] font-semibold text-white">
+                        {panelFilterCount}
+                      </span>
+                    )}
+                  </button>
+                )}
 
                 <label className="relative flex h-10 items-center rounded-xl bg-white ring-1 ring-black/10 transition focus-within:ring-(--primary)">
                   <ArrowUpDown className="pointer-events-none absolute start-3 h-4 w-4 text-gray-400" />
@@ -483,7 +501,7 @@ function ProductsPageContent() {
                     aria-label={t("sortBy")}
                     className="h-full cursor-pointer appearance-none rounded-xl bg-transparent pe-9 ps-9 text-sm font-medium text-gray-700 outline-none"
                   >
-                    {SORTS.map((value) => (
+                    {sorts.map((value) => (
                       <option key={value} value={value}>
                         {t(`sort.${value}`)}
                       </option>

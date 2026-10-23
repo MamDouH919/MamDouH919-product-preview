@@ -5,10 +5,13 @@ import { CartService } from './cart.service';
 import { CartRemindersOptOutDto, SaveCartDto } from './dto/cart.dto';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
 import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type CustomerRequest = Request & { customerId?: string };
 
 /** The signed-in customer's saved basket. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('customers/me/cart')
 @UseGuards(CustomerAuthGuard)
 export class CartController {
@@ -26,6 +29,7 @@ export class CartController {
 }
 
 /** Public: the "stop these emails" link in a cart reminder. The token is the authorisation. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('cart-reminders')
 export class CartRemindersController {
   constructor(private readonly cartService: CartService) {}

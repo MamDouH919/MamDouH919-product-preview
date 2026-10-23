@@ -17,14 +17,26 @@ import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { parseNestedBody } from '../common/helpers/parse-nested-body';
+import { TenantConnectionService } from '../common/helpers/dynamic-connection';
+import type { Request } from 'express';
 
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly tenants: TenantConnectionService,
+  ) {}
 
+  /** Public. Carries the store's plan, which the storefront and dashboard shape themselves around. */
   @Get()
-  get() {
-    return this.settingsService.get();
+  async get(@Req() req: Request) {
+    const setting = await this.settingsService.get();
+    const host: string = req['tenant'] ?? req.hostname;
+    return {
+      ...setting.toJSON(),
+      plan: this.tenants.getPlan(host),
+      modules: this.tenants.getModules(host),
+    };
   }
 
   // A role decides who may change the store's settings, as for mail settings —

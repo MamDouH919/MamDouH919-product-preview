@@ -14,7 +14,10 @@ import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
+@RequireModules(StoreModule.INVENTORY)
 @Controller('inventory')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class InventoryController {

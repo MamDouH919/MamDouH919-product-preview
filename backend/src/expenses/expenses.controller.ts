@@ -7,9 +7,12 @@ import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto, QueryExpensesDto, ReverseExpenseDto } from './dto/expense.dto';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type AdminRequest = Request & { userId?: string };
 
+@RequireModules(StoreModule.FINANCE)
 @Controller('finance/expenses')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class ExpensesController {

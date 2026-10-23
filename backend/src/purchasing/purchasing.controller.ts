@@ -15,10 +15,13 @@ import {
   UpdatePurchaseDto,
   UpdateSupplierDto,
 } from './dto/purchasing.dto';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type AdminRequest = Request & { userId?: string };
 
 /** Buying stock. Drafts are edited freely; posting, returning and paying move stock and money (`execute`). */
+@RequireModules(StoreModule.INVENTORY, StoreModule.FINANCE)
 @Controller('finance')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class PurchasingController {

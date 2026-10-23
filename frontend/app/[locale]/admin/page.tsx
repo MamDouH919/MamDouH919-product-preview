@@ -31,6 +31,7 @@ import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import type { LocalizedField } from "@/backend-api/globalTypes";
 import SalesOverview from "@/features/Dashboard/SalesOverview";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +173,7 @@ const Dashboard = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const dispatch = useAppDispatch();
+  const { has } = useStoreModules();
 
   const { data: banners, isLoading: loadingBanners } = useBannersQuery();
   const { data: products, isLoading: loadingProducts } = useProductsQuery();
@@ -262,7 +264,7 @@ const Dashboard = () => {
   return (
     <Container maxWidth="xl" disableGutters>
       <Stack spacing={4}>
-        <SalesOverview />
+        {has("orders") && <SalesOverview />}
 
         <Typography variant="h6" fontWeight={800}>
           {t("catalogOverview")}

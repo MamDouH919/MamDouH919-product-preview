@@ -3,6 +3,7 @@ import ProductDetailClient from "./_ProductDetailClient"
 import type { Product } from "@/backend-api/products/types"
 import { fetchBackend, isoCurrency, languageAlternates, requestBackendUrl, requestOrigin } from "@/lib/seo"
 import { withBackend } from "@/lib/getBackendUrl"
+import { ALL_MODULES, type StoreModule } from "@/lib/storeModules"
 
 interface PageProps {
   params: Promise<{ slug: string; locale: string }>
@@ -21,7 +22,12 @@ function plainText(html: string): string {
 // Same URL and revalidate in metadata and page, so Next makes the request once.
 const getProduct = (slug: string) => fetchBackend<Product>(`/products/slug/${encodeURIComponent(slug)}`, 60)
 
-type PublicSettings = { currency?: Record<string, string | undefined>; country?: string }
+type PublicSettings = {
+  currency?: Record<string, string | undefined>
+  country?: string
+  showPrices?: boolean
+  modules?: StoreModule[]
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug: rawSlug, locale } = await params
@@ -80,10 +86,13 @@ async function ProductJsonLd({ slug, locale }: { slug: string; locale: string })
   const name = loc(product.name, locale)
   const currency = isoCurrency(settings)
 
+  // Same rules as the storefront: a store without orders may hide prices, and one without stock has none to run out of.
+  const modules = settings?.modules ?? ALL_MODULES
+  const showPrices = modules.includes("orders") || settings?.showPrices !== false
   const variantPrices = (product.variants ?? []).map((v) => v.price).filter((p): p is number => p != null)
-  const prices = variantPrices.length ? variantPrices : product.price != null ? [product.price] : []
+  const prices = !showPrices ? [] : variantPrices.length ? variantPrices : product.price != null ? [product.price] : []
   const stock = product.totalStock ?? product.stock ?? 0
-  const inStock = !product.trackStock || product.allowBackorder || stock > 0
+  const inStock = !modules.includes("inventory") || !product.trackStock || product.allowBackorder || stock > 0
   const availability = `https://schema.org/${inStock ? "InStock" : "OutOfStock"}`
 
   // No offer at all rather than one with a guessed currency.

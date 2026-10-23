@@ -1,4 +1,5 @@
 import { LocalizedField } from "../globalTypes";
+import type { StoreModule, StorePlan } from "@/lib/storeModules";
 
 export type SocialMediaItem = {
   key: string;
@@ -29,6 +30,11 @@ export type Setting = {
   /** Days after delivery a customer may request a return; 0 turns customer requests off. */
   returnWindowDays?: number;
   bannerStyle?: BannerStyle;
+  /** Whether the storefront shows prices; only a store without online orders may turn it off. */
+  showPrices?: boolean;
+  /** Set by the platform, not the store: what the store is sold as, and the modules that come with it. */
+  plan?: StorePlan;
+  modules?: StoreModule[];
 };
 
 export type MailEncryption = "ssl" | "starttls" | "none";

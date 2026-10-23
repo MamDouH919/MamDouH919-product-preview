@@ -29,6 +29,8 @@ const GetSettings = ({ children }: { children: React.ReactNode }) => {
                     email: settings.email,
                     address: settings.address,
                     socialMedia: settings.socialMedia as any,
+                    showPrices: settings.showPrices,
+                    modules: settings.modules,
                 }));
             })
             .catch(() => null)

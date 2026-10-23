@@ -168,6 +168,10 @@ export class Setting extends Document {
 
   @Prop({ type: String, enum: BannerStyle, default: BannerStyle.PEEK })
   bannerStyle!: BannerStyle;
+
+  /** Whether the storefront shows prices. Off suits a showcase store that quotes on WhatsApp. */
+  @Prop({ default: true })
+  showPrices!: boolean;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

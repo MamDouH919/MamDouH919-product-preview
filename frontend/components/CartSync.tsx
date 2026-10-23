@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { CartItem, hydrateCart } from "@/Store/slices/cart";
 import { fetchSavedCart, saveCart } from "@/backend-api/cart/queries";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 // localStorage is per origin, and every tenant has its own host — so each
 // storefront keeps its own cart without any tenant key in the name.
@@ -30,6 +31,11 @@ const readCart = (): CartItem[] => {
  * follows them to another device and an abandoned one can be followed up.
  */
 const CartSync = () => {
+  const { has } = useStoreModules();
+  return has("orders") ? <CartSyncInner /> : null;
+};
+
+const CartSyncInner = () => {
   const dispatch = useAppDispatch();
   const { i18n } = useTranslation();
   const { items, couponCode, hydrated } = useAppSelector((state) => state.cart);

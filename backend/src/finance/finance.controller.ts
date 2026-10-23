@@ -9,10 +9,13 @@ import { PaymentsService } from './payments.service';
 import { FinanceReportsService } from './finance-reports.service';
 import { ReconciliationService } from './reconciliation.service';
 import { FinanceSummaryQueryDto, RecordCollectionDto, VoidCollectionDto, WriteOffDto } from './dto/finance.dto';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type AdminRequest = Request & { userId?: string };
 
 /** The store's books. Every route acts on the request's own store only. */
+@RequireModules(StoreModule.FINANCE)
 @Controller('finance')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class FinanceController {

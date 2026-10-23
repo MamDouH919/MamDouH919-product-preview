@@ -19,6 +19,7 @@ import Image from "next/image";
 import { LogoWrapper } from "@/utils/global.style";
 import CustomLink from "@/components/CustomLink";
 import { useAppSelector } from "@/Store/store";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 import { getBackendUri } from "@/utils/helperFunctions";
 import LanguageIcon from "@/components/LanguageIcon";
 import AccountMenu from "@/components/AccountMenu";
@@ -203,6 +204,7 @@ const Navbar = () => {
   const [mobileCatsOpen, setMobileCatsOpen] = useState(false);
 
   const { logo } = useAppSelector((state) => state.settings);
+  const { has } = useStoreModules();
   const { data: categoriesData } = useCategoriesQuery();
   const categories = (categoriesData ?? [])
     .filter((c) => c.isActive)
@@ -331,8 +333,12 @@ const Navbar = () => {
                 <Box sx={{ display: { xs: "none", sm: "block" } }}>
                   <LanguageIcon />
                 </Box>
-                <CartButton />
-                <AccountMenu />
+                {has("orders") && (
+                  <>
+                    <CartButton />
+                    <AccountMenu />
+                  </>
+                )}
                 <IconButton
                   onClick={() => setMobileOpen((o) => !o)}
                   aria-label={mobileOpen ? "close menu" : "open menu"}

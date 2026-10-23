@@ -41,6 +41,7 @@ import { useSubCategoriesQuery } from "@/backend-api/sub-categories/hooks";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 import { getBackendUrl } from "@/lib/getBackendUrl";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 type ImageItem = { file: File | string | null };
 
@@ -82,6 +83,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
   const lang = i18n.language;
 
   const isEditing = !!defaultData;
+  // Without the inventory module there is no stock to count, so its fields go.
+  const { has } = useStoreModules();
+  const tracksInventory = has("inventory");
 
   const { data: categories = [] } = useCategoriesQuery();
 
@@ -167,13 +171,19 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         );
       }
 
-      formData.append("trackStock", String(data.trackStock));
-      formData.append("allowBackorder", String(data.allowBackorder));
-      formData.append("lowStockThreshold", String(Number(data.lowStockThreshold) || 0));
-      // Opening stock only exists at creation — afterwards stock moves through
-      // the inventory ledger, never through this form.
-      if (!isEditing && !data.variants?.length) {
-        formData.append("stock", String(Number(data.stock) || 0));
+      if (tracksInventory) {
+        formData.append("trackStock", String(data.trackStock));
+        formData.append("allowBackorder", String(data.allowBackorder));
+        formData.append("lowStockThreshold", String(Number(data.lowStockThreshold) || 0));
+        // Opening stock only exists at creation — afterwards stock moves through
+        // the inventory ledger, never through this form.
+        if (!isEditing && !data.variants?.length) {
+          formData.append("stock", String(Number(data.stock) || 0));
+        }
+      } else if (!isEditing) {
+        // Untracked, so the storefront never shows it sold out; an edit leaves
+        // whatever was set while the store had stock.
+        formData.append("trackStock", "false");
       }
 
       if (data.price) formData.append("price", data.price);
@@ -212,6 +222,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
   const trackStock = watch("trackStock");
   const hasVariants = variantFields.length > 0;
+  const variantColumn = tracksInventory ? 3 : 4;
 
   return (
     <Box component="form" onSubmit={handleSubmit((data) => mutation.mutate(data))}>
@@ -406,7 +417,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                 <Paper key={field.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                   <Stack direction="row" spacing={1} alignItems="flex-start">
                     <Grid container spacing={2} sx={{ flex: 1 }}>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: variantColumn }}>
                         <TextInputComponent
                           name={`variants.${index}.label`}
                           label={t("label")}
@@ -414,7 +425,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                           required
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: variantColumn }}>
                         <TextInputComponent
                           name={`variants.${index}.price`}
                           label={t("price")}
@@ -422,23 +433,25 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                           type="number"
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Grid size={{ xs: 12, sm: tracksInventory ? 6 : 12, md: variantColumn }}>
                         <TextInputComponent
                           name={`variants.${index}.sku`}
                           label={t("sku")}
                           control={control}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <TextInputComponent
-                          name={`variants.${index}.stock`}
-                          label={field._id ? t("currentStock") : t("openingStock")}
-                          control={control}
-                          type="number"
-                          readOnly={!!field._id}
-                          helperText={field._id ? t("stockEditedInInventory") : undefined}
-                        />
-                      </Grid>
+                      {tracksInventory && (
+                        <Grid size={{ xs: 12, sm: 6, md: variantColumn }}>
+                          <TextInputComponent
+                            name={`variants.${index}.stock`}
+                            label={field._id ? t("currentStock") : t("openingStock")}
+                            control={control}
+                            type="number"
+                            readOnly={!!field._id}
+                            helperText={field._id ? t("stockEditedInInventory") : undefined}
+                          />
+                        </Grid>
+                      )}
                     </Grid>
                     <Tooltip title={t("delete")}>
                       <IconButton color="error" onClick={() => removeVariant(index)}>
@@ -453,58 +466,60 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         </FormSection>
 
         {/* ── 6. Inventory ── */}
-        <FormSection step={6} title={t("inventory")} hint={t("productInventoryHint")}>
-          <Stack spacing={2}>
-            <SwitchField
-              checked={trackStock}
-              onChange={(v) => setValue("trackStock", v)}
-              label={t("trackStock")}
-              hint={t("trackStockHint")}
-            />
+        {tracksInventory && (
+          <FormSection step={6} title={t("inventory")} hint={t("productInventoryHint")}>
+            <Stack spacing={2}>
+              <SwitchField
+                checked={trackStock}
+                onChange={(v) => setValue("trackStock", v)}
+                label={t("trackStock")}
+                hint={t("trackStockHint")}
+              />
 
-            {trackStock && (
-              <>
-                <Grid container spacing={2}>
-                  {/* With variants, stock lives per variant — there is nothing
-                      meaningful to type here. */}
-                  {!hasVariants && (
+              {trackStock && (
+                <>
+                  <Grid container spacing={2}>
+                    {/* With variants, stock lives per variant — there is nothing
+                        meaningful to type here. */}
+                    {!hasVariants && (
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextInputComponent
+                          name="stock"
+                          label={isEditing ? t("currentStock") : t("openingStock")}
+                          control={control}
+                          type="number"
+                          readOnly={isEditing}
+                          helperText={isEditing ? t("stockEditedInInventory") : t("openingStockHint")}
+                        />
+                      </Grid>
+                    )}
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextInputComponent
-                        name="stock"
-                        label={isEditing ? t("currentStock") : t("openingStock")}
+                        name="lowStockThreshold"
+                        label={t("lowStockThreshold")}
                         control={control}
                         type="number"
-                        readOnly={isEditing}
-                        helperText={isEditing ? t("stockEditedInInventory") : t("openingStockHint")}
+                        helperText={t("lowStockThresholdHint")}
                       />
                     </Grid>
-                  )}
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextInputComponent
-                      name="lowStockThreshold"
-                      label={t("lowStockThreshold")}
-                      control={control}
-                      type="number"
-                      helperText={t("lowStockThresholdHint")}
-                    />
                   </Grid>
-                </Grid>
 
-                {hasVariants && <Alert severity="info">{t("stockPerVariantHint")}</Alert>}
+                  {hasVariants && <Alert severity="info">{t("stockPerVariantHint")}</Alert>}
 
-                <SwitchField
-                  checked={watch("allowBackorder")}
-                  onChange={(v) => setValue("allowBackorder", v)}
-                  label={t("allowBackorder")}
-                  hint={t("allowBackorderHint")}
-                />
-              </>
-            )}
-          </Stack>
-        </FormSection>
+                  <SwitchField
+                    checked={watch("allowBackorder")}
+                    onChange={(v) => setValue("allowBackorder", v)}
+                    label={t("allowBackorder")}
+                    hint={t("allowBackorderHint")}
+                  />
+                </>
+              )}
+            </Stack>
+          </FormSection>
+        )}
 
         {/* ── 7. Visibility, order & slug ── */}
-        <FormSection step={7} title={t("productVisibility")} hint={t("productVisibilityHint")}>
+        <FormSection step={tracksInventory ? 7 : 6} title={t("productVisibility")} hint={t("productVisibilityHint")}>
           <Stack spacing={2}>
             <SwitchField
               checked={watch("isActive")}

@@ -91,4 +91,9 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsIn(Object.values(BannerStyle))
   bannerStyle?: BannerStyle;
+
+  // Arrives as the form-data string "true" or "false".
+  @IsOptional()
+  @IsIn([true, false, 'true', 'false'])
+  showPrices?: boolean | 'true' | 'false';
 }

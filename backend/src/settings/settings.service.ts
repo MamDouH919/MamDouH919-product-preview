@@ -72,6 +72,12 @@ export class SettingsService {
     if (dto.bannerStyle !== undefined && !Object.values(BannerStyle).includes(dto.bannerStyle)) {
       throw new BadRequestException(`Unknown banner style "${dto.bannerStyle}"`);
     }
+    if (dto.showPrices !== undefined) {
+      if (!['true', 'false'].includes(String(dto.showPrices))) {
+        throw new BadRequestException('showPrices must be true or false');
+      }
+      dto.showPrices = String(dto.showPrices) === 'true';
+    }
 
     let seedCountry: string | undefined;
     if (dto.country !== undefined) {

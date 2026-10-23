@@ -16,11 +16,14 @@ import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 /**
  * Admin management only. Shoppers apply a code through `POST /orders/quote`,
  * so there is no public endpoint that confirms whether a code exists.
  */
+@RequireModules(StoreModule.ORDERS)
 @Controller('coupons')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class CouponsController {

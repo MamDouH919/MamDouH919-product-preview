@@ -38,7 +38,7 @@ import PauseCircleOutlined from '@mui/icons-material/PauseCircleOutlined';
 import PlayCircleOutlined from '@mui/icons-material/PlayCircleOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import OpenInNew from '@mui/icons-material/OpenInNew';
-import { ApiError, type Tenant } from '../api';
+import { ApiError, PLAN_LABELS, type Tenant } from '../api';
 import { useDeleteTenant, useTenants, useUpdateTenant } from '../hooks/useTenants';
 import { TenantFormDialog } from '../components/TenantFormDialog';
 import { CheckDialog } from '../components/CheckDialog';
@@ -243,7 +243,16 @@ export function TenantsPage() {
                   <TableCell>
                     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                       <StatusChip tenant={t} tenants={all} />
-                      {t.aliasOf && <Chip size="small" variant="outlined" label={`Alias of ${t.aliasOf}`} />}
+                      {t.aliasOf ? (
+                        <Chip size="small" variant="outlined" label={`Alias of ${t.aliasOf}`} />
+                      ) : (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          color={t.plan === 'catalog' ? 'default' : 'primary'}
+                          label={PLAN_LABELS[t.plan]}
+                        />
+                      )}
                     </Stack>
                   </TableCell>
                   <TableCell>

@@ -16,6 +16,7 @@ import {
 import { createReview, deleteMyReview, updateMyReview } from "@/backend-api/reviews/mutations"
 import { MyReview, RatingSummary } from "@/backend-api/reviews/types"
 import Stars from "./Stars"
+import { useStoreModules } from "@/Hooks/useStoreModules"
 
 const PAGE_SIZE = 5
 
@@ -255,8 +256,14 @@ export default function ProductReviews({ productId }: { productId: string }) {
   const lang = i18n.language
   const [page, setPage] = useState(1)
   const { data, isLoading } = useProductReviewsQuery(productId, page, PAGE_SIZE)
+  // Reviews come from customers who bought the product; a store that takes no
+  // orders shows the ones it already has and nothing to write one with.
+  const { has } = useStoreModules()
+  const canWrite = has("orders")
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
+
+  if (!canWrite && !data?.summary.count) return null
 
   return (
     <section id="reviews" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8 mb-16 scroll-mt-24">
@@ -273,8 +280,12 @@ export default function ProductReviews({ productId }: { productId: string }) {
         <p className="text-gray-500">{t("noReviewsYet")}</p>
       )}
 
-      <div className="border-t border-gray-100 my-6" />
-      <MyReviewPanel productId={productId} />
+      {canWrite && (
+        <>
+          <div className="border-t border-gray-100 my-6" />
+          <MyReviewPanel productId={productId} />
+        </>
+      )}
 
       {data && data.data.length > 0 && (
         <>

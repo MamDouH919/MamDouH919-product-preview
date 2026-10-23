@@ -6,6 +6,7 @@ import SocialIcons from '@/components/SocialIcons';
 import ScrollToTop from '@/components/ScrollToTop';
 import GetCustomerLogged from '@/components/GetCustomerLogged';
 import CartSync from '@/components/CartSync';
+import ModuleRouteGate from '@/components/ModuleRouteGate';
 
 export default function Layout({
   children,
@@ -27,7 +28,7 @@ export default function Layout({
       <Navbar />
       <SocialIcons />
       <Box component="main" sx={{ flexGrow: 1, pt: { xs: 10, md: 12 } }}>
-        {children}
+        <ModuleRouteGate area="website">{children}</ModuleRouteGate>
       </Box>
       <Footer />
     </Box>

@@ -17,6 +17,7 @@ import PhoneOutlined from '@mui/icons-material/PhoneOutlined';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import WhatsApp from '@mui/icons-material/WhatsApp';
 import { useAppSelector } from '@/Store/store';
+import { useStoreModules } from '@/Hooks/useStoreModules';
 import { getBackendUri, getLocalizedString } from '@/utils/helperFunctions';
 import { useSettingsQuery } from '@/backend-api/settings/hooks';
 import { useCategoriesQuery } from '@/backend-api/categories/hooks';
@@ -94,6 +95,7 @@ const Footer = () => {
   const lang = i18n.language;
 
   const { logo } = useAppSelector((state) => state.settings);
+  const { has } = useStoreModules();
   const { data: settings } = useSettingsQuery();
   const { data: categories } = useCategoriesQuery();
   const { data: navPages } = usePagesNavigationQuery();
@@ -118,7 +120,7 @@ const Footer = () => {
     ...(navPages ?? [])
       .filter((p) => p.showInFooter)
       .map((p) => ({ href: `/${p.slug}`, label: getLocalizedString(p.title, lang) })),
-    { href: '/track', label: t('trackOrder') },
+    ...(has('orders') ? [{ href: '/track', label: t('trackOrder') }] : []),
     { href: '/contact', label: t('contactUs') },
   ];
 

@@ -3,6 +3,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   IsUrl,
@@ -10,6 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { StorePlan } from '../../common/tenant/store-plan';
 
 /** A bare hostname: lower-case labels, no port, no scheme. */
 const HOST_PATTERN = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
@@ -41,6 +43,11 @@ export class CreateTenantDto {
   @Transform(lowerTrim)
   @Matches(HOST_PATTERN)
   aliasOf?: string;
+
+  @ApiPropertyOptional({ enum: StorePlan, description: 'Left out means full. Ignored on an alias, which follows its primary host' })
+  @IsOptional()
+  @IsEnum(StorePlan)
+  plan?: StorePlan;
 }
 
 export class UpdateTenantDto {
@@ -66,6 +73,11 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsBoolean()
   disabled?: boolean;
+
+  @ApiPropertyOptional({ enum: StorePlan, description: 'Turning features off hides their data; nothing is deleted' })
+  @IsOptional()
+  @IsEnum(StorePlan)
+  plan?: StorePlan;
 }
 
 export class SeedUserDto {

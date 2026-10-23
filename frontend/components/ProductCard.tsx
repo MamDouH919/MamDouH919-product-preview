@@ -11,6 +11,7 @@ import CustomLink from "@/components/CustomLink"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
 import QuickAddDialog from "@/features/Cart/QuickAddDialog"
+import { useStoreModules } from "@/Hooks/useStoreModules"
 import Image from "next/image"
 
 function localizedField(field: Record<string, string | undefined> | undefined, lang: string) {
@@ -23,6 +24,9 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
   const theme = useTheme()
   const currency = useCurrency()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  // A catalog store takes no orders, so it has no cart, wishlist or stock to show.
+  const { has, showPrices } = useStoreModules()
+  const sells = has("orders")
 
   const name = localizedField(product.name, lang)
   const categoryName = localizedField(product.category?.name, lang)
@@ -36,7 +40,7 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
   const visibleVariants = variants.slice(0, 3)
   const extraVariantCount = variants.length - visibleVariants.length
 
-  const limited = product.trackStock && !product.allowBackorder
+  const limited = has("inventory") && product.trackStock && !product.allowBackorder
   const stock = product.totalStock ?? (variants.length ? variants.reduce((s, v) => s + (v.stock ?? 0), 0) : product.stock)
   const soldOut = limited && (stock ?? 0) <= 0
   const canQuickAdd = !soldOut && displayPrice != null
@@ -107,7 +111,7 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
         </div>
 
         <div className="flex shrink-0 flex-col gap-2">
-          <WishlistButton productId={product._id} />
+          {sells && <WishlistButton productId={product._id} />}
           <WhatsAppButton slug={product.slug} productName={name} className="h-9! w-9! shadow-md" />
         </div>
       </div>
@@ -145,36 +149,42 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
           </span>
         )}
 
-        <div className="flex items-end justify-between gap-3">
-          <div className="flex min-w-0 flex-col leading-none">
-            {variants.length > 1 && displayPrice != null && (
-              <span className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/55">{t("from")}</span>
+        {(showPrices || sells) && (
+          <div className="flex items-end justify-between gap-3">
+            {showPrices && (
+              <div className="flex min-w-0 flex-col leading-none">
+                {variants.length > 1 && displayPrice != null && (
+                  <span className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/55">{t("from")}</span>
+                )}
+                {displayPrice != null ? (
+                  <span className="flex items-baseline gap-1 text-white">
+                    <span className="text-xl font-extrabold tabular-nums tracking-tight">{displayPrice.toLocaleString()}</span>
+                    <span className="text-[11px] font-medium text-white/60">{currency}</span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-white/40">—</span>
+                )}
+              </div>
             )}
-            {displayPrice != null ? (
-              <span className="flex items-baseline gap-1 text-white">
-                <span className="text-xl font-extrabold tabular-nums tracking-tight">{displayPrice.toLocaleString()}</span>
-                <span className="text-[11px] font-medium text-white/60">{currency}</span>
-              </span>
-            ) : (
-              <span className="text-sm text-white/40">—</span>
+
+            {/* Only color and transform animate here — no width/padding changes, so hover never triggers layout */}
+            {sells && (
+              <button
+                type="button"
+                onClick={() => setQuickAddOpen(true)}
+                disabled={!canQuickAdd}
+                aria-label={t("addToCart")}
+                title={t("addToCart")}
+                className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-neutral-900 shadow-lg transition-[background-color,color,transform] duration-200 hover:scale-105 group-hover:bg-(--primary) group-hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"
+              >
+                <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.25} />
+              </button>
             )}
           </div>
-
-          {/* Only color and transform animate here — no width/padding changes, so hover never triggers layout */}
-          <button
-            type="button"
-            onClick={() => setQuickAddOpen(true)}
-            disabled={!canQuickAdd}
-            aria-label={t("addToCart")}
-            title={t("addToCart")}
-            className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-neutral-900 shadow-lg transition-[background-color,color,transform] duration-200 hover:scale-105 group-hover:bg-(--primary) group-hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"
-          >
-            <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.25} />
-          </button>
-        </div>
+        )}
       </div>
 
-      <QuickAddDialog product={product} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
+      {sells && <QuickAddDialog product={product} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />}
     </article>
   )
 }

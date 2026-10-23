@@ -8,11 +8,14 @@ import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 type CustomerRequest = Request & { customerId?: string };
 type AdminRequest = Request & { userId?: string };
 
 /** The customer's side — only ever their own orders. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('returns/me')
 @UseGuards(CustomerAuthGuard)
 export class CustomerReturnsController {
@@ -30,6 +33,7 @@ export class CustomerReturnsController {
 }
 
 /** The store's side. Returns are part of orders, so they share its permission. */
+@RequireModules(StoreModule.ORDERS)
 @Controller('returns')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class ReturnsController {

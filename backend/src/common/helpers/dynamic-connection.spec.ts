@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { databaseKey, TenantConnectionService, validateTenantMap } from './dynamic-connection';
+import { DEFAULT_PLAN, StoreModule, StorePlan } from '../tenant/store-plan';
 
 const store = (db: string, extra = {}) => ({
   mongoUri: `mongodb://127.0.0.1:27017/${db}`,
@@ -75,5 +76,20 @@ describe('TenantConnectionService', () => {
     const service = new TenantConnectionService();
     expect(() => service.getTenantConfig('b.com')).toThrow(NotFoundException);
     expect(() => service.getTenantConfig('__proto__')).toThrow(NotFoundException);
+  });
+
+  it('gives each store its plan, an alias its primary host\'s, and a store without one everything', () => {
+    process.env.TENANT_MAP = JSON.stringify({
+      'a.com': store('a', { plan: StorePlan.CATALOG }),
+      'www.a.com': store('a', { aliasOf: 'a.com', plan: StorePlan.FULL }),
+      'b.com': store('b'),
+    });
+    const service = new TenantConnectionService();
+    expect(service.getPlan('a.com')).toBe(StorePlan.CATALOG);
+    expect(service.getPlan('www.a.com')).toBe(StorePlan.CATALOG);
+    expect(service.hasModule('a.com', StoreModule.ORDERS)).toBe(false);
+    expect(service.getPlan('b.com')).toBe(StorePlan.FULL);
+    expect(service.hasModule('b.com', StoreModule.FINANCE)).toBe(true);
+    expect(service.getPlan('__proto__')).toBe(DEFAULT_PLAN);
   });
 });

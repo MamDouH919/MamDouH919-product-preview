@@ -1409,5 +1409,10 @@
     "openPage": "Open page",
     "helpQuestion": "Q",
     "helpNextTopic": "Next",
-    "homeSections": "Home page sections"
+    "homeSections": "Home page sections",
+    "notInPlan": "Not part of your store's plan",
+    "notInPlanHint": "Your store shows products without online ordering. Contact us to add orders, stock and accounting.",
+    "storefront": "Storefront",
+    "showPrices": "Show prices",
+    "showPricesHint": "Turn off to show products without prices, so visitors ask on WhatsApp."
 }

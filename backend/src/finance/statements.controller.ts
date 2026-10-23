@@ -10,6 +10,8 @@ import { toCsv } from '../common/helpers/csv';
 import { formatMinor } from '../common/money/money';
 import { StatementsService } from './statements.service';
 import { PeriodsService } from './periods.service';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
 
 class StatementQueryDto {
   @IsOptional()
@@ -51,6 +53,7 @@ const money = (minor: number) => formatMinor(minor);
 const named = (name: Record<string, string | undefined> | undefined, lang: 'en' | 'ar') => name?.[lang] ?? name?.en ?? name?.ar ?? '';
 
 /** The financial statements, as JSON for the dashboard or CSV for a spreadsheet. */
+@RequireModules(StoreModule.FINANCE)
 @Controller('finance')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class StatementsController {

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppSelector } from "@/Store/store";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 export interface LinkItem {
     primary: string;
@@ -30,6 +31,7 @@ export interface LinkItem {
 export const useLinksList = () => {
     const { t } = useTranslation()
     const isSuper = useAppSelector((state) => state.auth.isSuper)
+    const { allows } = useStoreModules()
 
     const linksList: LinkItem[] = useMemo(() => [
         {
@@ -124,5 +126,11 @@ export const useLinksList = () => {
         }] : []),
     ], [t, isSuper]);
 
-    return linksList
+    // Links the store's plan leaves out go, and so does a group left empty.
+    return useMemo(() => linksList.flatMap((link): LinkItem[] => {
+        if (link.pathname && !allows(link.pathname)) return []
+        if (!link.children) return [link]
+        const children = link.children.filter((child) => !child.pathname || allows(child.pathname))
+        return children.length ? [{ ...link, children }] : []
+    }), [linksList, allows])
 }

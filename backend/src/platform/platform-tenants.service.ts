@@ -6,6 +6,7 @@ import {
   TenantConnectionService,
 } from '../common/helpers/dynamic-connection';
 import { TenantRecord } from '../common/tenant/tenant-registry';
+import { DEFAULT_PLAN, StorePlan } from '../common/tenant/store-plan';
 import { seedTenant } from '../common/tenant/seed-tenant';
 import { supportsTransactions } from '../common/tenant/with-transaction';
 import { User, UserSchema } from '../auth/schemas/user.schema';
@@ -17,6 +18,8 @@ export interface TenantView {
   frontendUrl: string;
   aliasOf: string | null;
   disabled: boolean;
+  /** An alias's own plan is ignored: it serves its primary host's. */
+  plan: StorePlan;
   /** The connection string with any user:password replaced by `***`. */
   database: string;
   /** Whether this API instance holds an open connection to it right now. */
@@ -62,6 +65,7 @@ export class PlatformTenantsService {
       frontendUrl: stripSlash(dto.frontendUrl),
       ...(dto.aliasOf ? { aliasOf: dto.aliasOf } : {}),
       disabled: false,
+      plan: dto.plan ?? DEFAULT_PLAN,
     };
     this.assertValid([...records, record], registry.uri);
 
@@ -80,6 +84,7 @@ export class PlatformTenantsService {
       mongoUri: dto.mongoUri ?? current.mongoUri,
       frontendUrl: dto.frontendUrl ? stripSlash(dto.frontendUrl) : current.frontendUrl,
       disabled: dto.disabled ?? current.disabled,
+      plan: dto.plan ?? current.plan,
     };
     if (dto.aliasOf !== undefined) {
       if (dto.aliasOf) next.aliasOf = dto.aliasOf;
@@ -180,6 +185,7 @@ export class PlatformTenantsService {
       frontendUrl: record.frontendUrl,
       aliasOf: record.aliasOf ?? null,
       disabled: record.disabled,
+      plan: record.plan,
       database: redactMongoUri(record.mongoUri),
       connected: this.tenants.isConnected(record.host),
       createdAt: record.createdAt,
