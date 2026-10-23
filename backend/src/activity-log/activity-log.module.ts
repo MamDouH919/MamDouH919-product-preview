@@ -6,6 +6,7 @@ import { ActivityLogInterceptor } from './activity-log.interceptor';
 import { ActivityLog, ActivityLogSchema } from './schemas/activity-log.schema';
 import { AuthModule } from '../auth/auth.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
+import { User, UserSchema } from '../auth/schemas/user.schema';
 
 @Module({
   imports: [AuthModule],
@@ -13,6 +14,7 @@ import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
   providers: [
     ActivityLogService,
     tenantModelProvider(ActivityLog.name, ActivityLogSchema),
+    tenantModelProvider(User.name, UserSchema),
     // Global, so every admin write anywhere in the app is recorded without per-module wiring.
     { provide: APP_INTERCEPTOR, useClass: ActivityLogInterceptor },
   ],

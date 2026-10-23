@@ -21,7 +21,7 @@ import {
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import CustomLink from "@/components/CustomLink";
-import { HELP_TOPICS, HelpBlock, HelpSection, HelpTopicId, helpGuide } from "@/features/Help/guide";
+import { HelpBlock, HelpSection, HelpTopic, HelpTopicId, useHelpGuide } from "@/features/Help/guide";
 
 const TOPIC_ICONS: Record<HelpTopicId, React.ElementType> = {
   start: Rocket,
@@ -39,14 +39,15 @@ const TOPIC_ICONS: Record<HelpTopicId, React.ElementType> = {
  * help button on every page can open the part that explains it.
  */
 const HelpPage = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const guide = helpGuide(i18n.language);
+  // Only what the store's plan has: a tab it lacks falls back to the start.
+  const { topics, guide } = useHelpGuide();
   const requested = params.get("tab") as HelpTopicId | null;
-  const tab: HelpTopicId = requested && HELP_TOPICS.includes(requested) ? requested : "start";
+  const tab: HelpTopicId = requested && topics.includes(requested) ? requested : "start";
   const topic = guide[tab];
 
   useEffect(() => {
@@ -66,7 +67,7 @@ const HelpPage = () => {
     <Stack id="help-top" spacing={2} pb={4}>
       <Paper variant="outlined" sx={{ borderRadius: 2, position: "sticky", top: 0, zIndex: 2 }}>
         <Tabs value={tab} onChange={(_, v) => changeTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
-          {HELP_TOPICS.map((id) => {
+          {topics.map((id) => {
             const Icon = TOPIC_ICONS[id];
             return <Tab key={id} value={id} label={guide[id].label} icon={<Icon size={18} />} iconPosition="start" sx={{ minHeight: 52 }} />;
           })}
@@ -96,7 +97,7 @@ const HelpPage = () => {
         <SectionCard key={`${tab}-${i}`} id={`${tab}-${i}`} number={i + 1} section={section} />
       ))}
 
-      <NextTopic current={tab} onGo={changeTab} />
+      <NextTopic current={tab} topics={topics} guide={guide} onGo={changeTab} />
     </Stack>
   );
 };
@@ -236,16 +237,26 @@ const Rich = ({ text }: { text: string }) => (
   </>
 );
 
-const NextTopic = ({ current, onGo }: { current: HelpTopicId; onGo: (id: HelpTopicId) => void }) => {
+const NextTopic = ({
+  current,
+  topics,
+  guide,
+  onGo,
+}: {
+  current: HelpTopicId;
+  topics: HelpTopicId[];
+  guide: Record<HelpTopicId, HelpTopic>;
+  onGo: (id: HelpTopicId) => void;
+}) => {
   const { t, i18n } = useTranslation();
-  const index = HELP_TOPICS.indexOf(current);
-  const next = HELP_TOPICS[index + 1];
+  const index = topics.indexOf(current);
+  const next = topics[index + 1];
   if (!next) return null;
   const Arrow = i18n.dir() === "rtl" ? ArrowLeft : ArrowRight;
   return (
     <Stack direction="row" justifyContent="flex-end">
       <Button endIcon={<Arrow size={16} />} onClick={() => onGo(next)}>
-        {t("helpNextTopic")}: {helpGuide(i18n.language)[next].label}
+        {t("helpNextTopic")}: {guide[next].label}
       </Button>
     </Stack>
   );

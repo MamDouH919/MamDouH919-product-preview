@@ -1,6 +1,6 @@
-import type { HelpGuide } from "../guide";
+import type { HelpGuideSource } from "../guide";
 
-const en: HelpGuide = {
+const en: HelpGuideSource = {
   start: {
     label: "Getting started",
     summary: "How the system thinks, the right setup order, and where everything lives in the menu.",
@@ -10,10 +10,28 @@ const en: HelpGuide = {
         blocks: [
           {
             type: "p",
+            unless: "orders",
+            text: "Your store is a showcase: visitors browse your products and categories on the website and ask about them on **WhatsApp** — nothing is ordered or paid for online. The dashboard is where you keep the catalogue and the website up to date.",
+          },
+          {
+            type: "list",
+            unless: "orders",
+            title: "Worth knowing from day one",
+            items: [
+              "A product shows on the website only while it's **Active**. Switch it off to hide it without deleting it.",
+              "Every product has a **WhatsApp** button, so keep the WhatsApp number in **Settings → General** up to date — it's how visitors reach you.",
+              "To show products without prices, turn off **Show prices** in **Settings → General**.",
+              "Online orders, stock and accounting aren't part of your plan. Contact us if you'd like to add them.",
+            ],
+          },
+          {
+            type: "p",
+            requires: ["finance"],
             text: "The dashboard isn't just a list of orders — it keeps full accounting books. Every movement of money or goods (a collection, refund, purchase, expense, courier settlement or transfer) is posted to the books automatically and shows up straight away in **Money accounts** balances and in **Reports**.",
           },
           {
             type: "list",
+            requires: ["orders", "finance"],
             title: "Rules worth knowing from day one",
             items: [
               "Money records are **never edited** once saved. A mistake is fixed with **Void** or **Reverse**, which posts a new entry cancelling the old one; the original stays on record with your reason.",
@@ -29,6 +47,17 @@ const en: HelpGuide = {
         blocks: [
           {
             type: "steps",
+            unless: "orders",
+            items: [
+              "**Settings → General**: store details, logo and colours, and your phone and **WhatsApp** numbers. Decide here whether to **Show prices**.",
+              "**Settings → Email**: so messages from the website's contact form reach you.",
+              "**Products & categories**: create the categories first, then add products by hand or import them all at once from a CSV file (see the Import tab).",
+              "**Website content**: banners, home-page sections, and pages such as About us.",
+            ],
+          },
+          {
+            type: "steps",
+            requires: ["orders", "inventory", "finance"],
             items: [
               "**Settings → General**: store details, currency and the **Return window (days)**.",
               "**Settings → Email**: so customers receive order emails and password-reset links.",
@@ -47,6 +76,17 @@ const en: HelpGuide = {
         blocks: [
           {
             type: "list",
+            unless: "orders",
+            items: [
+              "**Products & categories**: products (including CSV import/export), categories and sub-categories.",
+              "**Customers & messages**: reviews, contact messages and subscribers.",
+              "**Website content**: pages, banners and sections.",
+              "**Settings**: general, email, and the **Activity log** (every change made in the dashboard and who made it, kept for a year).",
+            ],
+          },
+          {
+            type: "list",
+            requires: ["orders", "inventory", "finance"],
             items: [
               "**Sales**: orders, returns, refunds and coupons.",
               "**Products & categories**: products (including CSV import/export), categories and sub-categories.",
@@ -68,6 +108,7 @@ const en: HelpGuide = {
   },
 
   orders: {
+    requires: ["orders"],
     label: "Orders & collection",
     summary: "An order's journey from the moment it's placed until its cash is in the till.",
     sections: [
@@ -144,6 +185,7 @@ const en: HelpGuide = {
   },
 
   returns: {
+    requires: ["orders", "finance"],
     label: "Returns & refunds",
     summary: "How to take a return, put goods back in stock, and give the money back correctly.",
     sections: [
@@ -280,6 +322,7 @@ const en: HelpGuide = {
   },
 
   accounts: {
+    requires: ["finance"],
     label: "Accounts",
     summary: "Cash box, bank and wallets, settling with couriers, and expenses.",
     sections: [
@@ -405,6 +448,7 @@ const en: HelpGuide = {
   },
 
   purchases: {
+    requires: ["inventory", "finance"],
     label: "Purchases & suppliers",
     summary: "Bringing in new stock from a supplier at its cost, paying them, and sending goods back.",
     sections: [
@@ -499,6 +543,7 @@ const en: HelpGuide = {
   },
 
   inventory: {
+    requires: ["inventory"],
     label: "Inventory",
     summary: "Quantities and cost, stock takes, and manual adjustments.",
     sections: [
@@ -586,13 +631,14 @@ const en: HelpGuide = {
         blocks: [
           {
             type: "p",
-            text: "Add many products at once, or change prices and quantities of existing ones, from an Excel or Google Sheets file instead of opening each product.",
+            text: "Add many products at once, or change the details and prices of existing ones, from an Excel or Google Sheets file instead of opening each product.",
           },
           {
             type: "steps",
             items: [
               "On **Products**, click **Export CSV** first — it gives you a file with the right columns, holding your current products.",
-              "Open it in Excel or Google Sheets and edit: change prices or quantities, or add rows for new products.",
+              { text: "Open it in Excel or Google Sheets and edit: change prices or quantities, or add rows for new products.", requires: ["inventory"] },
+              { text: "Open it in Excel or Google Sheets and edit: change names or prices, or add rows for new products.", unless: "inventory" },
               "Save it as **CSV UTF-8** (so Arabic text stays intact).",
               "Back on Products, click **Import CSV**, then **Choose CSV file**.",
               "A **preview** appears: each row is marked **New**, **Update**, **Unchanged** or **Error** with its line number. At this point **nothing has changed yet**.",
@@ -609,7 +655,7 @@ const en: HelpGuide = {
             items: [
               "Each row is matched to an existing product by **product_id** first, then by **slug**. A row that matches nothing **creates a new product**.",
               "**An empty cell leaves that field as it is** — to change only the price, leave the other columns empty.",
-              "Quantity changes are recorded in stock movements as a **Stock take**, so you can trace them later.",
+              { text: "Quantity changes are recorded in stock movements as a **Stock take**, so you can trace them later.", requires: ["inventory"] },
             ],
           },
           {
@@ -634,6 +680,7 @@ const en: HelpGuide = {
           },
           {
             type: "tip",
+            requires: ["inventory", "finance"],
             text: "CSV is great for adding products, changing prices and stock takes. But stock arriving from a supplier should be recorded as a **Purchase**, so its cost and what you owe are recorded.",
           },
         ],
@@ -665,6 +712,7 @@ const en: HelpGuide = {
   },
 
   reports: {
+    requires: ["finance"],
     label: "Reports & closing",
     summary: "How to read your numbers, and how to close the month.",
     sections: [
