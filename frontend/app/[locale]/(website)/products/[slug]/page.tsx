@@ -32,18 +32,23 @@ type PublicSettings = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug: rawSlug, locale } = await params
   const slug = decodeURIComponent(rawSlug)
-  const [product, origin, backendUrl] = await Promise.all([getProduct(slug), requestOrigin(), requestBackendUrl()])
+  const [product, origin] = await Promise.all([getProduct(slug), requestOrigin()])
   if (!product) return {}
 
   const path = `/products/${encodeURIComponent(slug)}`
   const name = loc(product.name, locale)
   const rawDesc = plainText(loc(product.description, locale) || loc(product.shortDescription, locale))
   const description = rawDesc.length > 160 ? rawDesc.slice(0, 157) + "…" : rawDesc
-  const imageUrl = product.images?.[0] ? withBackend(backendUrl, product.images[0]) : undefined
+  const firstImage = product.images?.[0]
+  // Previews go through the OG route, which serves a small 1200×630 JPEG; `v`
+  // changes with the image so WhatsApp and Facebook don't keep a stale one.
+  const imageUrl = firstImage
+    ? `${origin}/api/og/products/${encodeURIComponent(slug)}?v=${encodeURIComponent(firstImage.split("/").pop() ?? "")}`
+    : undefined
   const keywords = (product.tags ?? []) as string[]
 
   const ogImage = imageUrl
-    ? [{ url: imageUrl, alt: name, width: 1200, height: 630 }]
+    ? [{ url: imageUrl, alt: name, width: 1200, height: 630, type: "image/jpeg" }]
     : []
 
   return {
