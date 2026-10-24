@@ -11,6 +11,7 @@ const imageBackends = [
   "http://localhost:3010",
   "https://api-ranosh.novaslash.com",
   "https://api-gravity.novaslash.com",
+  "https://api-demo.novaslash.com",
 ];
 
 function parseRemotePattern(url: string) {

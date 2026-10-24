@@ -44,7 +44,7 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('product preview API')
-      .setDescription('API documentation for Gravity application')
+      .setDescription('API documentation for E-commerce-novaslash application')
       .setVersion('1.0')
       .build();
 
