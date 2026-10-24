@@ -19,6 +19,7 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   "ranosh.novaslash.com": ranosh,
   "gravity.novaslash.com": gravity,
   "demo.localhost": demo,
+  "demo.novaslash.com": demo,
 };
 
 export const DEFAULT_TENANT = "localhost";
@@ -26,9 +27,6 @@ export const DEFAULT_TENANT = "localhost";
 /** Resolves a hostname (with or without port) to a tenant SEO config. */
 export function resolveTenantSeo(host?: string | null): TenantSeo {
   const hostname = host?.split(":")[0] ?? "";
-  console.log(host);
-  console.log(hostname);
-  console.log(TENANT_SEO[hostname]);
-  
+
   return TENANT_SEO[hostname] ?? TENANT_SEO[DEFAULT_TENANT];
 }
