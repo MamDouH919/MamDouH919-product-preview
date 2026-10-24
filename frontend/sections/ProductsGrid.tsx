@@ -16,6 +16,7 @@ export default function ProductsGrid() {
   const products = (data ?? [])
     .filter((p) => p.isActive)
     .sort((a, b) => a.order - b.order)
+    .slice(0, 8)
 
   const cssVars = {
     "--primary": theme.palette.primary.main,

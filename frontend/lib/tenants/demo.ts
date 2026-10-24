@@ -2,7 +2,7 @@ import type { TenantSeo } from "./types";
 
 const demo: TenantSeo = {
   siteName: "Demo Store",
-  siteUrl: "http://demo.localhost:3000",
+  siteUrl: "https://demo.novaslash.com",
   ar: {
     title: "متجر تجريبي | تصفح المنتجات",
     titleTemplate: "%s | متجر تجريبي",
