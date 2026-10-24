@@ -1404,6 +1404,7 @@
     "activeHint": "Turn off to hide the product from the store without deleting it.",
     "orderHint": "Lower numbers appear first in product lists.",
     "slugHint": "The product's address in the website link. Leave empty to generate it from the name.",
+    "slugInvalid": "Use lowercase English letters, numbers and hyphens only — no spaces or capitals (e.g. blue-shirt)",
     "helpGuide": "User guide",
     "helpForThisPage": "How does this page work?",
     "openPage": "Open page",

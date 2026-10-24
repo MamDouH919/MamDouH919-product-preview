@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -8,7 +8,9 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -93,9 +95,16 @@ export class CreateProductDto {
   @IsMongoId()
   subCategory?: string;
 
+  // Empty means "generate it from the name"; anything else must already be a
+  // clean URL segment — the server won't silently rewrite what the user typed.
   @ApiProperty({ required: false })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @ValidateIf((o) => o.slug !== '')
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    message: 'slug may only contain lowercase English letters, numbers and single hyphens (e.g. my-product)',
+  })
   slug?: string;
 
   @ApiProperty({ required: false, type: [String] })

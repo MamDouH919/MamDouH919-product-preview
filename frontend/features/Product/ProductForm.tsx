@@ -75,6 +75,9 @@ interface ProductFormProps {
 
 const LANGS = ["ar", "en"] as const;
 
+// Mirrors the backend DTO: lowercase English letters, digits, single hyphens.
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 const ProductForm = ({ defaultData }: ProductFormProps) => {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -190,7 +193,8 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
       if (data.sku) formData.append("sku", data.sku);
       if (!isEditing) formData.append("category", data.category);
       if (data.subCategory) formData.append("subCategory", data.subCategory);
-      if (data.slug) formData.append("slug", data.slug);
+      // On edit an empty slug is still sent, so the server regenerates it.
+      if (data.slug || isEditing) formData.append("slug", data.slug.trim());
       if (data.tags) {
         data.tags
           .split(",")
@@ -529,7 +533,13 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
             />
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextInputComponent name="slug" label={t("slug")} control={control} helperText={t("slugHint")} />
+                <TextInputComponent
+                  name="slug"
+                  label={t("slug")}
+                  control={control}
+                  helperText={t("slugHint")}
+                  rules={{ pattern: { value: SLUG_PATTERN, message: t("slugInvalid") } }}
+                />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextInputComponent

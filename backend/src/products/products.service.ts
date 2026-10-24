@@ -21,7 +21,8 @@ function buildSlug(text: string): string {
     .trim()
     .replace(/[\s_]+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-');
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 @Injectable()
@@ -51,8 +52,9 @@ export class ProductsService {
     }
 
     if (!createProductDto.slug) {
-      const base = createProductDto.name.en ?? createProductDto.name.ar ?? 'product';
-      createProductDto.slug = await this.uniqueSlug(buildSlug(base));
+      createProductDto.slug = await this.slugFromName(createProductDto.name);
+    } else {
+      await this.assertSlugFree(createProductDto.slug);
     }
 
     // Save at zero and let the ledger put the opening stock in, so the stored
@@ -396,6 +398,13 @@ export class ProductsService {
       addedVariants = added;
     }
 
+    // An emptied slug field means "make one for me", same as on create.
+    if (updateProductDto.slug === '') {
+      updateProductDto.slug = await this.slugFromName(updateProductDto.name ?? existing.name, id);
+    } else if (updateProductDto.slug && updateProductDto.slug !== existing.slug) {
+      await this.assertSlugFree(updateProductDto.slug, id);
+    }
+
     if (updateProductDto.sku !== undefined || updateProductDto.variants) {
       await this.assertSkusFree(
         { sku: updateProductDto.sku ?? existing.sku, variants: updateProductDto.variants ?? existing.variants },
@@ -559,13 +568,28 @@ export class ProductsService {
     }
   }
 
-  private async uniqueSlug(base: string): Promise<string> {
+  /** Arabic-only names strip down to nothing, so those fall back to "product". */
+  private slugFromName(name: { en?: string; ar?: string } | undefined, exceptId?: string): Promise<string> {
+    const base = buildSlug(name?.en ?? '') || buildSlug(name?.ar ?? '') || 'product';
+    return this.uniqueSlug(base, exceptId);
+  }
+
+  private async uniqueSlug(base: string, exceptId?: string): Promise<string> {
+    const notSelf = exceptId ? { _id: { $ne: exceptId } } : {};
     let slug = base;
     let count = 0;
-    while (await this.productModel.exists({ slug })) {
+    while (await this.productModel.exists({ ...notSelf, slug })) {
       count++;
       slug = `${base}-${count}`;
     }
     return slug;
+  }
+
+  /** A slug the user typed is kept as-is, so a clash is theirs to resolve. */
+  private async assertSlugFree(slug: string, exceptId?: string) {
+    const notSelf = exceptId ? { _id: { $ne: exceptId } } : {};
+    if (await this.productModel.exists({ ...notSelf, slug })) {
+      throw new ConflictException(`Slug "${slug}" is already used by another product`);
+    }
   }
 }
