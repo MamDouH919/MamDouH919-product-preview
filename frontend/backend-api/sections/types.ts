@@ -15,6 +15,7 @@ export type Section = {
   description?: LocalizedField;
   image?: string;
   type?: SectionType;
+  active?: boolean;
   highlights?: HighlightItem[];
   gallery?: string[];
   links?: { label?: LocalizedField; url: string }[];

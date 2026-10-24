@@ -37,6 +37,9 @@ export class Section extends Document {
   @Prop({ enum: SectionType, default: SectionType.DEFAULT })
   type!: SectionType;
 
+  @Prop({ default: true })
+  active!: boolean;
+
   @Prop({
     type: [
       {

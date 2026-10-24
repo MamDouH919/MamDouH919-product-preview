@@ -13,3 +13,8 @@ export const updateSection = async ({ id, data }: { id: string; data: FormData }
     });
     return response.data;
 };
+
+export const toggleSectionActive = async ({ id, active }: { id: string; active: boolean }): Promise<any> => {
+    const response = await api.patch(`/sections/${id}`, { active });
+    return response.data;
+};

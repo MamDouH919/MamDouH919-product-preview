@@ -11,7 +11,9 @@ import { LocalizedField } from "@/backend-api/globalTypes"
  * theme colours as CSS variables.
  */
 export function useHomeSection(sectionName: string) {
-  const { data: section, isLoading } = useSectionByNameQuery(sectionName)
+  const { data, isLoading } = useSectionByNameQuery(sectionName)
+  // Sections created before `active` existed have no value and stay visible.
+  const section = data?.active === false ? undefined : data
   const { i18n } = useTranslation()
   const theme = useTheme()
 

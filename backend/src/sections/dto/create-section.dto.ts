@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -62,6 +63,11 @@ export class CreateSectionDto {
   @IsOptional()
   @IsEnum(SectionType)
   type?: SectionType;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()

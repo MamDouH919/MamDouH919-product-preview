@@ -1,16 +1,19 @@
 "use client";
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSectionsQuery } from '@/backend-api/sections/hooks';
+import { SECTIONS_QUERY_KEY, useSectionsQuery } from '@/backend-api/sections/hooks';
+import { toggleSectionActive } from '@/backend-api/sections/mutations';
 import { Section } from '@/backend-api/sections/types';
 import Image from 'next/image';
 import { getBackendUri } from '@/utils/helperFunctions';
-import { IconButton, Stack } from '@mui/material';
+import { IconButton, Stack, Switch } from '@mui/material';
 import Edit from '@mui/icons-material/Edit';
 import CustomLink from '@/components/CustomLink';
 import { changeBreadCrumbActions, resetBreadCrumbActions } from '@/Store/slices/bread-crumb';
 import { useAppDispatch, useAppSelector } from '@/Store/store';
 import SimpleTable from '@/components/Table/SimpleTable';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const getNestedValue = (obj: any, path: string) => {
   return path.split('.').reduce((acc, key) => acc?.[key], obj);
@@ -19,6 +22,7 @@ const getNestedValue = (obj: any, path: string) => {
 const SectionsList = () => {
   const { t, i18n } = useTranslation();
   const dispatch = useAppDispatch();
+  const queryClient = useQueryClient();
   const isSuper = useAppSelector((state) => state.auth.isSuper);
   const lang = i18n.language;
 
@@ -28,6 +32,16 @@ const SectionsList = () => {
     () => sections?.map((section: Section) => ({ ...section, id: section._id })) ?? [],
     [sections]
   );
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: toggleSectionActive,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [SECTIONS_QUERY_KEY] });
+    },
+    onError: () => {
+      toast.error(t("somethingWentWrong"));
+    },
+  });
 
   useEffect(() => {
     dispatch(changeBreadCrumbActions({
@@ -80,6 +94,18 @@ const SectionsList = () => {
       render: (row: any) => getNestedValue(row, `title.${lang}`) || getNestedValue(row, 'title.en') || '',
     },
     {
+      id: "active",
+      header: t("active"),
+      render: (row: any) => (
+        <Switch
+          checked={row.active !== false}
+          onChange={(e) => toggleActiveMutation.mutate({ id: row._id, active: e.target.checked })}
+          disabled={toggleActiveMutation.isPending}
+          size="small"
+        />
+      ),
+    },
+    {
       id: "actions",
       header: t("actions"),
       render: (row: any) => (
@@ -92,7 +118,7 @@ const SectionsList = () => {
         </Stack>
       ),
     },
-  ], [t, lang]);
+  ], [t, lang, toggleActiveMutation]);
 
   return (
     <SimpleTable
