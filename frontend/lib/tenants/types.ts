@@ -17,4 +17,5 @@ export type TenantSeo = {
   manifest: string;
   /** Open Graph / Twitter share image. */
   ogImage: string;
+  contentSiteVerify?: string;
 };

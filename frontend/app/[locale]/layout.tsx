@@ -88,12 +88,19 @@ export default async function RootLayout({
   const { locale } = await params;
   const isRtl = config.app.rtlLanguages.includes(locale);
 
+
+  const host = (await headers()).get("host");
+  const tenant = resolveTenantSeo(host);
+
   return (
     <html
       lang={locale}
       dir={isRtl ? "rtl" : "ltr"}
       className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} h-full antialiased`}
     >
+      <head>
+        {tenant.contentSiteVerify && <meta name="google-site-verification" content={tenant.contentSiteVerify} />}
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers locale={locale}>
           {children}

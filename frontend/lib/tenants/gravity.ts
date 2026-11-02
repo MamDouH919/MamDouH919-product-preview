@@ -31,6 +31,7 @@ const localhost: TenantSeo = {
   },
   manifest: "/gravity/manifest.json",
   ogImage: "/gravity/logo.webp",
+  contentSiteVerify: "-wIhSV_jn_zCy-hWqan_gS2G--R3VhfqH6MpuJchrUs"
 };
 
 export default localhost;
