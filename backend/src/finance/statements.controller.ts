@@ -8,6 +8,7 @@ import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { toCsv } from '../common/helpers/csv';
 import { formatMinor } from '../common/money/money';
+import { AccountType } from './accounts';
 import { StatementsService } from './statements.service';
 import { PeriodsService } from './periods.service';
 import { RequireModules } from '../decorators/store-module.decorator';
@@ -51,6 +52,7 @@ class ReopenPeriodDto {
 type AdminRequest = Request & { userId?: string };
 const money = (minor: number) => formatMinor(minor);
 const named = (name: Record<string, string | undefined> | undefined, lang: 'en' | 'ar') => name?.[lang] ?? name?.en ?? name?.ar ?? '';
+const SIDE_LABEL = { en: { debit: 'Debit', credit: 'Credit' }, ar: { debit: 'مدين', credit: 'دائن' } } as const;
 
 /** The financial statements, as JSON for the dashboard or CSV for a spreadsheet. */
 @RequireModules(StoreModule.FINANCE)
@@ -67,8 +69,10 @@ export class StatementsController {
   async profitAndLoss(@Query() q: StatementQueryDto, @Res() res: Response) {
     const pl = await this.statements.profitAndLoss(q.from, q.to);
     const lang = q.lang ?? 'en';
+    // Contra-revenue (discounts, returns) is a deduction, so the revenue lines add up to net revenue.
+    const signed = (type: AccountType, minor: number) => money(type === AccountType.CONTRA_REVENUE ? -minor : minor);
     return this.send(res, q, 'profit-and-loss', pl, ['account', 'name', 'amount', 'previous'], () =>
-      [...pl.revenue, ...pl.costOfSales, ...pl.expenses].map((l) => [l.code, named(l.name, lang), money(l.amountMinor), l.previousMinor === undefined ? '' : money(l.previousMinor)]),
+      [...pl.revenue, ...pl.costOfSales, ...pl.expenses].map((l) => [l.code, named(l.name, lang), signed(l.type, l.amountMinor), l.previousMinor === undefined ? '' : signed(l.type, l.previousMinor)]),
     );
   }
 
@@ -103,9 +107,9 @@ export class StatementsController {
   async trialBalance(@Query() q: StatementQueryDto, @Res() res: Response) {
     const tb = await this.statements.trialBalance(q.to);
     const lang = q.lang ?? 'en';
-    return this.send(res, q, 'trial-balance', tb, ['account', 'name', 'debit', 'credit', 'balance'], () => [
-      ...tb.accounts.map((a) => [a.code, named(a.name, lang), money(a.debitMinor), money(a.creditMinor), money(a.balanceMinor)]),
-      ['', 'Total', money(tb.totalDebitMinor), money(tb.totalCreditMinor), ''],
+    return this.send(res, q, 'trial-balance', tb, ['account', 'name', 'debit', 'credit', 'balance', 'side'], () => [
+      ...tb.accounts.map((a) => [a.code, named(a.name, lang), money(a.debitMinor), money(a.creditMinor), money(a.balanceMinor), a.balanceMinor ? SIDE_LABEL[lang][a.side] : '']),
+      ['', 'Total', money(tb.totalDebitMinor), money(tb.totalCreditMinor), '', ''],
     ]);
   }
 

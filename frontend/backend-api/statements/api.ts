@@ -61,9 +61,24 @@ export type Payables = {
   rows: { purchaseId: string; purchaseNumber: number; supplier?: string; supplierInvoiceNo?: string; date: string; dueDate?: string; totalMinor: number; owedMinor: number; days: number; overdueDays: number; bucket: AgeBucket }[];
 };
 
+export type BalanceSide = "debit" | "credit";
+export type UnusualBalanceReason = "asset_credit" | "expense_credit" | "contra_revenue_credit" | "liability_debit" | "revenue_debit" | "equity_debit";
+
 export type TrialBalance = {
   asOf?: string;
-  accounts: { code: string; name: AccountName; type: string; debitMinor: number; creditMinor: number; balanceMinor: number }[];
+  accounts: {
+    code: string;
+    name: AccountName;
+    type: string;
+    debitMinor: number;
+    creditMinor: number;
+    /** Unsigned; `side` says where it falls. */
+    balanceMinor: number;
+    side: BalanceSide;
+    normalSide: BalanceSide;
+    isUnusual: boolean;
+    unusualReason: UnusualBalanceReason | null;
+  }[];
   totalDebitMinor: number;
   totalCreditMinor: number;
   balanced: boolean;

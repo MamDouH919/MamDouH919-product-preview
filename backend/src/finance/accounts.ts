@@ -86,10 +86,17 @@ export const CHART: AccountInfo[] = [
 
 export const ACCOUNT_CODES = CHART.map((a) => a.code);
 
+export type BalanceSide = 'debit' | 'credit';
+
+/** The side a healthy balance sits on: credit for liabilities, equity and revenue, debit for the rest. */
+export function normalSideOf(type: AccountType): BalanceSide {
+  return type === AccountType.LIABILITY || type === AccountType.EQUITY || type === AccountType.REVENUE ? 'credit' : 'debit';
+}
+
 /** Accounts whose balance grows with credits: liabilities, equity, revenue. */
 export function isCreditNormal(code: string): boolean {
   const type = CHART.find((a) => a.code === code)?.type;
-  return type === AccountType.LIABILITY || type === AccountType.EQUITY || type === AccountType.REVENUE;
+  return type !== undefined && normalSideOf(type) === 'credit';
 }
 
 /** Accounts a running cost can be recorded against (an expense's category). */

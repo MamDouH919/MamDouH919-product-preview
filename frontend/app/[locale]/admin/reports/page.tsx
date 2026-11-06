@@ -285,9 +285,6 @@ const ValuationReport = () => {
   );
 };
 
-/** Account types that normally carry a debit balance; the rest normally carry a credit one. */
-const DEBIT_NORMAL = ["asset", "contra_revenue", "cost_of_sales", "expense"];
-
 const TrialBalanceReport = ({ range }: { range: DayRange }) => {
   const { t } = useTranslation();
   const currency = useCurrency();
@@ -295,9 +292,8 @@ const TrialBalanceReport = ({ range }: { range: DayRange }) => {
   const { data, isLoading } = useReportQuery<TrialBalance>("trial-balance", range);
   if (isLoading || !data) return <TableLoading />;
   const money = (minor: number) => formatMinorMoney(minor, currency);
-  // The balance is debit minus credit; show it unsigned with the side it falls on.
-  const side = (minor: number) => (minor === 0 ? money(0) : `${money(Math.abs(minor))} ${t(minor > 0 ? "debitSide" : "creditSide")}`);
-  const unusual = data.accounts.filter((a) => (DEBIT_NORMAL.includes(a.type) ? a.balanceMinor < 0 : a.balanceMinor > 0));
+  const balance = (a: TrialBalance["accounts"][number]) => (a.balanceMinor === 0 ? money(0) : `${money(a.balanceMinor)} ${t(a.side === "debit" ? "debitSide" : "creditSide")}`);
+  const unusual = data.accounts.filter((a) => a.isUnusual);
   return (
     <Stack spacing={2}>
       <Alert severity="info" icon={false}>
@@ -312,7 +308,7 @@ const TrialBalanceReport = ({ range }: { range: DayRange }) => {
             {unusual.map((a) => (
               <li key={a.code}>
                 <Typography variant="body2">
-                  <b>{name(a.name)}</b> ({side(a.balanceMinor)}): {t(DEBIT_NORMAL.includes(a.type) ? "trialUnusualDebitNormal" : "trialUnusualCreditNormal")}
+                  <b>{name(a.name)}</b> ({balance(a)}): {t(`trialUnusualReason.${a.unusualReason}`)}
                 </Typography>
               </li>
             ))}
@@ -326,7 +322,7 @@ const TrialBalanceReport = ({ range }: { range: DayRange }) => {
           <Chip key="k" size="small" variant="outlined" label={t(`accountTypes.${a.type}`, { defaultValue: a.type })} />,
           money(a.debitMinor),
           money(a.creditMinor),
-          <Typography key="b" variant="body2" color={unusual.includes(a) ? "warning.main" : undefined} fontWeight={unusual.includes(a) ? 600 : undefined}>{side(a.balanceMinor)}</Typography>,
+          <Typography key="b" variant="body2" color={a.isUnusual ? "warning.main" : undefined} fontWeight={a.isUnusual ? 600 : undefined}>{balance(a)}</Typography>,
         ])}
         total={[t("total"), "", money(data.totalDebitMinor), money(data.totalCreditMinor), ""]}
       />

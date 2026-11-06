@@ -265,7 +265,7 @@ Every line on the cash account names a money account (`moneyaccounts`): a cash b
 | `cash-flow` | `from`, `to` | direct method: cash in and out by cause (expenses by category), opening and closing balance of each money account; transfers net to zero |
 | `receivables` | now | what each delivered order still owes, aged from delivery (0–7, 8–30, 31–60, over 60 days) |
 | `payables` | now | what each posted purchase still owes, aged from receipt, with days past due |
-| `trial-balance` | `to` | every account's debits, credits and balance through the end of that day; total debits must equal total credits |
+| `trial-balance` | `to` | every account's debits, credits, unsigned balance and the side it falls on through the end of that day, flagging balances on the unusual side for the account's type; total debits must equal total credits |
 | `sales-by-product` | `from`, `to` | units delivered, net sales after each line's share of the discount, cost, margin, and refunds made in the period |
 
 `GET /inventory/valuation` (`finance-reports:read`) values stock on hand at its moving average cost and lists items without a cost. Days are calendar days in the store's time zone; ranges are `[start of from, start of the day after to)`. Receivables and payables are as of now: they can't yet be run for a past date.

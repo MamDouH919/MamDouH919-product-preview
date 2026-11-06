@@ -7,7 +7,8 @@ import { OrderStatus } from '../orders/enums/order-status.enum';
 import { Purchase, PurchaseStatus } from '../purchasing/schemas/purchase.schema';
 import { Refund, RefundStatus } from '../refunds/schemas/refund.schema';
 import { MoneyAccount } from '../money-accounts/schemas/money-account.schema';
-import { ACCOUNT, AccountType, CHART, EXPENSE_ACCOUNTS, isCreditNormal } from './accounts';
+import { ACCOUNT, AccountType, CHART, EXPENSE_ACCOUNTS } from './accounts';
+import { accountBalance } from './account-balance';
 import { FinanceReportsService } from './finance-reports.service';
 import { JournalService } from './journal.service';
 import { outstandingOf, orderAmounts } from './order-money';
@@ -247,7 +248,7 @@ export class StatementsService {
         type: a.type,
         debitMinor: debit,
         creditMinor: credit,
-        balanceMinor: isCreditNormal(a.code) ? credit - debit : debit - credit,
+        ...accountBalance(a.type, debit, credit),
       };
     }).filter((a) => a.debitMinor || a.creditMinor);
     const totalDebitMinor = accounts.reduce((t, a) => t + a.debitMinor, 0);

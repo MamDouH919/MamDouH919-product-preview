@@ -139,13 +139,25 @@ describe('Statements, money accounts and periods', () => {
       const tb = await store.statements.trialBalance(today());
       expect(tb.balanced).toBe(true);
       expect(tb.totalDebitMinor).toBe(tb.totalCreditMinor);
-      expect(tb.accounts.find((a) => a.code === ACCOUNT.CASH)?.balanceMinor).toBe(31500 - 300000);
+      // More rent paid than cash came in: cash really is on the unusual side.
+      expect(tb.accounts.find((a) => a.code === ACCOUNT.CASH)).toMatchObject({ balanceMinor: 300000 - 31500, side: 'credit', normalSide: 'debit', isUnusual: true, unusualReason: 'asset_credit' });
+      expect(tb.accounts.find((a) => a.code === ACCOUNT.PRODUCT_SALES)).toMatchObject({ balanceMinor: 30000, side: 'credit', normalSide: 'credit', isUnusual: false });
 
       const flow = await store.statements.cashFlow(today(), today());
       expect(Object.fromEntries(flow.lines.map((l) => [l.key, l.amountMinor]))).toEqual({ payment: 31500, [`expense:${ACCOUNT.RENT}`]: -300000 });
       expect(flow).toMatchObject({ inflowMinor: 31500, outflowMinor: 300000, netMinor: -268500 });
       expect(flow.closingMinor - flow.openingMinor).toBe(flow.netMinor);
       await reconciled();
+    });
+
+    it('trial balance: an opening balance sits on the credit side of equity, with no warning', async () => {
+      const [cash] = await store.moneyAccounts.list();
+      await store.moneyAccounts.setOpeningBalance(String(cash._id), { amount: '2000000' }, owner);
+
+      const tb = await store.statements.trialBalance(today());
+      expect(tb.accounts.find((a) => a.code === ACCOUNT.EQUITY)).toMatchObject({ debitMinor: 0, creditMinor: 200_000_000, balanceMinor: 200_000_000, side: 'credit', isUnusual: false });
+      expect(tb.accounts.find((a) => a.code === ACCOUNT.CASH)).toMatchObject({ balanceMinor: 200_000_000, side: 'debit', isUnusual: false });
+      expect(tb.accounts.filter((a) => a.isUnusual)).toEqual([]);
     });
 
     it('what customers owe and what suppliers are owed, by age', async () => {

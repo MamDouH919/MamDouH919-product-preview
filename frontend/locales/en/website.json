@@ -1337,8 +1337,14 @@
     "trialIntro": "Every transaction is recorded in at least two accounts: a debit in one and an equal credit in another. For example, buying stock with cash: inventory is debited (goes up) and cash is credited (goes down). That is why the two columns must always add up to the same total.",
     "trialHowToRead": "For assets and expenses a debit means an increase and a credit a decrease; for liabilities, revenue and equity it is the other way round. The balance is the difference between the two columns, marked with the side it falls on.",
     "trialUnusual": "These accounts have a balance on the unusual side — check them:",
-    "trialUnusualDebitNormal": "more went out than came in; a receipt or addition was probably not recorded.",
-    "trialUnusualCreditNormal": "more was paid or taken off than was owed; a transaction was probably not recorded.",
+    "trialUnusualReason": {
+      "asset_credit": "more was paid out or taken off than was there; a receipt or addition was probably not recorded.",
+      "expense_credit": "adjustments or returns exceed the recorded expense; check the reversing entries.",
+      "contra_revenue_credit": "more discounts or returns were reversed than were recorded; check the reversing entries.",
+      "liability_debit": "more was paid or taken off than was owed; an invoice or liability was probably not recorded.",
+      "revenue_debit": "returns or discounts exceed sales, or a sale was posted the wrong way round.",
+      "equity_debit": "withdrawals or losses exceed the capital, or an opening balance was posted on the wrong side."
+    },
     "accountTypes": {
         "asset": "Asset",
         "liability": "Liability",
