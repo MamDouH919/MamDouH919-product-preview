@@ -6,7 +6,7 @@ import { Permissions } from '../decorators/permissions.decorator';
 import { Resource } from '../roles/enums/resource.enum';
 import { Action } from '../roles/enums/action.enum';
 import { MoneyAccountsService } from './money-accounts.service';
-import { CreateMoneyAccountDto, TransferMoneyDto, UpdateMoneyAccountDto } from './dto/money-account.dto';
+import { CreateMoneyAccountDto, SetOpeningBalanceDto, TransferMoneyDto, UpdateMoneyAccountDto } from './dto/money-account.dto';
 import { RequireModules } from '../decorators/store-module.decorator';
 import { StoreModule } from '../common/tenant/store-plan';
 
@@ -33,6 +33,12 @@ export class MoneyAccountsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateMoneyAccountDto) {
     return this.accounts.update(id, dto);
+  }
+
+  @Permissions([{ resource: Resource.MONEY_ACCOUNTS, actions: [Action.EXECUTE] }])
+  @Post(':id/opening-balance')
+  setOpeningBalance(@Param('id') id: string, @Body() dto: SetOpeningBalanceDto, @Req() req: Request & { userId?: string }) {
+    return this.accounts.setOpeningBalance(id, dto, req.userId);
   }
 
   @Permissions([{ resource: Resource.MONEY_ACCOUNTS, actions: [Action.EXECUTE] }])

@@ -11,6 +11,7 @@ export type MoneyAccount = {
   isDefault: boolean;
   isActive: boolean;
   balanceMinor: number;
+  hasOpeningBalance: boolean;
 };
 
 export const MONEY_ACCOUNTS_QUERY_KEY = "money-accounts";
@@ -22,6 +23,9 @@ export const updateMoneyAccount = async ({ id, ...data }: { id: string; name?: s
 /** `amount` is a decimal string ("5000.00"). */
 export const transferMoney = async (data: { fromId: string; toId: string; amount: string; note?: string }) =>
   (await api.post("/finance/money-accounts/transfers", data)).data;
+/** `amount` is a decimal string ("2000000.00"). Allowed once per account. */
+export const setOpeningBalance = async ({ id, ...data }: { id: string; amount: string; date?: string }) =>
+  (await api.post(`/finance/money-accounts/${id}/opening-balance`, data)).data;
 
 export const useMoneyAccountsQuery = (enabled = true) =>
   useQuery({ queryKey: [MONEY_ACCOUNTS_QUERY_KEY], queryFn: fetchMoneyAccounts, enabled, retry: false });

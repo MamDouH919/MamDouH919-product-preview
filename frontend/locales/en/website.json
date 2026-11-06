@@ -1266,6 +1266,8 @@
     "transferMoney": "Transfer money",
     "moneyTransferred": "Money transferred",
     "transferMoreThanHeld": "More than this account holds",
+    "setOpeningBalance": "Set opening balance",
+    "openingBalanceOnce": "An account's opening balance is recorded once and can't be edited after saving, so check the amount and date.",
     "savedSuccessfully": "Saved",
     "reports": "Reports",
     "report": {
@@ -1308,6 +1310,7 @@
         "courier_settlement": "Courier settlements",
         "supplier_payment": "Payments to suppliers",
         "money_transfer": "Transfers between accounts",
+        "money_account_opening": "Opening balances",
         "purchase": "Purchases",
         "purchase_return": "Purchase returns",
         "order": "Orders"

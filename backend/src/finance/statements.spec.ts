@@ -77,6 +77,48 @@ describe('Statements, money accounts and periods', () => {
       expect((await store.moneyAccounts.list()).filter((a: any) => a.isDefault).map((a: any) => a.name)).toEqual(['Bank Misr']);
       await reconciled();
     });
+
+    it('take one opening balance each, into cash and equity, with no profit', async () => {
+      const [cash] = await store.moneyAccounts.list();
+      const id = String(cash._id);
+      expect(cash.hasOpeningBalance).toBe(false);
+
+      await expect(store.moneyAccounts.setOpeningBalance(id, { amount: '0' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(store.moneyAccounts.setOpeningBalance(id, { amount: '1', date: new Date(Date.now() + 86_400_000 * 2).toISOString() })).rejects.toBeInstanceOf(BadRequestException);
+
+      await store.moneyAccounts.setOpeningBalance(id, { amount: '2000000' }, owner);
+
+      const [after] = await store.moneyAccounts.list();
+      expect(after.balanceMinor).toBe(200_000_000);
+      expect(after.hasOpeningBalance).toBe(true);
+      const books = await store.journal.balances();
+      expect(books[ACCOUNT.CASH]).toBe(200_000_000);
+      expect(books[ACCOUNT.EQUITY]).toBe(200_000_000);
+
+      await expect(store.moneyAccounts.setOpeningBalance(id, { amount: '5' }, owner)).rejects.toBeInstanceOf(ConflictException);
+      expect((await store.moneyAccounts.list())[0].balanceMinor).toBe(200_000_000);
+
+      const flow = await store.statements.cashFlow(today(), today());
+      expect(flow.lines).toEqual([{ key: 'money_account_opening', amountMinor: 200_000_000 }]);
+      const pl = await store.statements.profitAndLoss(today(), today());
+      expect(pl.totals.netProfitMinor).toBe(0);
+
+      // The money is really there: it can be moved on.
+      const bank = String((await store.moneyAccounts.create({ name: 'Bank Misr', type: MoneyAccountType.BANK }))._id);
+      await store.moneyAccounts.transfer({ fromId: id, toId: bank, amount: '500000' });
+      await reconciled();
+    });
+
+    it('refuse an opening balance on an inactive account or inside closed books', async () => {
+      const bank = String((await store.moneyAccounts.create({ name: 'Old bank', type: MoneyAccountType.BANK }))._id);
+      await store.moneyAccounts.update(bank, { isActive: false });
+      await expect(store.moneyAccounts.setOpeningBalance(bank, { amount: '10' })).rejects.toBeInstanceOf(BadRequestException);
+
+      await store.periods.lock(yesterday(), owner);
+      const [cash] = await store.moneyAccounts.list();
+      await expect(store.moneyAccounts.setOpeningBalance(String(cash._id), { amount: '10', date: new Date(Date.now() - 86_400_000 * 3).toISOString() })).rejects.toBeInstanceOf(ConflictException);
+      expect((await store.moneyAccounts.list())[0].hasOpeningBalance).toBe(false);
+    });
   });
 
   describe('statements', () => {

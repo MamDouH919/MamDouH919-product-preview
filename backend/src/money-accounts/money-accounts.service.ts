@@ -10,10 +10,12 @@ import { JournalService } from '../finance/journal.service';
 import { ACCOUNT } from '../finance/accounts';
 import { MoneyAccount } from './schemas/money-account.schema';
 import { MoneyTransfer } from './schemas/money-transfer.schema';
-import { CreateMoneyAccountDto, TransferMoneyDto, UpdateMoneyAccountDto } from './dto/money-account.dto';
+import { CreateMoneyAccountDto, SetOpeningBalanceDto, TransferMoneyDto, UpdateMoneyAccountDto } from './dto/money-account.dto';
 
 const TRANSFER_COUNTER = 'money_transfer';
 const TRANSFER_NUMBER_BASE = 9000;
+const OPENING_SOURCE = 'money_account_opening';
+const OPENING_EVENT = 'opened';
 
 @Injectable()
 export class MoneyAccountsService {
@@ -30,8 +32,13 @@ export class MoneyAccountsService {
   async list() {
     // Make sure the main cash box exists, so a new store sees where money will go.
     await withTransaction(this.connection, (session) => this.journal.defaultMoneyAccount(session));
-    const [accounts, balances] = await Promise.all([this.accountModel.find().sort({ isDefault: -1, name: 1 }).lean().exec(), this.balances()]);
-    return accounts.map((a) => ({ ...a, balanceMinor: balances.get(String(a._id)) ?? 0 }));
+    const [accounts, balances, opened] = await Promise.all([
+      this.accountModel.find().sort({ isDefault: -1, name: 1 }).lean().exec(),
+      this.balances(),
+      this.entryModel.distinct('source.id', { 'source.type': OPENING_SOURCE }).exec(),
+    ]);
+    const openedIds = new Set(opened.map(String));
+    return accounts.map((a) => ({ ...a, balanceMinor: balances.get(String(a._id)) ?? 0, hasOpeningBalance: openedIds.has(String(a._id)) }));
   }
 
   create(dto: CreateMoneyAccountDto) {
@@ -61,17 +68,9 @@ export class MoneyAccountsService {
 
   /** Moves money between two accounts. Never more than the one it leaves holds. */
   async transfer(dto: TransferMoneyDto, userId?: string) {
-    let amountMinor: number;
-    try {
-      amountMinor = parseMoney(dto.amount);
-    } catch (error) {
-      if (error instanceof MoneyError) throw new BadRequestException(error.message);
-      throw error;
-    }
-    if (amountMinor <= 0) throw new BadRequestException('The amount must be above zero');
+    const amountMinor = this.positiveAmount(dto.amount);
     if (dto.fromId === dto.toId) throw new BadRequestException('Pick two different accounts');
-    const date = dto.date ? new Date(dto.date) : new Date();
-    if (Number.isNaN(date.getTime()) || date.getTime() > Date.now() + 60_000) throw new BadRequestException('The date must be today or earlier');
+    const date = this.pastDate(dto.date);
 
     return withTransaction(this.connection, async (session) => {
       const [from, to] = await Promise.all([this.journal.moneyAccount(dto.fromId, session), this.journal.moneyAccount(dto.toId, session)]);
@@ -102,6 +101,36 @@ export class MoneyAccountsService {
     });
   }
 
+  /**
+   * What an account already held when the store started using the system:
+   * cash in, owner equity out. Once per account, and the entry's source being
+   * the account itself means the books' own unique index enforces that too.
+   */
+  async setOpeningBalance(id: string, dto: SetOpeningBalanceDto, userId?: string) {
+    const amountMinor = this.positiveAmount(dto.amount);
+    const date = this.pastDate(dto.date);
+
+    return withTransaction(this.connection, async (session) => {
+      const account = await this.journal.moneyAccount(id, session);
+      if (await this.journal.findBySource(OPENING_SOURCE, account, OPENING_EVENT, session)) {
+        throw new ConflictException('This account already has an opening balance');
+      }
+      return this.journal.post(
+        {
+          date,
+          source: { type: OPENING_SOURCE, id: account, event: OPENING_EVENT },
+          lines: [
+            { account: ACCOUNT.CASH, debitMinor: amountMinor, moneyAccount: account },
+            { account: ACCOUNT.EQUITY, creditMinor: amountMinor },
+          ],
+          memo: 'Opening balance',
+          createdBy: userId,
+        },
+        session,
+      );
+    });
+  }
+
   /** Balance of each money account: debits − credits of its cash lines. */
   async balances(session?: ClientSession): Promise<Map<string, number>> {
     const rows = await this.entryModel
@@ -113,6 +142,24 @@ export class MoneyAccountsService {
       .session(session ?? null)
       .exec();
     return new Map(rows.map((r) => [String(r._id), r.balance]));
+  }
+
+  private positiveAmount(amount: string): number {
+    let amountMinor: number;
+    try {
+      amountMinor = parseMoney(amount);
+    } catch (error) {
+      if (error instanceof MoneyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (amountMinor <= 0) throw new BadRequestException('The amount must be above zero');
+    return amountMinor;
+  }
+
+  private pastDate(value?: string): Date {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime()) || date.getTime() > Date.now() + 60_000) throw new BadRequestException('The date must be today or earlier');
+    return date;
   }
 
   private oid(id: string) {

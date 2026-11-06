@@ -39,6 +39,19 @@ export class UpdateMoneyAccountDto {
   isDefault?: boolean;
 }
 
+export class SetOpeningBalanceDto {
+  @ApiProperty({ example: '2000000.00' })
+  @IsString()
+  @Matches(/^\d+(\.\d{1,2})?$/, { message: 'amount must be an amount with at most 2 decimals' })
+  amount!: string;
+
+  /** The day the account held this money. Today when left out. */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+}
+
 export class TransferMoneyDto {
   @ApiProperty()
   @IsMongoId()

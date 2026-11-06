@@ -1260,6 +1260,8 @@
     "transferMoney": "تحويل أموال",
     "moneyTransferred": "تم التحويل",
     "transferMoreThanHeld": "أكثر من رصيد هذا الحساب",
+    "setOpeningBalance": "إدخال الرصيد الافتتاحي",
+    "openingBalanceOnce": "يُسجَّل الرصيد الافتتاحي مرة واحدة لكل حساب ولا يمكن تعديله بعد الحفظ، فتأكد من المبلغ والتاريخ.",
     "savedSuccessfully": "تم الحفظ",
     "reports": "التقارير",
     "report": {
@@ -1302,6 +1304,7 @@
         "courier_settlement": "تسويات المندوبين",
         "supplier_payment": "مدفوعات للموردين",
         "money_transfer": "تحويلات بين الحسابات",
+        "money_account_opening": "أرصدة افتتاحية",
         "purchase": "مشتريات",
         "purchase_return": "مرتجعات مشتريات",
         "order": "طلبات"

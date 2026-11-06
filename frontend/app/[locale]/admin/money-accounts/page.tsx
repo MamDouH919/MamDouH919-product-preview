@@ -12,6 +12,7 @@ import {
   MONEY_ACCOUNTS_QUERY_KEY,
   MoneyAccount,
   MoneyAccountType,
+  setOpeningBalance,
   transferMoney,
   updateMoneyAccount,
   useMoneyAccountsQuery,
@@ -19,7 +20,7 @@ import {
 import { useCurrency } from "@/Hooks/useCurrency";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatMinorMoney } from "@/features/Order/format";
-import { AMOUNT, inputToMinor, toastError } from "@/features/Purchasing/shared";
+import { AMOUNT, inputToMinor, toastError, todayInput } from "@/features/Purchasing/shared";
 
 const TYPES: MoneyAccountType[] = ["cash", "bank", "wallet"];
 
@@ -32,6 +33,7 @@ const MoneyAccountsPage = () => {
   const { data, isLoading } = useMoneyAccountsQuery();
   const [editing, setEditing] = useState<MoneyAccount | "new" | null>(null);
   const [transferring, setTransferring] = useState(0);
+  const [opening, setOpening] = useState<MoneyAccount | null>(null);
 
   useEffect(() => {
     dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("moneyAccounts") }], breadCrumbBtns: [] }));
@@ -68,6 +70,9 @@ const MoneyAccountsPage = () => {
         render: (row: MoneyAccount) => (
           <Stack direction="row" spacing={1}>
             <Button size="small" onClick={() => setEditing(row)}>{t("edit")}</Button>
+            {row.isActive && !row.hasOpeningBalance && (
+              <Button size="small" onClick={() => setOpening(row)}>{t("setOpeningBalance")}</Button>
+            )}
             {!row.isDefault && row.isActive && (
               <Button size="small" disabled={update.isPending} onClick={() => update.mutate({ id: row._id, isDefault: true })}>{t("makeDefault")}</Button>
             )}
@@ -99,6 +104,7 @@ const MoneyAccountsPage = () => {
       </Box>
       {editing && <AccountDialog key={editing === "new" ? "new" : editing._id} account={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
       {transferring > 0 && <TransferDialog key={transferring} accounts={active} onClose={() => setTransferring(0)} />}
+      {opening && <OpeningBalanceDialog key={opening._id} account={opening} onClose={() => setOpening(null)} />}
     </Stack>
   );
 };
@@ -132,6 +138,49 @@ const AccountDialog = ({ account, onClose }: { account: MoneyAccount | null; onC
       <DialogActions>
         <Button onClick={onClose}>{t("back")}</Button>
         <Button variant="contained" disabled={!name.trim() || mutation.isPending} onClick={() => mutation.mutate()}>{t("save")}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+const OpeningBalanceDialog = ({ account, onClose }: { account: MoneyAccount; onClose: () => void }) => {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const currency = useCurrency();
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(todayInput());
+  const mutation = useMutation({
+    mutationFn: () => setOpeningBalance({ id: account._id, amount, date: new Date(date).toISOString() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MONEY_ACCOUNTS_QUERY_KEY] });
+      toast.success(t("savedSuccessfully"));
+      onClose();
+    },
+    onError: (error) => toastError(error, t("somethingWentWrong")),
+  });
+  const valid = AMOUNT.test(amount) && Number(amount) > 0 && !!date;
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{`${t("setOpeningBalance")}: ${account.name}`}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} pt={1}>
+          <TextField
+            label={t("amount")}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.trim())}
+            error={!!amount && !AMOUNT.test(amount)}
+            // Spelled back with separators: this can't be edited afterwards, and a missing zero is easy to miss.
+            helperText={valid ? formatMinorMoney(inputToMinor(amount), currency) : undefined}
+            autoFocus
+            slotProps={{ htmlInput: { inputMode: "decimal", dir: "ltr" } }}
+          />
+          <TextField label={t("date")} type="date" value={date} onChange={(e) => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayInput() } }} />
+          <Typography variant="caption" color="text.secondary">{t("openingBalanceOnce")}</Typography>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t("back")}</Button>
+        <Button variant="contained" disabled={!valid || mutation.isPending} onClick={() => mutation.mutate()}>{t("save")}</Button>
       </DialogActions>
     </Dialog>
   );
