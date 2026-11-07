@@ -1,5 +1,6 @@
 // src/theme.ts
 import { createTheme } from '@mui/material/styles';
+import { arEG, enUS } from '@mui/material/locale';
 import { Cairo } from "next/font/google";
 
 // Import Cairo font from Google Fonts via Next.js
@@ -50,6 +51,23 @@ export default function getTheme({
         styleOverrides: {
           root: {
             textTransform: "capitalize",
+          },
+        },
+      },
+      MuiTablePagination: {
+        styleOverrides: {
+          // MuiToolbar capitalizes every word, and MuiInputBase forces 16px on
+          // inputs, which makes the page-size value larger than the labels.
+          // The small-input padding (1px/5px) also lifts it off the text baseline.
+          toolbar: {
+            textTransform: "none",
+          },
+          input: {
+            "& .MuiInputBase-input": {
+              fontSize: "inherit",
+              paddingTop: 3,
+              paddingBottom: 3,
+            },
           },
         },
       },
@@ -107,5 +125,17 @@ export default function getTheme({
       fontFamily: cairo.style.fontFamily,
       fontSize: 12.5,
     },
-  });
+  },
+  dir === "rtl" ? arEG : enUS,
+  dir === "rtl" ? {
+    components: {
+      MuiTablePagination: {
+        defaultProps: {
+          // Isolate the range as LTR, otherwise the bidi algorithm flips "1–25" to "25–1".
+          labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
+            `\u2066${from}–${to}\u2069 من ${count !== -1 ? count : `أكثر من ${to}`}`,
+        },
+      },
+    },
+  } : {});
 }
