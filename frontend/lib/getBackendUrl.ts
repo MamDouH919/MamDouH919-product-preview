@@ -17,6 +17,7 @@ const api: Record<string, string> = {
   "gravity.novaslash.com": "https://api-gravity.novaslash.com",
   "demo.novaslash.com": "https://api-demo.novaslash.com",
   "mk.novaslash.com": "https://api-mk.novaslash.com",
+  "nuxi.novaslash.com": "https://api-nuxi.novaslash.com",
 }
 
 export function getBackendUrl(): string {

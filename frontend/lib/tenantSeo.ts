@@ -5,6 +5,7 @@ import ranosh from "./tenants/ranosh";
 import gravity from "./tenants/gravity";
 import demo from "./tenants/demo";
 import mk from "./tenants/mk";
+import nuxi from "./tenants/nuxi";
 
 export type { TenantSeo, LocaleSeo } from "./tenants/types";
 
@@ -23,6 +24,8 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   "demo.novaslash.com": demo,
   "mk.localhost": mk,
   "mk.novaslash.com": mk,
+  "nuxi.localhost": nuxi,
+  "nuxi.novaslash.com": nuxi,
 };
 
 export const DEFAULT_TENANT = "localhost";
