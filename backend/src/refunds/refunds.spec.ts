@@ -9,6 +9,7 @@ import { ACCOUNT } from '../finance/accounts';
 import { RefundMethod, RefundReason, RefundStatus } from './schemas/refund.schema';
 import { ReturnReason, ReturnStatus } from '../returns/schemas/return-request.schema';
 import { DeliveryFeeRefundPolicy } from '../settings/schemas/setting.schema';
+import { dayKey } from '../common/helpers/time-zone';
 
 jest.setTimeout(180_000);
 
@@ -102,7 +103,9 @@ describe('Refunds', () => {
       expect(await store.finance.summary('2026-09-01', '2026-09-30')).toMatchObject({ netRevenueMinor: 31500, productReturnsMinor: 0 });
       const today = await store.finance.summary();
       expect(today).toMatchObject({ productReturnsMinor: 13500, refundsPaidOutMinor: 13500 });
-      expect((await store.finance.summary(new Date().toISOString().slice(0, 10), new Date().toISOString().slice(0, 10))).netRevenueMinor).toBe(-13500);
+      // "Today" is the store's calendar day, not UTC's: around midnight the two differ.
+      const day = dayKey(new Date(), (await store.finance.storeClock()).timeZone);
+      expect((await store.finance.summary(day, day)).netRevenueMinor).toBe(-13500);
       await reconciled();
     });
 

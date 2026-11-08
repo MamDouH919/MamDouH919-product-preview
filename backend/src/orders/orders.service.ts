@@ -11,7 +11,8 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model, QueryFilter, Types } from 'mongoose';
-import { TENANT_CONNECTION } from '../common/tenant/tenant.module';
+import { STORE_MODULES, TENANT_CONNECTION } from '../common/tenant/tenant.module';
+import { StoreModule } from '../common/tenant/store-plan';
 import { withTransaction } from '../common/tenant/with-transaction';
 import { DEFAULT_CURRENCY, formatMinor, MoneyError } from '../common/money/money';
 import { safeTimeZone, zonedDayRange } from '../common/helpers/time-zone';
@@ -146,7 +147,18 @@ export class OrdersService {
     private readonly couponsService: CouponsService,
     private readonly priceListService: PriceListService,
     private readonly notifications: OrderNotificationsService,
+    @Inject(STORE_MODULES) private readonly modules: readonly StoreModule[],
   ) {}
+
+  /** Whether orders take stock off the shelf. Without it every product sells as if untracked. */
+  private get takesStock(): boolean {
+    return this.modules.includes(StoreModule.INVENTORY);
+  }
+
+  /** Whether orders post to the books: their cost when placed, the sale when delivered. */
+  private get keepsBooks(): boolean {
+    return this.modules.includes(StoreModule.FINANCE);
+  }
 
   // ── Pricing ─────────────────────────────────────────────────────────────────
 
@@ -534,7 +546,7 @@ export class OrdersService {
         throw error;
       }
 
-      await this.reserveCost(created, lines, movements, session);
+      if (this.keepsBooks) await this.reserveCost(created, lines, movements, session);
       return created;
     });
 
@@ -688,7 +700,8 @@ export class OrdersService {
         );
       }
 
-      if (to === OrderStatus.DELIVERED) {
+      // A store without the books leaves the sale unbooked; nothing waits on it.
+      if (to === OrderStatus.DELIVERED && this.keepsBooks) {
         await this.bookDelivery(updated, change.by, session);
       }
       if (to === OrderStatus.CANCELLED) {
@@ -1051,7 +1064,9 @@ export class OrdersService {
         if (!(error instanceof MoneyError)) throw error;
       }
       const unitPrice = unitPriceMinor !== undefined ? toMajor(unitPriceMinor) : undefined;
-      const limited = product.trackStock && !product.allowBackorder;
+      // Without inventory nothing is counted, so nothing runs out.
+      const tracksStock = this.takesStock && product.trackStock;
+      const limited = tracksStock && !product.allowBackorder;
       const available = limited ? (variant ? variant.stock : product.stock) ?? 0 : null;
 
       const line: ResolvedLine = {
@@ -1066,7 +1081,7 @@ export class OrdersService {
         lineTotal: unitPriceMinor !== undefined ? toMajor(unitPriceMinor * item.quantity) : 0,
         lineTotalMinor: unitPriceMinor !== undefined ? unitPriceMinor * item.quantity : 0,
         available,
-        tracksStock: product.trackStock,
+        tracksStock,
       };
 
       if (unitPriceMinor === undefined) return { ...line, issue: 'no_price' };

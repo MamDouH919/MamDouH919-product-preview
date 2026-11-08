@@ -1,11 +1,15 @@
 const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3023').replace(/\/+$/, '');
 const TOKEN_KEY = 'platform-token';
 
-/** What a store is sold as. `catalog` shows products only; `full` adds online orders, stock and the books. */
-export type StorePlan = 'catalog' | 'full';
+/**
+ * What a store is sold as. `catalog` shows products only; `orders` adds online
+ * orders without stock, couriers or the books; `full` has everything.
+ */
+export type StorePlan = 'catalog' | 'orders' | 'full';
 
 export const PLAN_LABELS: Record<StorePlan, string> = {
   full: 'Full shop',
+  orders: 'Orders only',
   catalog: 'Catalog only',
 };
 

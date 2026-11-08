@@ -26,10 +26,11 @@ export const useInventorySummaryQuery = () => {
   });
 };
 
-export const useLowStockQuery = () => {
+export const useLowStockQuery = (enabled = true) => {
   return useQuery({
     queryKey: [INVENTORY_QUERY_KEY, "low-stock"],
     queryFn: fetchLowStock,
+    enabled,
   });
 };
 

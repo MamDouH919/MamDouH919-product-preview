@@ -27,6 +27,7 @@ import { approveReturn, rejectReturn } from "@/backend-api/returns/mutations";
 import { REFUNDS_QUERY_KEY, useRefundsQuery } from "@/backend-api/refunds/hooks";
 import RefundRequestDialog from "@/features/Refund/RefundRequestDialog";
 import RefundsCard from "@/features/Refund/RefundsCard";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 import { ORDERS_QUERY_KEY } from "@/backend-api/orders/hooks";
 import { useCurrency } from "@/Hooks/useCurrency";
 import CustomLink from "@/components/CustomLink";
@@ -49,7 +50,9 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const [note, setNote] = useState("");
   // Bumped to open a fresh refund dialog each time.
   const [refundDialog, setRefundDialog] = useState(0);
-  const { data: refunds } = useRefundsQuery({ returnId: id, limit: 50 });
+  // Refunds live in the books; a store without them settles returns outside the system.
+  const keepsBooks = useStoreModules().has("finance");
+  const { data: refunds } = useRefundsQuery({ returnId: id, limit: 50 }, keepsBooks);
 
   useEffect(() => {
     dispatch(
@@ -103,7 +106,7 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   // A return is settled by one refund; while one is open or paid, there's nothing more to ask for.
   const hasRefund = (refunds?.data ?? []).some((r) => ["requested", "approved", "executed"].includes(r.status));
   // Refunds live in the books, so only orders delivered after they started can be refunded here.
-  const canRefund = open && !hasRefund && !!ret.orderSummary?.bookedAt;
+  const canRefund = keepsBooks && open && !hasRefund && !!ret.orderSummary?.bookedAt;
 
   const openDialog = (kind: Decision) => {
     setNote("");
@@ -167,11 +170,12 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
-          {open && !ret.orderSummary?.bookedAt && (
+          {open && !keepsBooks && <Alert severity="info">{t("returnOutsideSystem")}</Alert>}
+          {open && keepsBooks && !ret.orderSummary?.bookedAt && (
             <Alert severity="info">{t("refundOutsideBooks")}</Alert>
           )}
 
-          <RefundsCard returnId={id} currency={currency} />
+          {keepsBooks && <RefundsCard returnId={id} currency={currency} />}
 
           {open && (
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>

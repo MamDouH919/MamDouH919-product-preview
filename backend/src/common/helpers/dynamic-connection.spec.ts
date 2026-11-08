@@ -92,4 +92,12 @@ describe('TenantConnectionService', () => {
     expect(service.hasModule('b.com', StoreModule.FINANCE)).toBe(true);
     expect(service.getPlan('__proto__')).toBe(DEFAULT_PLAN);
   });
+
+  it('gives an orders-only store orders without stock, couriers or the books', () => {
+    process.env.TENANT_MAP = JSON.stringify({ 'c.com': store('c', { plan: StorePlan.ORDERS }) });
+    const service = new TenantConnectionService();
+    expect(service.getModules('c.com')).toEqual([StoreModule.ORDERS]);
+    expect(service.hasModule('c.com', StoreModule.INVENTORY)).toBe(false);
+    expect(service.hasModule('c.com', StoreModule.FINANCE)).toBe(false);
+  });
 });

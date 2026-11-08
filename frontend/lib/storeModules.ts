@@ -1,7 +1,7 @@
 import config from "@/config.json";
 
 /** What the store is sold as; set on the platform, never by the store. Mirrors the API's StorePlan. */
-export type StorePlan = "catalog" | "full";
+export type StorePlan = "catalog" | "orders" | "full";
 
 /** The parts of the system a plan switches on. Products and the website are always on. */
 export type StoreModule = "orders" | "inventory" | "finance";

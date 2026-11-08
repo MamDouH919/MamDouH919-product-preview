@@ -2,6 +2,13 @@
 export enum StorePlan {
   /** Products, categories, pages and the rest of the website — nothing is bought online. */
   CATALOG = 'catalog',
+  /**
+   * Online orders, customers, coupons, returns and delivery prices, without
+   * stock, purchases, couriers or the books: the store sells online and keeps
+   * its stock and money outside the system. Final: such a store is never
+   * moved to FULL, since it has no books to start them from.
+   */
+  ORDERS = 'orders',
   /** Everything: online orders, stock and the books. */
   FULL = 'full',
 }
@@ -26,6 +33,7 @@ export enum StoreModule {
  */
 export const PLAN_MODULES: Record<StorePlan, readonly StoreModule[]> = {
   [StorePlan.CATALOG]: [],
+  [StorePlan.ORDERS]: [StoreModule.ORDERS],
   [StorePlan.FULL]: [StoreModule.ORDERS, StoreModule.INVENTORY, StoreModule.FINANCE],
 };
 

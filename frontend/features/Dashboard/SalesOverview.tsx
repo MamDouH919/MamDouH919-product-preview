@@ -24,6 +24,7 @@ import { DashboardPeriod } from "@/backend-api/reports/types";
 import { useLowStockQuery } from "@/backend-api/inventory/hooks";
 import { ORDER_STATUSES } from "@/backend-api/orders/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 import OrderStatusChip from "@/features/Order/OrderStatusChip";
 import { formatDateTime, formatMoney, localized } from "@/features/Order/format";
 import { getBackendUri } from "@/utils/helperFunctions";
@@ -139,7 +140,10 @@ const SalesOverview = () => {
   const [days, setDays] = useState<DashboardPeriod>(30);
 
   const { data, isLoading, isError } = useDashboardReportQuery(days);
-  const { data: lowStock, isError: lowStockHidden } = useLowStockQuery();
+  // Hidden when the store keeps no stock, or the viewer may not read it.
+  const keepsStock = useStoreModules().has("inventory");
+  const { data: lowStock, isError: lowStockError } = useLowStockQuery(keepsStock);
+  const lowStockHidden = !keepsStock || lowStockError;
 
   if (isError) return null;
 

@@ -26,6 +26,23 @@ const en: HelpGuideSource = {
           },
           {
             type: "p",
+            requires: ["orders"],
+            unless: "finance",
+            text: "Your store takes orders online: customers order and check out on the website, and you follow each order from the dashboard until it's delivered. Stock, purchasing, couriers and accounting aren't part of your plan, so the system doesn't count stock or keep books — you keep those outside it.",
+          },
+          {
+            type: "list",
+            requires: ["orders"],
+            unless: "finance",
+            title: "Worth knowing from day one",
+            items: [
+              "Products **never run out** on the website: nothing is counted, so a product sells as long as it's **Active**. Switch it off when you can't supply it.",
+              "Revenue on the home page counts orders **on the day they're delivered**. Orders that haven't been delivered aren't revenue yet.",
+              "Collecting payments, refunds and courier cash happen outside the system; the order only records how the customer chose to pay.",
+            ],
+          },
+          {
+            type: "p",
             requires: ["finance"],
             text: "The dashboard isn't just a list of orders — it keeps full accounting books. Every movement of money or goods (a collection, refund, purchase, expense, courier settlement or transfer) is posted to the books automatically and shows up straight away in **Money accounts** balances and in **Reports**.",
           },
@@ -57,6 +74,18 @@ const en: HelpGuideSource = {
           },
           {
             type: "steps",
+            requires: ["orders"],
+            unless: "finance",
+            items: [
+              "**Settings → General**: store details, currency and the **Return window (days)**.",
+              "**Settings → Email**: so customers receive order emails and password-reset links.",
+              "**Delivery → Price list**: a price for each governorate or area (0 = free delivery).",
+              "**Products**: add products by hand, or import them all at once from a CSV file (see the Import tab).",
+              "**Sales → Coupons**: optional discount codes for your customers.",
+            ],
+          },
+          {
+            type: "steps",
             requires: ["orders", "inventory", "finance"],
             items: [
               "**Settings → General**: store details, currency and the **Return window (days)**.",
@@ -80,6 +109,19 @@ const en: HelpGuideSource = {
             items: [
               "**Products & categories**: products (including CSV import/export), categories and sub-categories.",
               "**Customers & messages**: reviews, contact messages and subscribers.",
+              "**Website content**: pages, banners and sections.",
+              "**Settings**: general, email, and the **Activity log** (every change made in the dashboard and who made it, kept for a year).",
+            ],
+          },
+          {
+            type: "list",
+            requires: ["orders"],
+            unless: "finance",
+            items: [
+              "**Sales**: orders, returns and coupons.",
+              "**Products & categories**: products (including CSV import/export), categories and sub-categories.",
+              "**Delivery**: the delivery price list.",
+              "**Customers & messages**: customers, reviews, contact messages and subscribers.",
               "**Website content**: pages, banners and sections.",
               "**Settings**: general, email, and the **Activity log** (every change made in the dashboard and who made it, kept for a year).",
             ],
@@ -123,17 +165,25 @@ const en: HelpGuideSource = {
               "Open the order from **Sales → Orders**.",
               "Check the items and address, then click **Confirm order**.",
               "When it leaves with the courier, click **Mark as shipped** — the note can hold the courier's name or tracking number.",
-              "When the customer receives it, click **Mark as delivered**. From that moment the order counts as **revenue**, and the **Payment** section opens for recording the collection.",
+              { text: "When the customer receives it, click **Mark as delivered**. From that moment the order counts as **revenue**, and the **Payment** section opens for recording the collection.", requires: ["finance"] },
+              { text: "When the customer receives it, click **Mark as delivered**. From that moment the order counts as **revenue** on the home page.", unless: "finance" },
             ],
           },
           {
             type: "warning",
+            requires: ["inventory"],
             text: "Cancelling an order (before delivery) puts its items back in stock automatically. After delivery there's no cancelling — what comes back is a **Return**.",
+          },
+          {
+            type: "warning",
+            unless: "inventory",
+            text: "An order can be cancelled only before it's delivered. After delivery there's no cancelling — what comes back is a **Return**.",
           },
         ],
       },
       {
         title: "Recording a collection (cash on delivery)",
+        requires: ["finance"],
         path: "/admin/orders",
         blocks: [
           {
@@ -153,6 +203,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Payment statuses",
+        requires: ["finance"],
         blocks: [
           {
             type: "list",
@@ -169,6 +220,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Fixing a wrong collection, or writing off a balance",
+        requires: ["finance"],
         blocks: [
           {
             type: "p",
@@ -185,12 +237,42 @@ const en: HelpGuideSource = {
   },
 
   returns: {
-    requires: ["orders", "finance"],
+    requires: ["orders"],
     label: "Returns & refunds",
     summary: "How to take a return, put goods back in stock, and give the money back correctly.",
     sections: [
       {
+        title: "Returns without accounting",
+        path: "/admin/returns",
+        unless: "finance",
+        blocks: [
+          {
+            type: "p",
+            text: "A **return** is goods coming back from the customer (Sales → Returns). Your plan has no accounting or stock, so paying the customer back and putting the goods back on the shelf happen outside the system — the return records what came back and why.",
+          },
+          {
+            type: "list",
+            title: "Where returns come from",
+            items: [
+              "**The customer**: from their account on the website, within the **Return window** set in **Settings → General** (0 turns customer requests off). You get an email alert if it's switched on.",
+              "**The store**: for a return taken by phone or in store, open the order (it must be **Delivered**) and click **Create return** in its Returns section. These start **Approved**.",
+            ],
+          },
+          {
+            type: "steps",
+            title: "Handling a return",
+            items: [
+              "Open **Sales → Returns** and click a return with status **Requested**.",
+              "Check the items, quantities, **Reason** and the customer's note.",
+              "Click **Approve** (optionally with a note to the customer), or **Reject** if it isn't accepted.",
+              "Pay the customer back and restock the goods the way you usually do, outside the system.",
+            ],
+          },
+        ],
+      },
+      {
         title: "Return vs refund",
+        requires: ["finance"],
         blocks: [
           {
             type: "list",
@@ -208,6 +290,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Where returns come from",
+        requires: ["finance"],
         blocks: [
           {
             type: "list",
@@ -222,6 +305,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Handling a return, start to finish",
+        requires: ["finance"],
         path: "/admin/returns",
         blocks: [
           {
@@ -244,6 +328,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Ways to give the money back",
+        requires: ["finance"],
         blocks: [
           {
             type: "list",
@@ -269,6 +354,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Approval rules and delivery-fee policy",
+        requires: ["finance"],
         path: "/admin/settings",
         blocks: [
           {
@@ -291,6 +377,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Refund without a return",
+        requires: ["finance"],
         path: "/admin/orders",
         blocks: [
           {
@@ -301,6 +388,7 @@ const en: HelpGuideSource = {
       },
       {
         title: "Made a mistake? Reversing a refund",
+        requires: ["finance"],
         path: "/admin/refunds",
         blocks: [
           {

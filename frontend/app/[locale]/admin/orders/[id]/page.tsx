@@ -43,6 +43,7 @@ import RefundsCard from "@/features/Refund/RefundsCard";
 import RefundRequestDialog from "@/features/Refund/RefundRequestDialog";
 import { REFUNDS_QUERY_KEY } from "@/backend-api/refunds/hooks";
 import { ORDER_FINANCE_QUERY_KEY } from "@/backend-api/finance/hooks";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 
 const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = use(params);
@@ -51,6 +52,9 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const fallbackCurrency = useCurrency();
+  // Payments and refunds live in the books; cancelling restocks only where stock is kept.
+  const { has } = useStoreModules();
+  const keepsBooks = has("finance");
 
   const [target, setTarget] = useState<OrderStatus | null>(null);
   const [note, setNote] = useState("");
@@ -237,9 +241,9 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
-          <OrderPaymentPanel orderId={order._id} currency={currency} />
+          {keepsBooks && <OrderPaymentPanel orderId={order._id} currency={currency} />}
 
-          {order.bookedAt && (
+          {keepsBooks && order.bookedAt && (
             <RefundsCard
               orderId={order._id}
               currency={currency}
@@ -323,7 +327,7 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
       <Dialog open={!!target} onClose={() => setTarget(null)} fullWidth maxWidth="xs">
         <DialogTitle>{target && t(`orderAction.${target}`)}</DialogTitle>
         <DialogContent>
-          {target === "cancelled" && (
+          {target === "cancelled" && has("inventory") && (
             <DialogContentText mb={2}>{t("cancelOrderRestockHint")}</DialogContentText>
           )}
           <TextField

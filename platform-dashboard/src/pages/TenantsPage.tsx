@@ -249,7 +249,7 @@ export function TenantsPage() {
                         <Chip
                           size="small"
                           variant="outlined"
-                          color={t.plan === 'catalog' ? 'default' : 'primary'}
+                          color={t.plan === 'full' ? 'primary' : t.plan === 'orders' ? 'secondary' : 'default'}
                           label={PLAN_LABELS[t.plan]}
                         />
                       )}

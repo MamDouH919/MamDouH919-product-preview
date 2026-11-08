@@ -141,6 +141,12 @@ describe('Tenant registry', () => {
     expect(tenants.hasModule('shop.test', StoreModule.ORDERS)).toBe(true);
   });
 
+  it('never moves an orders-only store to the full shop', async () => {
+    await service.update('shop.test', { plan: StorePlan.ORDERS });
+    await expect(service.update('shop.test', { plan: StorePlan.FULL })).rejects.toThrow(/orders-only/);
+    expect(tenants.getPlan('shop.test')).toBe(StorePlan.ORDERS);
+  });
+
   it('refuses to delete a store that still has aliases', async () => {
     await expect(service.remove('shop.test')).rejects.toThrow(/aliases first/);
     await service.remove('www.shop.test');

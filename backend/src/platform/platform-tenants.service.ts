@@ -86,6 +86,11 @@ export class PlatformTenantsService {
       disabled: dto.disabled ?? current.disabled,
       plan: dto.plan ?? current.plan,
     };
+    // An orders-only store keeps its stock and money outside the system from
+    // day one, so there are no books to start from: it never becomes full.
+    if (current.plan === StorePlan.ORDERS && next.plan === StorePlan.FULL) {
+      throw new BadRequestException('An orders-only store cannot be moved to the full shop plan.');
+    }
     if (dto.aliasOf !== undefined) {
       if (dto.aliasOf) next.aliasOf = dto.aliasOf;
       else delete next.aliasOf;

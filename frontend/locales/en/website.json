@@ -1123,6 +1123,7 @@
         "reverse": "Refund reversed"
     },
     "refundOutsideBooks": "This order was delivered before the books started, so it can't be refunded here. Record the refund outside the system.",
+    "returnOutsideSystem": "Your plan doesn't include accounting or stock, so refunds and restocking for this return happen outside the system. Approve it once it's agreed, or reject it.",
     "creditedAgainstBalance": "Credited against balance",
     "amount": "Amount",
     "beyondPolicy": "beyond policy",
@@ -1421,7 +1422,7 @@
     "helpNextTopic": "Next",
     "homeSections": "Home page sections",
     "notInPlan": "Not part of your store's plan",
-    "notInPlanHint": "Your store shows products without online ordering. Contact us to add orders, stock and accounting.",
+    "notInPlanHint": "This page isn't part of your store's plan. Contact us if you'd like to add it.",
     "storefront": "Storefront",
     "showPrices": "Show prices",
     "showPricesHint": "Turn off to show products without prices, so visitors ask on WhatsApp."

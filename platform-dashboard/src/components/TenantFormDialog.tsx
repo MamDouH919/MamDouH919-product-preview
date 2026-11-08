@@ -11,8 +11,32 @@ interface Props {
   onSaved: (message: string) => void;
 }
 
+/** What each plan has beyond the website, for telling an admin what a switch shows or hides. */
+const PLAN_PARTS: Record<StorePlan, string[]> = {
+  catalog: [],
+  orders: ['online orders'],
+  full: ['online orders', 'stock', 'accounting'],
+};
+
+const list = (parts: string[]) =>
+  parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+
+/** What switching from one plan to another does to the store's data. */
+function switchNote(from: StorePlan, to: StorePlan): string {
+  const hidden = PLAN_PARTS[from].filter((p) => !PLAN_PARTS[to].includes(p));
+  const added = PLAN_PARTS[to].filter((p) => !PLAN_PARTS[from].includes(p));
+  const notes: string[] = [];
+  if (hidden.length) {
+    const what = list(hidden);
+    notes.push(`${what[0].toUpperCase()}${what.slice(1)} are hidden from the store, not deleted. Switching back brings them back as they were.`);
+  }
+  if (added.length) notes.push(`The store gets ${list(added)}, with any data it had before.`);
+  return notes.join(' ');
+}
+
 const PLAN_HINTS: Record<StorePlan, string> = {
   full: 'Online orders, customer accounts, stock and accounting.',
+  orders: 'Online orders, customer accounts, coupons and returns. No stock, purchases, couriers or accounting — and it can never be moved to the full shop.',
   catalog: 'Products and the website only. Visitors ask on WhatsApp; nothing is ordered online.',
 };
 
@@ -120,7 +144,10 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
               value={plan}
               onChange={(e) => setPlan(e.target.value as StorePlan)}
             >
-              {(Object.keys(PLAN_LABELS) as StorePlan[]).map((p) => (
+              {/* An orders-only store never moves to the full shop: it has no books to start from. */}
+              {(Object.keys(PLAN_LABELS) as StorePlan[])
+                .filter((p) => !(tenant?.plan === 'orders' && p === 'full'))
+                .map((p) => (
                 <MenuItem key={p} value={p}>
                   {PLAN_LABELS[p]}
                 </MenuItem>
@@ -129,9 +156,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
           )}
           {editing && !aliasOf && plan !== tenant!.plan && (
             <Alert severity="info">
-              {plan === 'catalog'
-                ? 'Orders, stock and accounting are hidden from the store, not deleted. Switching back brings them back as they were.'
-                : 'The store gets online orders, stock and accounting, with any data it had before.'}
+              {switchNote(tenant!.plan, plan)}
             </Alert>
           )}
         </Stack>

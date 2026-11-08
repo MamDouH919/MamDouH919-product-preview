@@ -3,8 +3,16 @@ import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { Connection } from 'mongoose';
 import { TenantConnectionService } from '../helpers/dynamic-connection';
+import { StoreModule } from './store-plan';
 
 export const TENANT_CONNECTION = 'TENANT_CONNECTION';
+
+/**
+ * The modules the requesting store's plan has, for services whose work
+ * changes with the plan (an order takes stock and books the sale only when
+ * the store has those modules). Routes are gated by `@RequireModules`.
+ */
+export const STORE_MODULES = 'STORE_MODULES';
 
 @Global()
 @Module({
@@ -20,7 +28,14 @@ export const TENANT_CONNECTION = 'TENANT_CONNECTION';
         tenantConnection.getConnection(req['tenant'] ?? req.hostname),
       inject: [REQUEST, TenantConnectionService],
     },
+    {
+      provide: STORE_MODULES,
+      scope: Scope.REQUEST,
+      useFactory: (req: Request, tenantConnection: TenantConnectionService): readonly StoreModule[] =>
+        tenantConnection.getModules(req['tenant'] ?? req.hostname),
+      inject: [REQUEST, TenantConnectionService],
+    },
   ],
-  exports: [TENANT_CONNECTION, TenantConnectionService],
+  exports: [TENANT_CONNECTION, STORE_MODULES, TenantConnectionService],
 })
 export class TenantModule {}

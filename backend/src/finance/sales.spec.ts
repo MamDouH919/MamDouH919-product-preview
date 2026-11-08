@@ -7,6 +7,7 @@ import { OrderPaymentStatus, OrderStatus } from '../orders/enums/order-status.en
 import { Custody } from './schemas/payment.schema';
 import { ACCOUNT } from './accounts';
 import { zonedDayRange } from '../common/helpers/time-zone';
+import { PLAN_MODULES, StorePlan } from '../common/tenant/store-plan';
 
 jest.setTimeout(180_000);
 
@@ -365,5 +366,50 @@ describe('Sales and collections', () => {
     const [header, row] = csv.replace(/^﻿/, '').trim().split('\r\n');
     const cells = Object.fromEntries(header.split(',').map((h, i) => [h, row.split(',')[i]]));
     expect(cells).toMatchObject({ subtotal: '300.00', total: '345.00', payment_status: 'partially_paid', collected: '100.00', outstanding: '245.00' });
+  });
+
+  describe('A store on the orders-only plan', () => {
+    beforeEach(() => {
+      store = buildStore(db, PLAN_MODULES[StorePlan.ORDERS]);
+      store.delivery.price = 45;
+    });
+
+    it('sells past the shelf count, takes no stock and books nothing on delivery', async () => {
+      const a = await store.product(150, 1, 90);
+      const customer = await store.customer();
+      const opening = await entries();
+
+      const placed = await store.place(customer, [{ productId: a, quantity: 3 }]);
+      expect(placed.items[0].stockDeducted).toBe(false);
+      const delivered = await store.advance(String(placed._id));
+
+      expect(delivered.status).toBe(OrderStatus.DELIVERED);
+      expect(delivered.bookedAt).toBeUndefined();
+      expect(await entries()).toEqual(opening);
+      expect(((await db.model('Product').findById(a).lean().exec()) as any).stock).toBe(1);
+      expect(await db.model('StockMovement').countDocuments({ type: 'sale' })).toBe(0);
+    });
+
+    it('reports delivered orders on the home page without the books', async () => {
+      const a = await store.product(150);
+      const customer = await store.customer();
+      await store.advance(String((await store.place(customer, [{ productId: a, quantity: 2 }]))._id));
+      await store.place(customer, [{ productId: a, quantity: 1 }]); // placed, not delivered
+
+      const report = await store.dashboard.dashboard({ days: 7 } as never);
+      expect(report.booksStartedAt).toBeUndefined();
+      expect(report.current).toMatchObject({ revenueMinor: 34500, orders: 1, averageOrderValue: 345, placed: 2 });
+      expect(report.series.reduce((sum, day) => sum + day.orders, 0)).toBe(1);
+      expect(report.topProducts).toMatchObject([{ quantity: 2, revenueMinor: 30000 }]);
+    });
+
+    it('cancels without touching stock or the books', async () => {
+      const a = await store.product(150, 5);
+      const placed = await store.place(await store.customer(), [{ productId: a, quantity: 2 }]);
+      await store.orders.updateStatus(String(placed._id), OrderStatus.CANCELLED, undefined, undefined, 'shop.test');
+
+      expect(((await db.model('Product').findById(a).lean().exec()) as any).stock).toBe(5);
+      expect(await entries()).toEqual([]);
+    });
   });
 });

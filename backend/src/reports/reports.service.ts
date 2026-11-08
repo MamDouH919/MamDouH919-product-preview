@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Order } from '../orders/schemas/order.schema';
@@ -9,6 +9,8 @@ import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { FinanceReportsService, PeriodFigures } from '../finance/finance-reports.service';
 import { toMajor } from '../finance/order-money';
 import { dayKey, startOfDay, startOfNextDay } from '../common/helpers/time-zone';
+import { STORE_MODULES } from '../common/tenant/tenant.module';
+import { StoreModule } from '../common/tenant/store-plan';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -37,7 +39,13 @@ export interface PeriodTotals {
 /** Amount of an order in minor units, for orders written before they carried one. */
 const orderTotalMinor = { $ifNull: ['$totalMinor', { $round: [{ $multiply: ['$total', 100] }, 0] }] };
 
-function toTotals(figures: PeriodFigures, pipeline: Pipeline): PeriodTotals {
+/** What the home page needs from a period's sales, from the books or, without them, the orders. */
+type SalesFigures = Pick<PeriodFigures, 'netRevenueMinor' | 'deliveredOrders' | 'averageOrderValueMinor'>;
+
+/** An order's revenue without the books: what it was sold for, delivery included, tax left out. */
+const orderRevenueMinor = { $subtract: [orderTotalMinor, { $ifNull: ['$taxMinor', 0] }] };
+
+function toTotals(figures: SalesFigures, pipeline: Pipeline): PeriodTotals {
   return {
     revenue: toMajor(figures.netRevenueMinor),
     revenueMinor: figures.netRevenueMinor,
@@ -56,7 +64,17 @@ export class ReportsService {
     @InjectModel(Customer.name) private customerModel: Model<Customer>,
     @InjectModel(Review.name) private reviewModel: Model<Review>,
     private readonly finance: FinanceReportsService,
+    @Inject(STORE_MODULES) private readonly modules: readonly StoreModule[],
   ) {}
+
+  /**
+   * Whether sales figures come from the books. A store without them counts
+   * the orders it delivered instead — the same figures while nothing has been
+   * refunded, which such a store can't record anyway.
+   */
+  private get fromBooks(): boolean {
+    return this.modules.includes(StoreModule.FINANCE);
+  }
 
   /**
    * Everything the admin home page shows about sales, for the last `days`
@@ -67,7 +85,10 @@ export class ReportsService {
    */
   async dashboard(query: DashboardQueryDto) {
     const days = Number(query.days ?? 30);
-    const { timeZone: tz, booksStartedAt } = await this.finance.storeClock();
+    const clock = await this.finance.storeClock();
+    const tz = clock.timeZone;
+    // The books starting late only matters to figures taken from them.
+    const booksStartedAt = this.fromBooks ? clock.booksStartedAt : undefined;
     const now = new Date();
 
     const todayStart = startOfDay(now, tz);
@@ -91,13 +112,13 @@ export class ReportsService {
       newCustomers,
       pendingReviews,
     ] = await Promise.all([
-      this.finance.period(periodStart, end),
-      this.finance.period(previousStart, periodStart),
-      this.finance.period(todayStart, end),
+      this.sales(periodStart, end),
+      this.sales(previousStart, periodStart),
+      this.sales(todayStart, end),
       this.pipeline(periodStart, end),
       this.pipeline(previousStart, periodStart),
       this.pipeline(todayStart, end),
-      this.finance.dailyNetRevenue(periodStart, end, tz),
+      this.fromBooks ? this.finance.dailyNetRevenue(periodStart, end, tz) : this.dailyDelivered(periodStart, end, tz),
       this.topProducts(periodStart, end),
       this.orderModel.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]).exec(),
       this.orderModel
@@ -141,6 +162,40 @@ export class ReportsService {
     };
   }
 
+  private async sales(start: Date, end: Date): Promise<SalesFigures> {
+    if (this.fromBooks) return this.finance.period(start, end);
+    const [row] = await this.orderModel
+      .aggregate<{ revenue: number; orders: number }>([
+        { $match: { status: OrderStatus.DELIVERED, deliveredAt: { $gte: start, $lt: end } } },
+        { $group: { _id: null, revenue: { $sum: orderRevenueMinor }, orders: { $sum: 1 } } },
+      ])
+      .exec();
+    const revenue = row?.revenue ?? 0;
+    const orders = row?.orders ?? 0;
+    return {
+      netRevenueMinor: revenue,
+      deliveredOrders: orders,
+      averageOrderValueMinor: orders ? Math.round(revenue / orders) : 0,
+    };
+  }
+
+  /** Revenue and orders delivered per day in the store's zone, for a store without the books. */
+  private async dailyDelivered(start: Date, end: Date, tz: string) {
+    const rows = await this.orderModel
+      .aggregate<{ _id: string; revenue: number; orders: number }>([
+        { $match: { status: OrderStatus.DELIVERED, deliveredAt: { $gte: start, $lt: end } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$deliveredAt', timezone: tz } },
+            revenue: { $sum: orderRevenueMinor },
+            orders: { $sum: 1 },
+          },
+        },
+      ])
+      .exec();
+    return new Map(rows.map((row) => [row._id, { revenueMinor: row.revenue, orders: row.orders }]));
+  }
+
   private async pipeline(start: Date, end: Date): Promise<Pipeline> {
     const [row] = await this.orderModel
       .aggregate<Pipeline>([
@@ -162,7 +217,11 @@ export class ReportsService {
   private async topProducts(start: Date, end: Date) {
     const rows = await this.orderModel
       .aggregate([
-        { $match: { bookedAt: { $gte: start, $lt: end } } },
+        {
+          $match: this.fromBooks
+            ? { bookedAt: { $gte: start, $lt: end } }
+            : { status: OrderStatus.DELIVERED, deliveredAt: { $gte: start, $lt: end } },
+        },
         { $unwind: '$items' },
         {
           $group: {
@@ -174,7 +233,12 @@ export class ReportsService {
             slug: { $last: '$items.slug' },
             quantity: { $sum: '$items.quantity' },
             revenueMinor: {
-              $sum: { $subtract: ['$items.lineTotalMinor', { $ifNull: ['$items.discountMinor', 0] }] },
+              $sum: {
+                $subtract: [
+                  { $ifNull: ['$items.lineTotalMinor', { $round: [{ $multiply: ['$items.lineTotal', 100] }, 0] }] },
+                  { $ifNull: ['$items.discountMinor', 0] },
+                ],
+              },
             },
           },
         },

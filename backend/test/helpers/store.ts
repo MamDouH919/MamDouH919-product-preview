@@ -17,14 +17,16 @@ import { MoneyAccountsService } from '../../src/money-accounts/money-accounts.se
 import { OrderStatus } from '../../src/orders/enums/order-status.enum';
 import { CouponType } from '../../src/coupons/schemas/coupon.schema';
 import { parseMoney } from '../../src/common/money/money';
+import { PLAN_MODULES, StoreModule, StorePlan } from '../../src/common/tenant/store-plan';
 
 /**
  * One store wired the way Nest wires it, on its own database: real orders,
  * stock, coupons, journal, payments and reports. Only what reaches outside
  * the database (delivery pricing, the customer address book, email) is
- * stubbed, with fixed answers.
+ * stubbed, with fixed answers. `modules` is what the store's plan has —
+ * everything unless a test says otherwise.
  */
-export function buildStore(db: Connection) {
+export function buildStore(db: Connection, modules: readonly StoreModule[] = PLAN_MODULES[StorePlan.FULL]) {
   const model = (name: string) => db.model(name) as never;
   const zone = new Types.ObjectId();
   const subZone = new Types.ObjectId();
@@ -63,6 +65,7 @@ export function buildStore(db: Connection) {
     coupons,
     priceList as never,
     notifications as never,
+    modules,
   );
   const payments = new PaymentsService(
     model('Payment'),
@@ -88,7 +91,7 @@ export function buildStore(db: Connection) {
     model('CourierSettlement'),
     journal,
   );
-  const dashboard = new ReportsService(model('Order'), model('Customer'), model('Review'), finance);
+  const dashboard = new ReportsService(model('Order'), model('Customer'), model('Review'), finance, modules);
   const purchasing = new PurchasingService(
     model('Supplier'),
     model('Purchase'),
