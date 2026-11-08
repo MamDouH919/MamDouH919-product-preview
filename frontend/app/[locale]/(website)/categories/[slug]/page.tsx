@@ -1,300 +1,107 @@
-"use client"
-
-import { use, useState } from "react"
-import { useCategoryBySlugQuery } from "@/backend-api/categories/hooks"
-import { useSubCategoriesQuery } from "@/backend-api/sub-categories/hooks"
-import { useProductsQuery } from "@/backend-api/products/hooks"
-import { getBackendUri } from "@/utils/helperFunctions"
-import { useTranslation } from "react-i18next"
-import Image from "next/image"
-import CustomLink from "@/components/CustomLink"
-import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard"
-import Box from "@mui/material/Box"
-import Chip from "@mui/material/Chip"
-import Divider from "@mui/material/Divider"
-import Skeleton from "@mui/material/Skeleton"
-import Typography from "@mui/material/Typography"
-import { useTheme } from "@mui/material/styles"
-import { ShoppingBag, ArrowLeft, ChevronRight } from "lucide-react"
-
-function localized(field: Record<string, string | undefined> | undefined, lang: string) {
-  if (!field) return ""
-  return field[lang] || field["ar"] || field["en"] || ""
-}
-
-function PageSkeleton() {
-  return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", px: 2, py: 4 }}>
-      <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start", flexDirection: { xs: "column", md: "row" } }}>
-        <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          <Skeleton variant="rectangular" width="100%" height={260} sx={{ borderRadius: 2 }} />
-          <Skeleton variant="text" width="55%" height={32} />
-          <Skeleton variant="text" width="90%" />
-          <Skeleton variant="text" width="75%" />
-        </Box>
-        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} variant="rounded" width={80} height={32} />
-            ))}
-          </Box>
-          <Divider />
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 2 }}>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Box key={i}>
-                <Skeleton variant="rectangular" width="100%" height={160} sx={{ borderRadius: 2, mb: 1 }} />
-                <Skeleton variant="text" width="70%" />
-                <Skeleton variant="text" width="40%" />
-              </Box>
-            ))}
-          </Box>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
+import type { Metadata } from "next"
+import { notFound } from "next/navigation"
+import CategoryClient from "./_CategoryClient"
+import type { Category } from "@/backend-api/categories/types"
+import { fetchBackend, fetchBackendResult, metaDescription, pageMetadata, requestBackendUrl, requestOrigin } from "@/lib/seo"
+import { breadcrumbLd, JsonLd } from "@/lib/jsonLd"
+import type { Product } from "@/backend-api/products/types"
+import { withBackend } from "@/lib/getBackendUrl"
+import { loc, plainText } from "@/lib/productOffer"
+import { Prefetched, query } from "@/lib/prefetch"
+import { CATEGORIES_QUERY_KEY } from "@/backend-api/categories/hooks"
+import { SUB_CATEGORIES_QUERY_KEY } from "@/backend-api/sub-categories/hooks"
+import { PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks"
 
 interface PageProps {
-  params: Promise<{ slug: string }>
+  params: Promise<{ slug: string; locale: string }>
 }
 
-export default function CategoryPage({ params }: PageProps) {
-  const { slug } = use(params)
-  const { t, i18n } = useTranslation()
-  const lang = i18n.language
-  const theme = useTheme()
+// Same URL and revalidate in metadata and page, so Next makes the request once.
+const getCategory = (slug: string) => fetchBackendResult<Category>(`/categories/slug/${encodeURIComponent(slug)}`, 300)
 
-  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string | undefined>(undefined)
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug: rawSlug, locale } = await params
+  const slug = decodeURIComponent(rawSlug)
+  const [result, backendUrl] = await Promise.all([getCategory(slug), requestBackendUrl()])
+  if (!result.ok) return {}
 
-  const { data: category, isLoading: loadingCategory } = useCategoryBySlugQuery(slug)
+  const category = result.data
+  const name = loc(category.name, locale)
+  const description =
+    plainText(loc(category.description, locale)) ||
+    (locale === "ar" ? `تسوّق منتجات ${name}: الأسعار والصور والتفاصيل.` : `Shop ${name}: prices, photos and details.`)
 
-  const { data: subCategories, isLoading: loadingSubs } = useSubCategoriesQuery(category?._id)
-  const activeSubs = (subCategories ?? [])
-    .filter((s) => s.isActive)
-    .sort((a, b) => a.order - b.order)
+  return pageMetadata({
+    locale,
+    path: `/categories/${encodeURIComponent(slug)}`,
+    title: name,
+    description: metaDescription(description),
+    image: category.image ? { url: withBackend(backendUrl, category.image), alt: name } : undefined,
+    // A hidden category still resolves by slug for old links; keep it out of search.
+    index: category.isActive,
+  })
+}
 
-  const { data: productsData, isLoading: loadingProducts } = useProductsQuery(
-    category?._id
-      ? { categoryId: category._id, subCategoryId: selectedSubCategoryId }
-      : undefined
-  )
-  const products = (productsData ?? [])
-    .filter((p) => p.isActive)
-    .sort((a, b) => a.order - b.order)
+export default async function CategoryPage({ params }: PageProps) {
+  const { slug, locale } = await params
+  // A real 404 for a category that doesn't exist; a backend hiccup still renders the page.
+  const result = await getCategory(decodeURIComponent(slug))
+  if (!result.ok && result.missing) notFound()
 
-  if (loadingCategory) return <PageSkeleton />
-
-  if (!category) {
-    return (
-      <Box sx={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Box sx={{ textAlign: "center", px: 2 }}>
-          <Typography variant="h6" color="text.secondary" mb={2}>
-            {t("noData")}
-          </Typography>
-          <CustomLink href="/" style={{ color: theme.palette.primary.main, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <ArrowLeft size={16} />
-            {t("home")}
-          </CustomLink>
-        </Box>
-      </Box>
-    )
-  }
-
-  const name = localized(category.name, lang)
-  const description = localized(category.description, lang)
-  const hasSubs = !loadingSubs && activeSubs.length > 0
+  // The keys the client's hooks use. Its slug is the raw route param, as here.
+  const id = result.ok ? result.data._id : null
+  const entries = id
+    ? [
+        { key: [CATEGORIES_QUERY_KEY, "slug", slug], path: `/categories/slug/${encodeURIComponent(decodeURIComponent(slug))}` },
+        { key: [SUB_CATEGORIES_QUERY_KEY, id], path: `/sub-categories${query({ categoryId: id })}` },
+        // No sub-category picked on first load.
+        { key: [PRODUCTS_QUERY_KEY, { categoryId: id, subCategoryId: undefined }], path: `/products${query({ categoryId: id })}` },
+      ]
+    : []
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      {/* Breadcrumb */}
-      <Box sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>
-        <Box
-          sx={{
-            maxWidth: 1200,
-            mx: "auto",
-            px: 2,
-            py: 1.5,
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            flexWrap: "wrap",
-          }}
-        >
-          <CustomLink href="/" style={{ color: theme.palette.text.secondary, textDecoration: "none", fontSize: 14 }}>
-            {t("home")}
-          </CustomLink>
-          <ChevronRight size={14} color={theme.palette.text.disabled} />
-          <CustomLink href="/categories" style={{ color: theme.palette.text.secondary, textDecoration: "none", fontSize: 14 }}>
-            {t("categories")}
-          </CustomLink>
-          <ChevronRight size={14} color={theme.palette.text.disabled} />
-          <Typography variant="body2" color="text.primary" fontWeight={500}>
-            {name}
-          </Typography>
-        </Box>
-      </Box>
+    <Prefetched entries={entries}>
+      {result.ok && <CategoryJsonLd category={result.data} locale={locale} />}
+      <CategoryClient params={params} />
+    </Prefetched>
+  )
+}
 
-      <Box sx={{ maxWidth: 1200, mx: "auto", px: 2, py: 4 }}>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 4,
-            alignItems: "flex-start",
-            flexDirection: { xs: "column", md: "row" },
-          }}
-        >
-          {/* Left: category info */}
-          <Box
-            sx={{
-              width: { xs: "100%", md: 260 },
-              flexShrink: 0,
-              position: { md: "sticky" },
-              top: { md: 24 },
-            }}
-          >
-            {/* Image */}
-            <Box
-              sx={{
-                position: "relative",
-                width: "100%",
-                paddingTop: "100%",
-                borderRadius: 2,
-                overflow: "hidden",
-                bgcolor: "grey.100",
-                mb: 2.5,
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              {category.image ? (
-                <Image
-                  src={getBackendUri(category.image)}
-                  alt={name}
-                  fill
-                  style={{ objectFit: "cover" }}
-                  priority
-                />
-              ) : (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Typography variant="h2" color="text.disabled" fontWeight={700}>
-                    {name.charAt(0).toUpperCase()}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
+/** Breadcrumbs, and the category as a list of its products, so search engines see what's in it. */
+async function CategoryJsonLd({ category, locale }: { category: Category; locale: string }) {
+  if (!category.isActive) return null
+  const [origin, products] = await Promise.all([
+    requestOrigin(),
+    // Same request as the prefetch above, so Next makes it once.
+    fetchBackend<Product[]>(`/products${query({ categoryId: category._id })}`, 60),
+  ])
+  const name = loc(category.name, locale)
+  const path = `/categories/${encodeURIComponent(category.slug)}`
 
-            {/* Name */}
-            <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
-              {name}
-            </Typography>
-
-            {/* Description */}
-            {description && (
-              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8 }}>
-                {description}
-              </Typography>
-            )}
-          </Box>
-
-          {/* Right: sub-categories + products */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            {/* Sub-category chips */}
-            {(loadingSubs || hasSubs) && (
-              <>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
-                  {loadingSubs ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} variant="rounded" width={80} height={32} />
-                    ))
-                  ) : (
-                    <>
-                      <Chip
-                        label={t("allProducts")}
-                        onClick={() => setSelectedSubCategoryId(undefined)}
-                        variant={selectedSubCategoryId === undefined ? "filled" : "outlined"}
-                        color={selectedSubCategoryId === undefined ? "primary" : "default"}
-                      />
-                      {activeSubs.map((sub) => (
-                        <Chip
-                          key={sub._id}
-                          label={localized(sub.name, lang)}
-                          onClick={() =>
-                            setSelectedSubCategoryId(
-                              selectedSubCategoryId === sub._id ? undefined : sub._id
-                            )
-                          }
-                          variant={selectedSubCategoryId === sub._id ? "filled" : "outlined"}
-                          color={selectedSubCategoryId === sub._id ? "primary" : "default"}
-                        />
-                      ))}
-                    </>
-                  )}
-                </Box>
-                <Divider sx={{ mb: 3 }} />
-              </>
-            )}
-
-            {/* Products */}
-            {loadingProducts ? (
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "repeat(2, 1fr)",
-                    sm: "repeat(2, 1fr)",
-                    md: "repeat(3, 1fr)",
-                  },
-                  gap: 2,
-                }}
-              >
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <ProductCardSkeleton key={i} />
-                ))}
-              </Box>
-            ) : products.length === 0 ? (
-              <Box
-                sx={{
-                  py: 10,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 2,
-                  color: "text.disabled",
-                }}
-              >
-                <ShoppingBag size={56} strokeWidth={1} />
-                <Typography variant="body1" fontWeight={500}>
-                  {t("noData")}
-                </Typography>
-              </Box>
-            ) : (
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "repeat(2, 1fr)",
-                    sm: "repeat(2, 1fr)",
-                    md: "repeat(3, 1fr)",
-                  },
-                  gap: 2,
-                }}
-              >
-                {products.map((product) => (
-                  <ProductCard key={product._id} product={product} lang={lang} />
-                ))}
-              </Box>
-            )}
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+  return (
+    <JsonLd
+      data={[
+        breadcrumbLd(origin, locale, [
+          { name: locale === "ar" ? "الأقسام" : "Categories", path: "/categories" },
+          { name, path },
+        ]),
+        {
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name,
+          url: `${origin}/${locale}${path}`,
+          mainEntity: {
+            "@type": "ItemList",
+            numberOfItems: products?.length ?? 0,
+            itemListElement: (products ?? []).map((p, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              url: `${origin}/${locale}/products/${encodeURIComponent(p.slug)}`,
+              name: loc(p.name, locale),
+            })),
+          },
+        },
+      ]}
+    />
   )
 }

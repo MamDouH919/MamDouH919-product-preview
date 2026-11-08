@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import config from "./config.json";
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3010";
 
@@ -35,15 +34,6 @@ const nextConfig: NextConfig = {
       // Placeholder images on demo products (backend `npm run seed:products`)
       { protocol: "https", hostname: "picsum.photos" },
     ],
-  },
-  async redirects() {
-    return [
-      {
-        source: "/",
-        destination: `/${config.app.defaultLanguage}`,
-        permanent: false,
-      },
-    ];
   },
 };
 

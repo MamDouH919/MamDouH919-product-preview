@@ -35,4 +35,10 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsNumber()
   order?: number;
+
+  // Google product taxonomy id or path, for shopping feeds. Empty clears it.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  googleProductCategory?: string;
 }

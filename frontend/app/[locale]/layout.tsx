@@ -1,27 +1,12 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Geist, Geist_Mono, Cairo } from "next/font/google";
+import { cairo } from "@/lib/fonts";
 import "../globals.css";
 import Providers from "@/lib/Providers";
 import config from "@/config.json";
 import { resolveTenantSeo } from "@/lib/tenantSeo";
+import { fetchBackend } from "@/lib/seo";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-  variable: "--font-cairo",
-});
 
 export async function generateMetadata(
   { params }: { params: Promise<{ locale: string }> }
@@ -48,7 +33,6 @@ export async function generateMetadata(
     keywords,
 
     authors: [{ name: siteName }],
-    category: "Perfumes & Fragrances",
 
     robots: {
       index: true,
@@ -65,8 +49,10 @@ export async function generateMetadata(
       siteName,
       title,
       description,
-      locale: locale === "ar" ? "ar_SA" : "en_US",
-      images: [{ url: tenant.ogImage, width: 1200, height: 630, alt: title }],
+      locale: locale === "ar" ? "ar_AR" : "en_US",
+      // The store's logo, at whatever size it is: claiming 1200×630 for it made
+      // Facebook and WhatsApp crop or drop the preview.
+      images: [{ url: tenant.ogImage, alt: title }],
     },
 
     twitter: {
@@ -91,18 +77,20 @@ export default async function RootLayout({
 
   const host = (await headers()).get("host");
   const tenant = resolveTenantSeo(host);
+  // Fresh within a minute of a change in the dashboard; the client refreshes it too.
+  const settings = await fetchBackend<Record<string, unknown>>("/settings", 60);
 
   return (
     <html
       lang={locale}
       dir={isRtl ? "rtl" : "ltr"}
-      className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} h-full antialiased`}
+      className={`${cairo.variable} h-full antialiased`}
     >
       <head>
         {tenant.contentSiteVerify && <meta name="google-site-verification" content={tenant.contentSiteVerify} />}
       </head>
       <body className="min-h-full flex flex-col">
-        <Providers locale={locale}>
+        <Providers locale={locale} initialSettings={settings}>
           {children}
         </Providers>
       </body>

@@ -1,7 +1,7 @@
 {
   "app": {
     "languages": ["en", "ar"],
-    "defaultLanguage": "en",
+    "defaultLanguage": "ar",
     "rtlLanguages": ["ar"],
     "theme": {
       "primaryColor": "#654321"

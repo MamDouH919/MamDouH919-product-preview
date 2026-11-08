@@ -115,7 +115,7 @@ function Lightbox({
 }
 
 export default function GallerySection({ sectionName = "home-gallery" }: { sectionName?: string }) {
-  const { section, text, cssVars } = useHomeSection(sectionName)
+  const { section, text, html, cssVars } = useHomeSection(sectionName)
   const { t } = useTranslation()
   const [open, setOpen] = useState<number | null>(null)
   const closeLightbox = useCallback(() => setOpen(null), [])
@@ -124,7 +124,7 @@ export default function GallerySection({ sectionName = "home-gallery" }: { secti
   if (!section || !images.length) return null
 
   const title = text(section.title)
-  const description = text(section.description)
+  const description = html(section.description)
 
   return (
     <section className="py-12 md:py-20" style={cssVars}>

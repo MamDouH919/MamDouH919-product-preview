@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -178,6 +179,8 @@ function MyReviewPanel({ productId }: { productId: string }) {
   const isLoggedIn = useAppSelector((state) => state.customer.isLoggedIn)
   const { data: eligibility } = useReviewEligibilityQuery(productId)
   const [editing, setEditing] = useState(false)
+  // From the router, not window, so the server renders the same link the browser does.
+  const here = usePathname()
 
   const remove = useMutation({
     mutationFn: (id: string) => deleteMyReview(id),
@@ -190,7 +193,6 @@ function MyReviewPanel({ productId }: { productId: string }) {
   })
 
   if (!isLoggedIn) {
-    const here = typeof window !== "undefined" ? window.location.pathname : ""
     return (
       <p className="text-sm text-gray-600">
         <CustomLink

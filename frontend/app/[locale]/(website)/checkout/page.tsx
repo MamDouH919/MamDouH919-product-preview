@@ -28,6 +28,7 @@ import { useCustomerAddressesQuery } from "@/backend-api/customers/hooks";
 import { Address } from "@/backend-api/customers/types";
 import { DELIVERY_AREAS_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import { MY_ORDERS_QUERY_KEY, QUOTE_QUERY_KEY, useQuoteQuery } from "@/backend-api/orders/hooks";
+import PolicyLinks from "@/components/PolicyLinks";
 import { placeGuestOrder, placeOrder } from "@/backend-api/orders/mutations";
 import { CreateGuestOrderPayload } from "@/backend-api/orders/types";
 import { useCurrency } from "@/Hooks/useCurrency";
@@ -390,6 +391,7 @@ const CheckoutPage = () => {
               >
                 {isPending ? <CircularProgress size={24} color="inherit" /> : t("placeOrder")}
               </Button>
+              <PolicyLinks className="justify-center" />
             </Stack>
           )}
         </Paper>

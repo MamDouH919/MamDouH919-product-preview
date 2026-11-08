@@ -31,6 +31,7 @@ type CategoryFormValues = {
   slug: string;
   isActive: boolean;
   order: number;
+  googleProductCategory: string;
 };
 
 interface CategoryFormProps {
@@ -54,6 +55,7 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
         slug: defaultData?.slug ?? "",
         isActive: defaultData?.isActive ?? true,
         order: defaultData?.order ?? 0,
+        googleProductCategory: defaultData?.googleProductCategory ?? "",
       },
     });
 
@@ -75,6 +77,10 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
       if (data.slug) formData.append("slug", data.slug);
       formData.append("isActive", String(data.isActive));
       formData.append("order", String(data.order));
+      // Sent empty on edit too, so clearing the field clears it.
+      if (data.googleProductCategory || isEditing) {
+        formData.append("googleProductCategory", data.googleProductCategory.trim());
+      }
 
       if (isEditing) {
         return updateCategory({ id: defaultData._id, data: formData });
@@ -147,6 +153,12 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
 
         <TextInputComponent name="slug" label={t("slug")} control={control} />
         <TextInputComponent name="order" label={t("order")} control={control} type="number" />
+        <TextInputComponent
+          name="googleProductCategory"
+          label={t("googleProductCategory")}
+          control={control}
+          helperText={t("googleProductCategoryHint")}
+        />
 
         <Button
           type="submit"

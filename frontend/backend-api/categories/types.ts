@@ -8,4 +8,6 @@ export type Category = {
   slug: string;
   isActive: boolean;
   order: number;
+  /** Google product taxonomy id or path, for shopping feeds. */
+  googleProductCategory?: string;
 };

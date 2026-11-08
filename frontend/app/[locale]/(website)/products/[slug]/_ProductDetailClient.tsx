@@ -1,6 +1,7 @@
 "use client"
 
 import { use, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { useProductBySlugQuery, useRelatedProductsQuery } from "@/backend-api/products/hooks"
 import { incrementProductView } from "@/backend-api/products/mutations"
 import { getBackendUri } from "@/utils/helperFunctions"
@@ -13,12 +14,14 @@ import { useCurrency } from "@/Hooks/useCurrency"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import AddToCart from "@/features/Cart/AddToCart"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
+import PolicyLinks from "@/components/PolicyLinks"
 import { useTheme, alpha } from "@mui/material/styles"
 import ProductReviews from "@/features/Review/ProductReviews"
 import Stars from "@/features/Review/Stars"
 import RecentlyViewed from "@/features/Product/RecentlyViewed"
 import { recordRecentlyViewed } from "@/features/Product/recentlyViewedStore"
 import { useStoreModules } from "@/Hooks/useStoreModules"
+import { saleFrom } from "@/lib/productOffer"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -76,7 +79,11 @@ export default function ProductDetailClient({ params }: Props) {
 
   const { data: product, isLoading, isError } = useProductBySlugQuery(slug)
 
-  const activeVariant = selectedVariant ?? (product?.variants?.length ? 0 : null)
+  // `?variant=<id>` (from shopping feeds and structured data) opens on that variant,
+  // so the price shown is the one that was advertised.
+  const variantParam = useSearchParams().get("variant")
+  const linkedVariant = product?.variants?.findIndex((v) => v._id === variantParam) ?? -1
+  const activeVariant = selectedVariant ?? (linkedVariant >= 0 ? linkedVariant : product?.variants?.length ? 0 : null)
   const { data: related } = useRelatedProductsQuery(product?._id, 4)
   const relatedProducts = related ?? []
 
@@ -164,6 +171,8 @@ export default function ProductDetailClient({ params }: Props) {
                   src={getBackendUri(images[activeImage])}
                   alt={name}
                   fill
+                  // Half of the 72rem (1152px) container on desktop, full width below.
+                  sizes="(min-width: 1152px) 556px, (min-width: 1024px) 50vw, 100vw"
                   className="object-cover"
                   priority
                 />
@@ -196,6 +205,7 @@ export default function ProductDetailClient({ params }: Props) {
                         src={getBackendUri(img)}
                         alt={`${name} ${idx + 1}`}
                         fill
+                        sizes="64px"
                         className="object-cover"
                       />
                     </div>
@@ -231,14 +241,28 @@ export default function ProductDetailClient({ params }: Props) {
             )}
 
             {(() => {
-              const displayPrice = activeVariant !== null
-                ? product.variants?.[activeVariant]?.price
-                : product.price
+              // As checkout prices it: a variant without its own price sells at
+              // the product's, "was" price included. Same rules as the feed.
+              const variant = activeVariant !== null ? product.variants?.[activeVariant] : undefined
+              const displayPrice = variant?.price ?? product.price
+              const wasPrice = displayPrice != null
+                ? saleFrom(displayPrice, variant?.price != null ? variant.compareAtPrice : product.compareAtPrice)
+                : undefined
               return showPrices && displayPrice != null ? (
-                <div className="flex items-baseline gap-1">
+                <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-4xl font-bold text-(--primary)">
                     {displayPrice.toLocaleString()} {currency}
                   </span>
+                  {wasPrice != null && (
+                    <>
+                      <span className="text-xl text-gray-400 line-through">
+                        {wasPrice.toLocaleString()} {currency}
+                      </span>
+                      <span className="text-sm font-semibold text-red-600 bg-red-50 rounded-full px-2.5 py-0.5">
+                        -{Math.round((1 - displayPrice / wasPrice) * 100)}%
+                      </span>
+                    </>
+                  )}
                 </div>
               ) : null
             })()}
@@ -320,6 +344,8 @@ export default function ProductDetailClient({ params }: Props) {
                 productName={name}
                 variant="full"
               />
+              {/* Delivery and returns, answered before the shopper has to ask. */}
+              <PolicyLinks />
               <CustomLink
                 href="/products"
                 className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-(--primary) transition-colors"

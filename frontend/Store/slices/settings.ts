@@ -23,6 +23,24 @@ export interface SettingsState {
 
 const initialState: SettingsState = {};
 
+/** The public settings response, as the storefront keeps it. */
+export const toSettingsState = (settings: any): SettingsState => ({
+    siteTitle: settings.siteTitle,
+    siteDescription: settings.siteDescription,
+    logo: settings.logo,
+    favicon: settings.favicon,
+    primaryColor: settings.primaryColor,
+    currency: settings.currency,
+    phone: settings.phone,
+    whatsapp: settings.whatsapp,
+    landLine: settings.landLine,
+    email: settings.email,
+    address: settings.address,
+    socialMedia: settings.socialMedia,
+    showPrices: settings.showPrices,
+    modules: settings.modules,
+});
+
 export const settingsSlice = createSlice({
     name: 'settings',
     initialState,

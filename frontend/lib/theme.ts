@@ -1,15 +1,7 @@
 // src/theme.ts
 import { createTheme } from '@mui/material/styles';
 import { arEG, enUS } from '@mui/material/locale';
-import { Cairo } from "next/font/google";
-
-// Import Cairo font from Google Fonts via Next.js
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-  variable: "--font-cairo",
-});
+import { cairo } from "./fonts";
 
 export default function getTheme({
   primary,

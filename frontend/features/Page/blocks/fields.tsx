@@ -92,6 +92,7 @@ export function LRichText({
           value={value?.[lang] ?? ""}
           onChange={(html) => onChange({ ...(value ?? {}), [lang]: html })}
           onUploadImage={uploadEditorImage}
+          lang={lang}
         />
       </Box>
     </Stack>

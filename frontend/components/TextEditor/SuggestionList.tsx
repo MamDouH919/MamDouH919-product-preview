@@ -1,130 +1,83 @@
-import { List, ListItem, ListItemButton, Paper } from "@mui/material";
+import { Chip, List, ListItem, ListItemButton, ListItemText, Paper, Typography } from "@mui/material";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useImperativeHandle, useState } from "react";
-import type { MentionSuggestion } from "./mentionSuggestionOptions";
+import { MENTION_KIND_LABEL } from "@/lib/mentions";
+import type { EditorLang, MentionNodeAttrs, MentionSuggestion } from "./mentionSuggestionOptions";
 
 export type SuggestionListRef = {
-  // For convenience using this SuggestionList from within the
-  // mentionSuggestionOptions, we'll match the signature of SuggestionOptions's
-  // `onKeyDown` returned in its `render` function
-  onKeyDown: NonNullable<
-    ReturnType<
-      NonNullable<SuggestionOptions<MentionSuggestion>["render"]>
-    >["onKeyDown"]
-  >;
+  // Same signature as the `onKeyDown` of SuggestionOptions' `render`, so
+  // mentionSuggestionOptions can hand key presses straight to the list.
+  onKeyDown: NonNullable<ReturnType<NonNullable<SuggestionOptions<MentionSuggestion>["render"]>>["onKeyDown"]>;
 };
 
-// This type is based on
-// https://github.com/ueberdosis/tiptap/blob/a27c35ac8f1afc9d51f235271814702bc72f1e01/packages/extension-mention/src/mention.ts#L73-L103.
-// TODO(Steven DeMartini): Use the Tiptap exported MentionNodeAttrs interface
-// once https://github.com/ueberdosis/tiptap/pull/4136 is merged.
-interface MentionNodeAttrs {
-  id: string | null;
-  label?: string | null;
-}
+export type SuggestionListProps = SuggestionProps<MentionSuggestion, MentionNodeAttrs> & { lang: EditorLang };
 
-export type SuggestionListProps = SuggestionProps<MentionSuggestion>;
+const KIND_COLOR = { product: "primary", category: "secondary", subCategory: "default" } as const;
 
-const SuggestionList = forwardRef<SuggestionListRef, SuggestionListProps>(
-  (props, ref) => {
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [prevItems, setPrevItems] = useState(props.items);
+/** The `@` menu: the store's products, categories and sub-categories matching what was typed. */
+const SuggestionList = forwardRef<SuggestionListRef, SuggestionListProps>((props, ref) => {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [prevItems, setPrevItems] = useState(props.items);
 
-    if (props.items !== prevItems) {
-      setPrevItems(props.items);
-      setSelectedIndex(0);
-    }
+  if (props.items !== prevItems) {
+    setPrevItems(props.items);
+    setSelectedIndex(0);
+  }
 
-    const selectItem = (index: number) => {
-      if (index >= props.items.length) {
-        // Make sure we actually have enough items to select the given index. For
-        // instance, if a user presses "Enter" when there are no options, the index will
-        // be 0 but there won't be any items, so just ignore the callback here
-        return;
+  const selectItem = (index: number) => {
+    // Enter with no results lands here with nothing to pick.
+    const item = props.items[index];
+    if (!item) return;
+    props.command({ id: item.id, label: item.label, kind: item.kind, href: item.href });
+  };
+
+  useImperativeHandle(ref, () => ({
+    onKeyDown: ({ event }) => {
+      const count = props.items.length;
+      if (event.key === "ArrowUp" && count) {
+        setSelectedIndex((selectedIndex + count - 1) % count);
+        return true;
       }
+      if (event.key === "ArrowDown" && count) {
+        setSelectedIndex((selectedIndex + 1) % count);
+        return true;
+      }
+      if (event.key === "Enter") {
+        selectItem(selectedIndex);
+        return true;
+      }
+      return false;
+    },
+  }));
 
-      const suggestion = props.items[index];
+  const { lang } = props;
 
-      // Set all of the attributes of our Mention node based on the suggestion
-      // data. The fields of `suggestion` will depend on whatever data you
-      // return from your `items` function in your "suggestion" options handler.
-      // Our suggestion handler returns `MentionSuggestion`s (which we've
-      // indicated via SuggestionProps<MentionSuggestion>). We are passing an
-      // object of the `MentionNodeAttrs` shape when calling `command` (utilized
-      // by the Mention extension to create a Mention Node).
-      const mentionItem: MentionNodeAttrs = {
-        id: suggestion.id,
-        label: suggestion.mentionLabel,
-      };
-      // type where if you specify the suggestion type (like
-      // `SuggestionProps<MentionSuggestion>`), it will incorrectly require that
-      // type variable for `command`'s argument as well (whereas instead the
-      // type of that argument should be the Mention Node attributes). This
-      // should be fixed once https://github.com/ueberdosis/tiptap/pull/4136 is
-      // merged and we can add a separate type arg to `SuggestionProps` to
-      // specify the type of the commanded selected item.
-      props.command(mentionItem);
-    };
-
-    const upHandler = () => {
-      setSelectedIndex(
-        (selectedIndex + props.items.length - 1) % props.items.length
-      );
-    };
-
-    const downHandler = () => {
-      setSelectedIndex((selectedIndex + 1) % props.items.length);
-    };
-
-    const enterHandler = () => {
-      selectItem(selectedIndex);
-    };
-
-    useImperativeHandle(ref, () => ({
-      onKeyDown: ({ event }) => {
-        if (event.key === "ArrowUp") {
-          upHandler();
-          return true;
-        }
-
-        if (event.key === "ArrowDown") {
-          downHandler();
-          return true;
-        }
-
-        if (event.key === "Enter") {
-          enterHandler();
-          return true;
-        }
-
-        return false;
-      },
-    }));
-
-    return props.items.length > 0 ? (
-      <Paper elevation={5}>
-        <List
-          dense
-          sx={{
-            // In case there are contiguous stretches of long text that can't wrap:
-            overflow: "hidden",
-          }}
-        >
+  return (
+    <Paper elevation={5} sx={{ minWidth: 260, maxWidth: 360 }} dir={lang === "ar" ? "rtl" : "ltr"}>
+      {props.items.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
+          {lang === "ar" ? "مفيش نتائج" : "No matches"}
+        </Typography>
+      ) : (
+        <List dense sx={{ overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
           {props.items.map((item, index) => (
-            <ListItem key={item.id} disablePadding>
-              <ListItemButton
-                selected={index === selectedIndex}
-                onClick={() => selectItem(index)}
-              >
-                {item.mentionLabel}
+            <ListItem key={item.key} disablePadding>
+              <ListItemButton selected={index === selectedIndex} onClick={() => selectItem(index)} sx={{ gap: 1 }}>
+                <ListItemText primary={item.label} primaryTypographyProps={{ noWrap: true }} />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  color={KIND_COLOR[item.kind]}
+                  label={MENTION_KIND_LABEL[item.kind][lang]}
+                />
               </ListItemButton>
             </ListItem>
           ))}
         </List>
-      </Paper>
-    ) : null;
-  }
-);
+      )}
+    </Paper>
+  );
+});
 
 SuggestionList.displayName = "SuggestionList";
 

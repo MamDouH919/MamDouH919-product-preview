@@ -17,6 +17,21 @@ export class ProductVariant {
   @Prop({ required: false })
   sku?: string;
 
+  /** The price before a discount, shown struck through. Unset or ≤ price: no sale. */
+  @Prop({ type: Number, required: false })
+  compareAtPrice?: number | null;
+
+  /** Barcode (EAN/UPC/ISBN), for shopping feeds. Own-made goods have none. */
+  @Prop({ required: false })
+  gtin?: string;
+
+  /** What sets this variant apart, for shopping feeds; free text in the store's language. */
+  @Prop({ required: false })
+  color?: string;
+
+  @Prop({ required: false })
+  size?: string;
+
   @Prop({ default: 0 })
   stock!: number;
 
@@ -50,6 +65,18 @@ export class Product extends Document {
 
   @Prop({ required: false })
   sku?: string;
+
+  /** The price before a discount, shown struck through. Unset or ≤ price: no sale. */
+  @Prop({ type: Number, required: false })
+  compareAtPrice?: number | null;
+
+  /** Who makes it. Empty means the store itself (its name is used in feeds). */
+  @Prop({ required: false })
+  brand?: string;
+
+  /** Barcode (EAN/UPC/ISBN), for shopping feeds. Own-made goods have none. */
+  @Prop({ required: false })
+  gtin?: string;
 
   @Prop({ type: SchemaTypes.ObjectId, ref: 'Category', required: true })
   category!: Types.ObjectId;

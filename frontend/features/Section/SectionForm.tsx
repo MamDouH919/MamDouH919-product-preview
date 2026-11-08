@@ -298,7 +298,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                     control={control}
                     render={({ field, fieldState }) => (
                       <div>
-                        <Editor value={field.value} onChange={field.onChange} />
+                        <Editor value={field.value} onChange={field.onChange} lang={tab.lang as "ar" | "en"} />
                         {fieldState.error && (
                           <Typography color="error">{fieldState.error.message}</Typography>
                         )}

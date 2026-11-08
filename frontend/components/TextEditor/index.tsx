@@ -20,6 +20,8 @@ interface EditorProps {
   onChange?: (value: string) => void;
   /** Uploads an image and resolves to its public URL. Without it images stay local blob URLs. */
   onUploadImage?: (file: File) => Promise<string>;
+  /** Language of the text; the `@` menu lists products and categories by their name in it. */
+  lang?: "ar" | "en";
 }
 
 function fileListToImageFiles(fileList: FileList): File[] {
@@ -29,9 +31,10 @@ function fileListToImageFiles(fileList: FileList): File[] {
   });
 }
 
-export default function Editor({ value, onChange, onUploadImage }: EditorProps) {
+export default function Editor({ value, onChange, onUploadImage, lang }: EditorProps) {
   const extensions = useExtensions({
-    placeholder: ""
+    placeholder: "",
+    lang,
   });
 
   const rteRef = useRef<RichTextEditorRef>(null);

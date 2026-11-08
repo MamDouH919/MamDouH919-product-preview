@@ -1,21 +1,105 @@
 import type { MentionOptions } from "@tiptap/extension-mention";
 import { ReactRenderer } from "@tiptap/react";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
+import api from "@/lib/api";
+import type { ProductSearchResponse } from "@/backend-api/products/types";
+import type { Category } from "@/backend-api/categories/types";
+import type { SubCategory } from "@/backend-api/sub-categories/types";
+import { mentionHref, type MentionKind } from "@/lib/mentions";
 import SuggestionList, { type SuggestionListRef } from "./SuggestionList";
 
+export type EditorLang = "ar" | "en";
+
+/** One thing the `@` menu offers: a product, category or sub-category of this store. */
 export type MentionSuggestion = {
+  /** Unique within the menu: kind and id. */
+  key: string;
+  kind: MentionKind;
+  /** The entity's id, stored on the mention. */
   id: string;
-  mentionLabel: string;
+  /** Its name in the language being written. */
+  label: string;
+  /** Where the mention links to, without the locale. */
+  href: string;
 };
+
+/** The attributes the mention node is created with (see mentionExtension). */
+export type MentionNodeAttrs = { id: string; label: string; kind: MentionKind; href: string };
+
+const MAX_PER_KIND = 5;
+
+const name = (field: Record<string, string | undefined> | undefined, lang: EditorLang) =>
+  field?.[lang] || field?.ar || field?.en || "";
+
+const matches = (field: Record<string, string | undefined> | undefined, query: string) =>
+  !query || Object.values(field ?? {}).some((v) => v?.toLowerCase().includes(query));
+
+// Categories and sub-categories are few and change rarely: fetched once per
+// minute, then filtered here as the user types. Products are searched on the server.
+let taxonomy: { at: number; data: Promise<[Category[], SubCategory[]]> } | null = null;
+function loadTaxonomy() {
+  if (!taxonomy || Date.now() - taxonomy.at > 60_000) {
+    const data = Promise.all([
+      api.get<Category[]>("/categories").then((r) => r.data),
+      api.get<SubCategory[]>("/sub-categories").then((r) => r.data),
+    ]);
+    taxonomy = { at: Date.now(), data };
+    // A failed fetch shouldn't stick for a minute.
+    data.catch(() => (taxonomy = null));
+  }
+  return taxonomy.data;
+}
+
+async function findMentions(query: string, lang: EditorLang): Promise<MentionSuggestion[]> {
+  const q = query.trim().toLowerCase();
+  const [products, [categories, subCategories]] = await Promise.all([
+    api
+      .get<ProductSearchResponse>("/products/search", { params: { q: q || undefined, limit: MAX_PER_KIND } })
+      .then((r) => r.data.data)
+      .catch(() => []),
+    loadTaxonomy().catch((): [Category[], SubCategory[]] => [[], []]),
+  ]);
+
+  const items: MentionSuggestion[] = [
+    ...products.map((p) => ({
+      key: `product:${p._id}`,
+      kind: "product" as const,
+      id: p._id,
+      label: name(p.name, lang),
+      href: mentionHref("product", { slug: p.slug }),
+    })),
+    ...categories
+      .filter((c) => c.isActive !== false && matches(c.name, q))
+      .slice(0, MAX_PER_KIND)
+      .map((c) => ({
+        key: `category:${c._id}`,
+        kind: "category" as const,
+        id: c._id,
+        label: name(c.name, lang),
+        href: mentionHref("category", { slug: c.slug }),
+      })),
+    ...subCategories
+      .filter((s) => s.isActive !== false && matches(s.name, q))
+      .slice(0, MAX_PER_KIND)
+      .map((s) => ({
+        key: `subCategory:${s._id}`,
+        kind: "subCategory" as const,
+        id: s._id,
+        label: name(s.name, lang),
+        href: mentionHref("subCategory", {
+          id: s._id,
+          categoryId: typeof s.category === "string" ? s.category : s.category?._id,
+        }),
+      })),
+  ];
+  return items.filter((i) => i.label);
+}
 
 /**
  * Workaround for the current typing incompatibility between Tippy.js and Tiptap
  * Suggestion utility.
  *
  * @see https://github.com/ueberdosis/tiptap/issues/2795#issuecomment-1160623792
- *
- * Adopted from
- * https://github.com/Doist/typist/blob/a1726a6be089e3e1452def641dfcfc622ac3e942/stories/typist-editor/constants/suggestions.ts#L169-L186
  */
 const DOM_RECT_FALLBACK: DOMRect = {
   bottom: 0,
@@ -31,111 +115,65 @@ const DOM_RECT_FALLBACK: DOMRect = {
   },
 };
 
-export const mentionSuggestionOptions: MentionOptions["suggestion"] = {
-  // Replace this `items` code with a call to your API that returns suggestions
-  // of whatever sort you like (including potentially additional data beyond
-  // just an ID and a label). It need not be async but is written that way for
-  // the sake of example.
-  items: async ({ query }): Promise<MentionSuggestion[]> =>
-    Promise.resolve(
-      [
-        "Lea Thompson",
-        "Cyndi Lauper",
-        "Tom Cruise",
-        "Madonna",
-        "Jerry Hall",
-        "Joan Collins",
-        "Winona Ryder",
-        "Christina Applegate",
-        "Alyssa Milano",
-        "Molly Ringwald",
-        "Ally Sheedy",
-        "Debbie Harry",
-        "Olivia Newton-John",
-        "Elton John",
-        "Michael J. Fox",
-        "Axl Rose",
-        "Emilio Estevez",
-        "Ralph Macchio",
-        "Rob Lowe",
-        "Jennifer Grey",
-        "Mickey Rourke",
-        "John Cusack",
-        "Matthew Broderick",
-        "Justine Bateman",
-        "Lisa Bonet",
-        "Benicio Monserrate Rafael del Toro Sánchez",
-      ]
-        // Typically we'd be getting this data from an API where we'd have a
-        // definitive "id" to use for each suggestion item, but for the sake of
-        // example, we'll just set the index within this hardcoded list as the
-        // ID of each item.
-        .map((name, index) => ({ mentionLabel: name, id: index.toString() }))
-        // Find matching entries based on what the user has typed so far (after
-        // the @ symbol)
-        .filter((item) =>
-          item.mentionLabel.toLowerCase().startsWith(query.toLowerCase())
-        )
-        .slice(0, 5)
-    ),
+/** The `@` menu, listing names in `lang` (the language of the field being edited). */
+export function createMentionSuggestion(lang: EditorLang): MentionOptions["suggestion"] {
+  return {
+    items: ({ query }) => findMentions(query, lang),
 
-  render: () => {
-    let component: ReactRenderer<SuggestionListRef> | undefined;
-    let popup: TippyInstance | undefined;
+    render: () => {
+      let component: ReactRenderer<SuggestionListRef> | undefined;
+      let popup: TippyInstance | undefined;
 
-    return {
-      onStart: (props) => {
-        component = new ReactRenderer(SuggestionList, {
-          props,
-          editor: props.editor,
-        });
+      return {
+        onStart: (props) => {
+          component = new ReactRenderer(SuggestionList, {
+            props: { ...props, lang },
+            editor: props.editor,
+          });
 
-        popup = tippy("body", {
-          getReferenceClientRect: () =>
-            props.clientRect?.() ?? DOM_RECT_FALLBACK,
-          appendTo: () => document.body,
-          content: component.element,
-          showOnCreate: true,
-          interactive: true,
-          trigger: "manual",
-          placement: "bottom-start",
-        })[0];
-      },
+          popup = tippy("body", {
+            getReferenceClientRect: () => props.clientRect?.() ?? DOM_RECT_FALLBACK,
+            appendTo: () => document.body,
+            content: component.element,
+            showOnCreate: true,
+            interactive: true,
+            trigger: "manual",
+            placement: "bottom-start",
+          })[0];
+        },
 
-      onUpdate(props) {
-        component?.updateProps(props);
+        onUpdate(props) {
+          component?.updateProps({ ...props, lang });
 
-        popup?.setProps({
-          getReferenceClientRect: () =>
-            props.clientRect?.() ?? DOM_RECT_FALLBACK,
-        });
-      },
+          popup?.setProps({
+            getReferenceClientRect: () => props.clientRect?.() ?? DOM_RECT_FALLBACK,
+          });
+        },
 
-      onKeyDown(props) {
-        if (props.event.key === "Escape") {
-          popup?.hide();
-          return true;
-        }
+        onKeyDown(props) {
+          if (props.event.key === "Escape") {
+            popup?.hide();
+            return true;
+          }
 
-        if (!component?.ref) {
-          return false;
-        }
+          if (!component?.ref) {
+            return false;
+          }
 
-        return component.ref.onKeyDown(props);
-      },
+          return component.ref.onKeyDown(props);
+        },
 
-      onExit() {
-        popup?.destroy();
-        component?.destroy();
+        onExit() {
+          popup?.destroy();
+          component?.destroy();
 
-        // Remove references to the old popup and component upon destruction/exit.
-        // (This should prevent redundant calls to `popup.destroy()`, which Tippy
-        // warns in the console is a sign of a memory leak, as the `suggestion`
-        // plugin seems to call `onExit` both when a suggestion menu is closed after
-        // a user chooses an option, *and* when the editor itself is destroyed.)
-        popup = undefined;
-        component = undefined;
-      },
-    };
-  },
-};
+          // The suggestion plugin calls onExit both when an item is chosen and
+          // when the editor is destroyed; dropping the references avoids a
+          // second destroy, which Tippy reports as a leak.
+          popup = undefined;
+          component = undefined;
+        },
+      };
+    },
+  };
+}

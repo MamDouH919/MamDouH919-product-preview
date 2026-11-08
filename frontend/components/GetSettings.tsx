@@ -1,14 +1,19 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useAppDispatch } from "@/Store/store";
-import { setSettings } from "@/Store/slices/settings";
+import { setSettings, toSettingsState } from "@/Store/slices/settings";
 import { fetchSettings } from "@/backend-api/settings/queries";
 import { CircularProgress, Stack } from "@mui/material";
 
-const GetSettings = ({ children }: { children: React.ReactNode }) => {
+/**
+ * Keeps the store's settings fresh. Normally the server has already put them
+ * in the store (`preloaded`), so the page shows at once and only refreshes
+ * them here; if the server couldn't, the page waits under a spinner.
+ */
+const GetSettings = ({ children, preloaded = false }: { children: React.ReactNode; preloaded?: boolean }) => {
     const dispatch = useAppDispatch();
     const initialized = useRef(false);
-    const [ready, setReady] = useState(false);
+    const [ready, setReady] = useState(preloaded);
 
     useEffect(() => {
         if (initialized.current) return;
@@ -16,22 +21,7 @@ const GetSettings = ({ children }: { children: React.ReactNode }) => {
 
         fetchSettings()
             .then((settings) => {
-                dispatch(setSettings({
-                    siteTitle: settings.siteTitle as any,
-                    siteDescription: settings.siteDescription as any,
-                    logo: settings.logo,
-                    favicon: settings.favicon,
-                    primaryColor: settings.primaryColor,
-                    currency: settings.currency as any,
-                    phone: settings.phone,
-                    whatsapp: settings.whatsapp,
-                    landLine: settings.landLine,
-                    email: settings.email,
-                    address: settings.address,
-                    socialMedia: settings.socialMedia as any,
-                    showPrices: settings.showPrices,
-                    modules: settings.modules,
-                }));
+                dispatch(setSettings(toSettingsState(settings)));
             })
             .catch(() => null)
             .finally(() => setReady(true));

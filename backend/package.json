@@ -25,7 +25,8 @@
     "normalize-ids": "ts-node -r tsconfig-paths/register scripts/normalize-ids.ts",
     "migrate:r2": "ts-node -r tsconfig-paths/register scripts/migrate-uploads-to-r2.ts",
     "seed:products": "ts-node -r tsconfig-paths/register scripts/seed-products.ts",
-    "seed:sections": "ts-node -r tsconfig-paths/register scripts/seed-sections.ts"
+    "seed:sections": "ts-node -r tsconfig-paths/register scripts/seed-sections.ts",
+    "seed:policies": "ts-node -r tsconfig-paths/register scripts/seed-policies.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1154.0",

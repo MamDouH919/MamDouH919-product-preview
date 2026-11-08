@@ -1,4 +1,8 @@
+'use client';
+
 import { Stack, styled } from '@mui/material';
+import { useParams } from 'next/navigation';
+import { localizeMentions } from '@/lib/mentions';
 import clsx from 'clsx';
 import React from 'react'
 
@@ -84,13 +88,15 @@ const Root = styled(Stack)(({ theme }) => ({
 }));
 
 const DangerouslySetInnerHTML = ({ data, limit = false }: { data: string, limit?: boolean }) => {
+    // Product/category mentions are stored without a locale; link them in the page's.
+    const { locale } = useParams<{ locale?: string }>() ?? {};
     return (
         <Root
             className={clsx({
                 [classes.serviceLines]: limit,
             })}
             spacing={0}
-            dangerouslySetInnerHTML={{ __html: data }}
+            dangerouslySetInnerHTML={{ __html: localizeMentions(data, locale) }}
         />
     )
 }

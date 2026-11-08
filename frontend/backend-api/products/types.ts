@@ -7,6 +7,11 @@ export type ProductVariant = {
   label: string;
   price?: number;
   sku?: string;
+  /** Price before a discount; a sale only when higher than `price`. */
+  compareAtPrice?: number | null;
+  gtin?: string;
+  color?: string;
+  size?: string;
   stock: number;
 };
 
@@ -17,7 +22,12 @@ export type Product = {
   shortDescription?: LocalizedField;
   images: string[];
   price?: number;
+  /** Price before a discount; a sale only when higher than `price`. */
+  compareAtPrice?: number | null;
   sku?: string;
+  /** Empty: the store's own product. */
+  brand?: string;
+  gtin?: string;
   category: Category;
   subCategory?: SubCategory;
   slug: string;

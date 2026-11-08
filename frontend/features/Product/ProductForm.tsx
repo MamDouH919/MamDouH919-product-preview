@@ -47,7 +47,17 @@ type ImageItem = { file: File | string | null };
 
 // `_id` travels back to the server so it can tell an edited variant from a new
 // one — that is what keeps a variant's stock attached to it across an edit.
-type VariantItem = { _id?: string; label: string; price: string; sku: string; stock: string };
+type VariantItem = {
+  _id?: string;
+  label: string;
+  price: string;
+  compareAtPrice: string;
+  sku: string;
+  gtin: string;
+  color: string;
+  size: string;
+  stock: string;
+};
 
 type ProductFormValues = {
   name: LocalizedField;
@@ -55,7 +65,10 @@ type ProductFormValues = {
   shortDescription: LocalizedField;
   images: ImageItem[];
   price: string;
+  compareAtPrice: string;
   sku: string;
+  brand: string;
+  gtin: string;
   category: string;
   subCategory: string;
   slug: string;
@@ -74,6 +87,11 @@ interface ProductFormProps {
 }
 
 const LANGS = ["ar", "en"] as const;
+
+// Mirrors the backend DTO: EAN-8, UPC-12, EAN-13 or GTIN-14.
+const GTIN_PATTERN = /^(\d{8}|\d{12,14})$/;
+
+const numberText = (n?: number | null) => (n != null ? String(n) : "");
 
 // Mirrors the backend DTO: lowercase English letters, digits, single hyphens.
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -102,12 +120,19 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         variants: (defaultData?.variants ?? []).map((v) => ({
           _id: v._id,
           label: v.label,
-          price: v.price !== undefined ? String(v.price) : "",
+          price: numberText(v.price),
+          compareAtPrice: numberText(v.compareAtPrice),
           sku: v.sku ?? "",
+          gtin: v.gtin ?? "",
+          color: v.color ?? "",
+          size: v.size ?? "",
           stock: String(v.stock ?? 0),
         })),
         price: defaultData?.price !== undefined ? String(defaultData.price) : "",
+        compareAtPrice: numberText(defaultData?.compareAtPrice),
         sku: defaultData?.sku ?? "",
+        brand: defaultData?.brand ?? "",
+        gtin: defaultData?.gtin ?? "",
         category: defaultData?.category?._id ?? "",
         subCategory: defaultData?.subCategory?._id ?? "",
         slug: defaultData?.slug ?? "",
@@ -164,8 +189,13 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
             data.variants.map((v) => ({
               ...(v._id ? { _id: v._id } : {}),
               label: v.label,
-              price: Number(v.price) || 0,
+              // Empty means "the product's price" — sending 0 would sell it free.
+              ...(v.price.trim() !== "" ? { price: Number(v.price) } : {}),
+              ...(v.compareAtPrice.trim() !== "" ? { compareAtPrice: Number(v.compareAtPrice) } : {}),
               ...(v.sku ? { sku: v.sku } : {}),
+              ...(v.gtin.trim() ? { gtin: v.gtin.trim() } : {}),
+              ...(v.color.trim() ? { color: v.color.trim() } : {}),
+              ...(v.size.trim() ? { size: v.size.trim() } : {}),
               // Only meaningful for a new variant. The server ignores it for an
               // existing one and keeps whatever the ledger says.
               stock: Number(v.stock) || 0,
@@ -191,6 +221,10 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
       if (data.price) formData.append("price", data.price);
       if (data.sku) formData.append("sku", data.sku);
+      // On edit these go even when empty, so clearing a field clears it.
+      if (data.compareAtPrice || isEditing) formData.append("compareAtPrice", data.compareAtPrice.trim());
+      if (data.brand || isEditing) formData.append("brand", data.brand.trim());
+      if (data.gtin || isEditing) formData.append("gtin", data.gtin.trim());
       if (!isEditing) formData.append("category", data.category);
       if (data.subCategory) formData.append("subCategory", data.subCategory);
       // On edit an empty slug is still sent, so the server regenerates it.
@@ -392,7 +426,28 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
+              <TextInputComponent
+                name="compareAtPrice"
+                label={t("compareAtPrice")}
+                control={control}
+                type="number"
+                helperText={t("compareAtPriceHint")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextInputComponent name="sku" label={t("sku")} control={control} helperText={t("skuHint")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextInputComponent
+                name="gtin"
+                label={t("gtin")}
+                control={control}
+                helperText={t("gtinHint")}
+                rules={{ pattern: { value: GTIN_PATTERN, message: t("gtinInvalid") } }}
+              />
+            </Grid>
+            <Grid size={12}>
+              <TextInputComponent name="brand" label={t("brand")} control={control} helperText={t("brandHint")} />
             </Grid>
           </Grid>
         </FormSection>
@@ -407,7 +462,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               size="small"
               variant="outlined"
               startIcon={<Add />}
-              onClick={() => appendVariant({ label: "", price: "", sku: "", stock: "0" })}
+              onClick={() =>
+                appendVariant({ label: "", price: "", compareAtPrice: "", sku: "", gtin: "", color: "", size: "", stock: "0" })
+              }
             >
               {t("addVariant")}
             </Button>
@@ -417,6 +474,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
             <EmptyHint text={t("noVariantsHint")} />
           ) : (
             <Stack spacing={2}>
+              <Typography variant="caption" color="text.secondary">
+                {t("variantAttributesHint")}
+              </Typography>
               {variantFields.map((field, index) => (
                 <Paper key={field.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                   <Stack direction="row" spacing={1} alignItems="flex-start">
@@ -442,6 +502,28 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                           name={`variants.${index}.sku`}
                           label={t("sku")}
                           control={control}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent
+                          name={`variants.${index}.compareAtPrice`}
+                          label={t("compareAtPrice")}
+                          control={control}
+                          type="number"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent name={`variants.${index}.color`} label={t("color")} control={control} />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent name={`variants.${index}.size`} label={t("size")} control={control} />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextInputComponent
+                          name={`variants.${index}.gtin`}
+                          label={t("gtin")}
+                          control={control}
+                          rules={{ pattern: { value: GTIN_PATTERN, message: t("gtinInvalid") } }}
                         />
                       </Grid>
                       {tracksInventory && (

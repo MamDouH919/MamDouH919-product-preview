@@ -16,11 +16,11 @@ const PROSE =
   "[&_li]:before:text-xs [&_li]:before:font-black [&_li]:before:text-(--primary) [&_li]:before:content-['✓']"
 
 export default function StorySection({ sectionName = "home-story" }: { sectionName?: string }) {
-  const { section, text, cssVars, isRtl } = useHomeSection(sectionName)
+  const { section, text, html, cssVars, isRtl } = useHomeSection(sectionName)
   if (!section) return null
 
   const title = text(section.title)
-  const description = text(section.description)
+  const description = html(section.description)
   if (!title && !section.image) return null
 
   return (

@@ -12,6 +12,7 @@ import WhatsAppButton from "@/components/WhatsAppButton"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
 import QuickAddDialog from "@/features/Cart/QuickAddDialog"
 import { useStoreModules } from "@/Hooks/useStoreModules"
+import { saleFrom } from "@/lib/productOffer"
 import Image from "next/image"
 
 function localizedField(field: Record<string, string | undefined> | undefined, lang: string) {
@@ -34,9 +35,12 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
   const hoverImage = product.images?.[1]
 
   const variants = product.variants ?? []
-  const variantPrices = variants.map((v) => v.price).filter((p): p is number => p != null)
+  // A variant without its own price sells at the product's, as at checkout.
+  const variantPrices = variants.map((v) => v.price ?? product.price).filter((p): p is number => p != null)
   const minVariantPrice = variantPrices.length ? Math.min(...variantPrices) : null
   const displayPrice = variants.length > 0 ? minVariantPrice : product.price
+  // A "from" price spans variants, so only a single-price product shows a "was" price.
+  const wasPrice = !variants.length && displayPrice != null ? saleFrom(displayPrice, product.compareAtPrice) : undefined
   const visibleVariants = variants.slice(0, 3)
   const extraVariantCount = variants.length - visibleVariants.length
 
@@ -160,6 +164,9 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
                   <span className="flex items-baseline gap-1 text-white">
                     <span className="text-xl font-extrabold tabular-nums tracking-tight">{displayPrice.toLocaleString()}</span>
                     <span className="text-[11px] font-medium text-white/60">{currency}</span>
+                    {wasPrice != null && (
+                      <span className="ms-1 text-xs tabular-nums text-white/55 line-through">{wasPrice.toLocaleString()}</span>
+                    )}
                   </span>
                 ) : (
                   <span className="text-sm text-white/40">—</span>

@@ -16,7 +16,6 @@ import { HorizontalRule } from "@tiptap/extension-horizontal-rule";
 import { Italic } from "@tiptap/extension-italic";
 import { Link } from "@tiptap/extension-link";
 import { ListItem } from "@tiptap/extension-list-item";
-import { Mention } from "@tiptap/extension-mention";
 import { OrderedList } from "@tiptap/extension-ordered-list";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import { Placeholder } from "@tiptap/extension-placeholder";
@@ -40,11 +39,14 @@ import {
   ResizableImage,
   TableImproved,
 } from "mui-tiptap";
-import { mentionSuggestionOptions } from "./mentionSuggestionOptions";
+import { mentionExtension } from "./mentionExtension";
+import type { EditorLang } from "./mentionSuggestionOptions";
 
 export type UseExtensionsOptions = {
   /** Placeholder hint to show in the text input area before a user types a message. */
   placeholder?: string;
+  /** Language of the text being written; the `@` menu lists names in it. */
+  lang?: EditorLang;
 };
 
 // Don't treat the end cursor as "inclusive" of the Link mark, so that users can
@@ -87,6 +89,7 @@ const CustomSuperscript = Superscript.extend({
  */
 export default function useExtensions({
   placeholder,
+  lang = "ar",
 }: UseExtensionsOptions = {}): EditorOptions["extensions"] {
   return useMemo(() => {
     return [
@@ -172,9 +175,8 @@ export default function useExtensions({
         nested: true,
       }),
 
-      Mention.configure({
-        suggestion: mentionSuggestionOptions,
-      }),
+      // `@` links a product, category or sub-category of the store.
+      mentionExtension(lang),
 
       Placeholder.configure({
         placeholder,
@@ -184,5 +186,5 @@ export default function useExtensions({
       // collaborative editing
       History,
     ];
-  }, [placeholder]);
+  }, [placeholder, lang]);
 }

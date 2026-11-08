@@ -10,8 +10,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Cairo everywhere, including Tailwind's font-sans (Geist was loaded but never shown). */
+  --font-sans: var(--font-cairo), Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,4 +26,17 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-cairo), Arial, sans-serif;
+}
+
+/* A product, category or sub-category mentioned with "@" in rich text (pages,
+   home sections, and the dashboard editor): a link that reads as part of the text. */
+a.mention[data-type="mention"] {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+a.mention[data-type="mention"]:hover {
+  opacity: 0.75;
 }

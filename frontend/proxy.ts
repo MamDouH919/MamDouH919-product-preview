@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import appConfig from './config.json';
 
-const locales = ['ar', 'en'];
-const DEFAULT_LOCALE = 'ar';
+// One source for both: this used to say 'ar' while config said 'en', so "/"
+// went to English and every other bare path to Arabic.
+const locales = appConfig.app.languages;
+const DEFAULT_LOCALE = appConfig.app.defaultLanguage;
 const PUBLIC_FILE = /\.(.*)$/;
 
 export function proxy(req: NextRequest) {
@@ -25,9 +28,12 @@ export function proxy(req: NextRequest) {
   );
   const locale = detectedLocale ?? req.cookies.get('NEXT_LOCALE')?.value ?? DEFAULT_LOCALE;
 
-  // If no locale prefix, redirect to add one
+  // If no locale prefix, redirect to add one ("/" → "/ar", not "/ar/", which
+  // would cost a second redirect).
   if (!detectedLocale) {
-    const response = NextResponse.redirect(new URL(`/${locale}${pathname}`, req.url));
+    const target = new URL(`/${locale}${pathname === '/' ? '' : pathname}`, req.url);
+    target.search = req.nextUrl.search;
+    const response = NextResponse.redirect(target);
     response.cookies.set('NEXT_LOCALE', locale, { maxAge: 31536000 });
     return response;
   }

@@ -103,6 +103,7 @@ export default function CategoriesSlider() {
                       src={getBackendUri(category.image)}
                       alt={name}
                       fill
+                      sizes="150px"
                       style={{ objectFit: "cover" }}
                     />
                   ) : (

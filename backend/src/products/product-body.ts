@@ -3,8 +3,10 @@ import { parseNestedBody } from '../common/helpers/parse-nested-body';
 import { deleteFile, toPublicPath } from '../common/helpers/compress-image';
 
 const NUMBER_FIELDS = ['price', 'stock', 'lowStockThreshold', 'order'] as const;
+// Fields a form clears by sending them empty: "" becomes null, which unsets them.
+const NULLABLE_NUMBER_FIELDS = ['compareAtPrice'] as const;
 const BOOLEAN_FIELDS = ['isActive', 'trackStock', 'allowBackorder'] as const;
-const VARIANT_NUMBER_FIELDS = ['price', 'stock'] as const;
+const VARIANT_NUMBER_FIELDS = ['price', 'stock', 'compareAtPrice'] as const;
 
 // Same rules as the global pipe in main.ts, so a product is held to the same
 // standard as every JSON endpoint.
@@ -12,6 +14,9 @@ const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, t
 
 const toNumber = (value: unknown) =>
   typeof value === 'string' ? (value.trim() === '' ? undefined : Number(value)) : value;
+
+const toNullableNumber = (value: unknown) =>
+  typeof value === 'string' ? (value.trim() === '' || value === 'null' ? null : Number(value)) : value;
 
 const toBoolean = (value: unknown) =>
   value === 'true' ? true : value === 'false' ? false : value;
@@ -50,6 +55,7 @@ export async function toProductDto<T extends object>(body: Record<string, any>, 
   }
 
   for (const field of NUMBER_FIELDS) if (field in data) data[field] = toNumber(data[field]);
+  for (const field of NULLABLE_NUMBER_FIELDS) if (field in data) data[field] = toNullableNumber(data[field]);
   for (const field of BOOLEAN_FIELDS) if (field in data) data[field] = toBoolean(data[field]);
   if (Array.isArray(data.variants)) {
     for (const variant of data.variants) {

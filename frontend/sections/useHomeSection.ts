@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useTheme } from "@mui/material/styles"
 import { useSectionByNameQuery } from "@/backend-api/sections/hooks"
 import { LocalizedField } from "@/backend-api/globalTypes"
+import { localizeMentions } from "@/lib/mentions"
 
 /**
  * Loads a home-page section by its `sectionName` and hands back what every
@@ -20,13 +21,16 @@ export function useHomeSection(sectionName: string) {
   const text = (field?: LocalizedField) =>
     field?.[i18n.language] || field?.ar || field?.en || ""
 
+  /** Rich text in the current language, its product/category mentions linked in that language too. */
+  const html = (field?: LocalizedField) => localizeMentions(text(field), i18n.language)
+
   const cssVars = {
     "--primary": theme.palette.primary.main,
     "--primary-dark": theme.palette.primary.dark,
     "--on-primary": theme.palette.primary.contrastText,
   } as React.CSSProperties
 
-  return { section, isLoading, text, cssVars, isRtl: i18n.dir() === "rtl" }
+  return { section, isLoading, text, html, cssVars, isRtl: i18n.dir() === "rtl" }
 }
 
 /** True when rich-text HTML has something visible, not just an empty `<p></p>`. */

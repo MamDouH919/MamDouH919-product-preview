@@ -38,6 +38,31 @@ export class ProductVariantDto {
   @IsString()
   sku?: string;
 
+  // The price before a discount; null clears it.
+  @ApiProperty({ required: false, minimum: 0, nullable: true })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  compareAtPrice?: number | null;
+
+  // EAN-8, UPC-12, EAN-13 or GTIN-14. Empty clears it.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @ValidateIf((o) => o.gtin !== '')
+  @Matches(/^(\d{8}|\d{12,14})$/, { message: 'gtin must be an 8, 12, 13 or 14 digit barcode' })
+  gtin?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  size?: string;
+
   // Honoured only for brand-new variants — the stock of an existing variant
   // can only change through the inventory ledger.
   @ApiProperty({ required: false })
@@ -84,6 +109,26 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   sku?: string;
+
+  // The price before a discount; null clears it.
+  @ApiProperty({ required: false, minimum: 0, nullable: true })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  compareAtPrice?: number | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  // EAN-8, UPC-12, EAN-13 or GTIN-14. Empty clears it.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @ValidateIf((o) => o.gtin !== '')
+  @Matches(/^(\d{8}|\d{12,14})$/, { message: 'gtin must be an 8, 12, 13 or 14 digit barcode' })
+  gtin?: string;
 
   @ApiProperty()
   @IsNotEmpty()

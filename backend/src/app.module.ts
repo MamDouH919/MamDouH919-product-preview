@@ -32,6 +32,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { MoneyAccountsModule } from './money-accounts/money-accounts.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SitemapModule } from './sitemap/sitemap.module';
+import { FeedModule } from './feed/feed.module';
 import { CartModule } from './cart/cart.module';
 import { ReturnsModule } from './returns/returns.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
@@ -99,6 +100,7 @@ import { StoreModuleGuard } from './guards/store-module.guard';
     MoneyAccountsModule,
     ReviewsModule,
     SitemapModule,
+    FeedModule,
     CartModule,
     ReturnsModule,
     ActivityLogModule,

@@ -53,12 +53,12 @@ function CountUp({ value }: { value: string }) {
 }
 
 export default function StatsSection({ sectionName = "home-stats" }: { sectionName?: string }) {
-  const { section, text, cssVars } = useHomeSection(sectionName)
+  const { section, text, html, cssVars } = useHomeSection(sectionName)
   const items = (section?.highlights ?? []).filter((h) => h.value)
   if (!section || !items.length) return null
 
   const title = text(section.title)
-  const description = text(section.description)
+  const description = html(section.description)
   const columns = items.length >= 4 ? "lg:grid-cols-4" : items.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"
 
   return (

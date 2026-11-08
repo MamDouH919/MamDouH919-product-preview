@@ -515,6 +515,7 @@ frontend/
 | backend | `npm run build` / `npm run start:prod` | compile / run `dist/main` |
 | backend | `npm run add-tenant` | register a host in the tenant map, optionally seed it |
 | backend | `npm run seed -- <host>` | seed roles and admin users for one tenant |
+| backend | `npm run seed:policies -- <host> [--reset]` | create the shipping and return policy pages from the store's settings (see `GOOGLE-SETUP.md`) |
 | backend | `npm run migrate:inventory -- <host>` | backfill stock fields + variant ids on pre-inventory data |
 | backend | `npm run finance:backfill -- <host> [--apply]` | prepare existing orders for the books, grant finance permissions, reconcile |
 | backend | `npm run normalize-ids -- <host> [--apply]` | convert reference ids stored as strings (from before the ObjectId schema fix) to ObjectIds |

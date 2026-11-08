@@ -27,11 +27,11 @@ function SectionLink({ url, className, children }: { url: string; className: str
 }
 
 export default function CtaSection({ sectionName = "home-cta" }: { sectionName?: string }) {
-  const { section, text, cssVars } = useHomeSection(sectionName)
+  const { section, text, html, cssVars } = useHomeSection(sectionName)
   if (!section) return null
 
   const title = text(section.title)
-  const description = text(section.description)
+  const description = html(section.description)
   const links = (section.links ?? []).filter((l) => l.url && text(l.label))
   if (!title) return null
 
