@@ -21,7 +21,7 @@ import Stars from "@/features/Review/Stars"
 import RecentlyViewed from "@/features/Product/RecentlyViewed"
 import { recordRecentlyViewed } from "@/features/Product/recentlyViewedStore"
 import { useStoreModules } from "@/Hooks/useStoreModules"
-import { saleFrom } from "@/lib/productOffer"
+import { linkedVariantIndex, saleFrom } from "@/lib/productOffer"
 
 function localized(field: Record<string, string | undefined> | undefined, lang: string) {
   if (!field) return ""
@@ -79,10 +79,13 @@ export default function ProductDetailClient({ params }: Props) {
 
   const { data: product, isLoading, isError } = useProductBySlugQuery(slug)
 
-  // `?variant=<id>` (from shopping feeds and structured data) opens on that variant,
-  // so the price shown is the one that was advertised.
-  const variantParam = useSearchParams().get("variant")
-  const linkedVariant = product?.variants?.findIndex((v) => v._id === variantParam) ?? -1
+  // `?size=30ml` or `?variant=<id>` (from shopping feeds and structured data)
+  // opens on that variant, so the price shown is the one that was advertised.
+  const searchParams = useSearchParams()
+  const linkedVariant = linkedVariantIndex(product?.variants, {
+    size: searchParams.get("size"),
+    variant: searchParams.get("variant"),
+  })
   const activeVariant = selectedVariant ?? (linkedVariant >= 0 ? linkedVariant : product?.variants?.length ? 0 : null)
   const { data: related } = useRelatedProductsQuery(product?._id, 4)
   const relatedProducts = related ?? []

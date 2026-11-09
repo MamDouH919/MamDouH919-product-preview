@@ -76,11 +76,12 @@ export function productOffers(product: OfferProduct, settings: OfferSettings | n
       const compareAt = v.price != null ? v.compareAtPrice : product.compareAtPrice
       return [{
         variantId: v._id,
-        label: v.label,
+        label: normalizeSizes(v.label ?? "") || undefined,
         sku: v.sku || product.sku || undefined,
         gtin: v.gtin || undefined,
         color: v.color?.trim() || undefined,
-        size: v.size?.trim() || undefined,
+        // Many stores only write the size into the label ("30 ML"); read it from there.
+        size: normalizeSizes(v.size ?? "") || sizeFromLabel(v.label),
         price,
         compareAtPrice: saleFrom(price, compareAt),
         inStock: alwaysInStock || (v.stock ?? 0) > 0,
@@ -96,6 +97,52 @@ export function productOffers(product: OfferProduct, settings: OfferSettings | n
     compareAtPrice: saleFrom(product.price, product.compareAtPrice),
     inStock: alwaysInStock || (product.stock ?? 0) > 0,
   }]
+}
+
+/** Collapses whitespace and writes volumes one way: "30ml", "30ML ", "30 Ml" → "30 ML". */
+export function normalizeSizes(text: string): string {
+  return text
+    .replace(/(\d+(?:[.,]\d+)?)\s*ml(?![\p{L}])/giu, "$1 ML")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** The volume in a variant label ("كاندي 30ml" → "30 ML"), when it has one. */
+export function sizeFromLabel(label?: string): string | undefined {
+  const match = label?.match(/(\d+(?:[.,]\d+)?)\s*ml(?![\p{L}])/iu)
+  return match ? `${match[1]} ML` : undefined
+}
+
+/** A size as a URL/id-safe key: "30 ML" → "30ml". */
+export function sizeKey(size: string): string {
+  return size.toLowerCase().replace(/[^\p{L}\p{N}.]+/gu, "")
+}
+
+/** The product page opened on this offer's variant: `?size=30ml`, else `?variant=<id>`. */
+export function offerLink(pageUrl: string, offer: Pick<Offer, "size" | "variantId">): string {
+  if (offer.size) return `${pageUrl}?size=${encodeURIComponent(sizeKey(offer.size))}`
+  if (offer.variantId) return `${pageUrl}?variant=${offer.variantId}`
+  return pageUrl
+}
+
+/** Which variant a `?size=` / `?variant=` link points at, or -1. */
+export function linkedVariantIndex(
+  variants: { _id?: string; size?: string; label?: string }[] | undefined,
+  params: { size?: string | null; variant?: string | null },
+): number {
+  if (!variants?.length) return -1
+  if (params.variant) {
+    const i = variants.findIndex((v) => v._id === params.variant)
+    if (i >= 0) return i
+  }
+  if (params.size) {
+    const wanted = sizeKey(params.size)
+    return variants.findIndex((v) => {
+      const size = normalizeSizes(v.size ?? "") || sizeFromLabel(v.label)
+      return !!size && sizeKey(size) === wanted
+    })
+  }
+  return -1
 }
 
 /** Descriptions are rich text; structured data, feeds and meta tags want plain text. */

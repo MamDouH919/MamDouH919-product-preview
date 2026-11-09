@@ -9,7 +9,7 @@ import { withBackend } from "@/lib/getBackendUrl"
 import { Prefetched } from "@/lib/prefetch"
 import { breadcrumbLd, JsonLd, returnPolicyLd, returnPolicyUrl, shippingLd, type StoreSettings } from "@/lib/jsonLd"
 import { PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks"
-import { loc, plainText, productOffers, type OfferSettings } from "@/lib/productOffer"
+import { loc, offerLink, plainText, productOffers, type OfferSettings } from "@/lib/productOffer"
 
 interface PageProps {
   params: Promise<{ slug: string; locale: string }>
@@ -96,7 +96,7 @@ async function ProductJsonLd({ slug, locale }: { slug: string; locale: string })
           priceCurrency: currency,
         }
       : undefined,
-    url: o.variantId ? `${url}?variant=${o.variantId}` : url,
+    url: offerLink(url, o),
     shippingDetails,
     hasMerchantReturnPolicy,
   })

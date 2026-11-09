@@ -47,6 +47,16 @@ export function withBackend(base: string, path: string): string {
   return /^https?:\/\//i.test(path) ? path : `${base}${path}`;
 }
 
+/** An absolute https URL — the only kind of link Merchant Center and crawlers accept for images. */
+export function isHttpsUrl(url?: string | null): url is string {
+  if (!url) return false
+  try {
+    return new URL(url).protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 export function getTenantKey(): string {
   if (typeof window !== "undefined") {
     return window.location.hostname ?? "";

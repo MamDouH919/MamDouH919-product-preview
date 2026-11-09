@@ -1,5 +1,14 @@
-import { withBackend } from "@/lib/getBackendUrl"
-import { loc, plainText, productOffers, type OfferProduct, type OfferSettings } from "@/lib/productOffer"
+import { isHttpsUrl, withBackend } from "@/lib/getBackendUrl"
+import {
+  loc,
+  normalizeSizes,
+  offerLink,
+  plainText,
+  productOffers,
+  sizeKey,
+  type OfferProduct,
+  type OfferSettings,
+} from "@/lib/productOffer"
 
 /**
  * Google Merchant Center product feed (RSS 2.0 + the `g:` namespace) for one
@@ -35,6 +44,18 @@ export type FeedContext = {
   storeName: string
   title: string
   description: string
+  /**
+   * Image URLs known not to load (checked by the route). Items left without a
+   * working image are skipped: Google disapproves an item whose image 404s.
+   */
+  brokenImages?: ReadonlySet<string>
+  /** Called for every product or variant left out of the feed, with why. */
+  onSkip?: (id: string, reason: string) => void
+}
+
+/** Every image a product lists, as the absolute URL the feed would send. */
+export function feedImageUrls(product: Pick<FeedProduct, "images">, backendUrl: string): string[] {
+  return (product.images ?? []).filter(Boolean).map((img) => withBackend(backendUrl, img.trim()))
 }
 
 /** Google's limits; longer values are rejected, not truncated. */
@@ -54,7 +75,10 @@ const escapeXml = (value: string) =>
 
 const clip = (value: string, max: number) => (value.length > max ? value.slice(0, max - 1).trimEnd() + "…" : value)
 
-const tag = (name: string, value: string | undefined) => (value ? `<${name}>${escapeXml(value)}</${name}>` : "")
+const tag = (name: string, value: string | undefined) => {
+  const text = value?.replace(/\s+/g, " ").trim()
+  return text ? `<${name}>${escapeXml(text)}</${name}>` : ""
+}
 
 export function buildGoogleFeed(products: FeedProduct[], settings: FeedSettings, ctx: FeedContext): string {
   const { locale, currency, origin, backendUrl } = ctx
@@ -69,14 +93,23 @@ export function buildGoogleFeed(products: FeedProduct[], settings: FeedSettings,
       : ""
 
   const items = products.flatMap((product) => {
-    const images = (product.images ?? []).map((img) => withBackend(backendUrl, img))
-    // Google rejects items without an image.
-    if (!images.length) return []
+    const skip = (reason: string) => {
+      ctx.onSkip?.(product._id, reason)
+      return []
+    }
 
-    const name = loc(product.name, locale)
+    const images = feedImageUrls(product, backendUrl).filter((img) => isHttpsUrl(img) && !ctx.brokenImages?.has(img))
+    // Google disapproves items without a working image; leave them out instead.
+    if (!images.length) {
+      return skip(product.images?.length ? `no loadable https image (${product.images.join(", ")})` : "no image")
+    }
+
+    const name = normalizeSizes(loc(product.name, locale))
+    if (!name) return skip("no title")
     const description =
       plainText(loc(product.description, locale)) || plainText(loc(product.shortDescription, locale)) || name
     const productType = [loc(product.category?.name, locale), loc(product.subCategory?.name, locale)]
+      .map((part) => part.trim())
       .filter(Boolean)
       .join(" > ")
     const pageUrl = `${origin}/${locale}/products/${encodeURIComponent(product.slug)}`
@@ -85,15 +118,24 @@ export function buildGoogleFeed(products: FeedProduct[], settings: FeedSettings,
 
     // Google rejects a zero price; older variants saved without one hold 0.
     const offers = productOffers(product, settings).filter((o) => o.price > 0)
-    // Variants are grouped only when they say how they differ — Google rejects
-    // a group whose members share every attribute.
-    const grouped = offers.length > 1 && offers.some((o) => o.color || o.size)
+    if (!offers.length) return skip("no price")
+    const grouped = !!product.variants?.length && offers.length > 1
 
-    return offers.map((offer) => {
-      const id = offer.variantId ? `${product._id}_${offer.variantId}` : product._id
-      const title = offer.label ? `${name} - ${offer.label}` : name
+    // Each variant needs its own id, the same on every build and in every
+    // language: the size when it has one ("<id>-30ml"), else the variant's id.
+    const usedIds = new Set<string>()
+    return offers.map((offer, index) => {
+      let id = product._id
+      if (product.variants?.length) {
+        const suffix = offer.size ? sizeKey(offer.size) : offer.color ? sizeKey(offer.color) : offer.variantId
+        id = `${product._id}-${suffix || index + 1}`
+        if (usedIds.has(id)) id = `${id}-${offer.variantId ?? index + 1}`
+      }
+      usedIds.add(id)
+
+      const title = offer.label && !name.endsWith(offer.label) ? `${name} - ${offer.label}` : name
       // The page preselects the variant, so the price Google crawls is this one.
-      const link = offer.variantId ? `${pageUrl}?variant=${offer.variantId}` : pageUrl
+      const link = offerLink(pageUrl, offer)
 
       return [
         "<item>",
