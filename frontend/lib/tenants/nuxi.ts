@@ -2,7 +2,7 @@ import type { TenantSeo } from "./types";
 
 const nuxi: TenantSeo = {
   siteName: "Nuxi",
-  siteUrl: "https://nuxi.novaslash.com",
+  siteUrl: "https://nuxi-eg.com",
   ar: {
     title: "Nuxi | قطع غيار سيارات وطنابير رياضية وتيل فرامل سيراميك",
     titleTemplate: "%s | Nuxi",

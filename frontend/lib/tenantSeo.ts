@@ -25,7 +25,7 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   "mk.localhost": mk,
   "mk.novaslash.com": mk,
   "nuxi.localhost": nuxi,
-  "nuxi.novaslash.com": nuxi,
+  "nuxi-eg.com": nuxi,
 };
 
 export const DEFAULT_TENANT = "localhost";
