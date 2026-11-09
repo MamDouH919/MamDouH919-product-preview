@@ -9,6 +9,12 @@ export class CreateBannerDto {
   @IsString()
   image?: string;
 
+  /** Send an empty string to remove the phone image. */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  mobileImage?: string;
+
   @ApiProperty({ required: true })
   @ValidateNested()
   @Type(() => LocalizedFieldDto)

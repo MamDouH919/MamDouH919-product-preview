@@ -7,6 +7,10 @@ export class Banner extends Document {
   @Prop({ required: true })
   image?: string;
 
+  /** Optional art-directed image for phones; the slider falls back to `image`. */
+  @Prop({ required: false })
+  mobileImage?: string;
+
   @Prop({ required: true, type: LocalizedFieldSchema })
   title!: LocalizedField;
 

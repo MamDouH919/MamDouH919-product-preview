@@ -1438,5 +1438,14 @@
     "notInPlanHint": "This page isn't part of your store's plan. Contact us if you'd like to add it.",
     "storefront": "Storefront",
     "showPrices": "Show prices",
-    "showPricesHint": "Turn off to show products without prices, so visitors ask on WhatsApp."
+    "showPricesHint": "Turn off to show products without prices, so visitors ask on WhatsApp.",
+    "bannerDesktopImage": "Laptop & desktop image",
+    "bannerDesktopImageHint": "Recommended 2200 × 1000 px (11:5). Keep text and products in the middle.",
+    "bannerMobileImage": "Phone image (optional)",
+    "bannerMobileImageHint": "Recommended 1080 × 750 px. Without it, phones show the main image cropped.",
+    "bannerSizeNotesTitle": "Image sizes for the banner",
+    "bannerSizeNoteDesktop": "Laptop & desktop image: 2200 × 1000 px (wide, 11:5). It also shows on tablets.",
+    "bannerSizeNoteMobile": "Phone image: 1080 × 750 px (optional). Without it, phones show the laptop image cropped from both sides.",
+    "bannerSizeNoteSafeArea": "Keep text, logos and products in the middle of the image. Very wide screens may crop a little from the top and bottom.",
+    "bannerSizeNoteFormat": "Use JPG or WebP, preferably under 500 KB each. Larger images are compressed automatically."
 }

@@ -1,6 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getImageProps } from "next/image"
+import { getBackendUri } from "@/utils/helperFunctions"
+import type { Banner } from "@/backend-api/banners/types"
 import { Pause, Play } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useBannersQuery } from "@/backend-api/banners/hooks"
@@ -10,6 +13,59 @@ export const SWIPE_THRESHOLD = 50
 
 export const navButton =
   "absolute top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-900 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] ring-1 ring-black/5 backdrop-blur transition-all duration-300 hover:scale-105 hover:bg-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 md:flex"
+
+/**
+ * A banner's image, art-directed: phones get `mobileImage` when there is one,
+ * everything else gets `image`. A <picture> lets the browser download only
+ * the one it shows. Fills its (positioned) parent like `<Image fill>`.
+ * The phone image is used below 640px (Tailwind's `sm`).
+ */
+export function BannerPicture({
+  slide,
+  alt,
+  priority,
+  sizes,
+  mobileSizes,
+  className,
+  style,
+  onLoad,
+}: {
+  slide: Banner
+  alt: string
+  priority?: boolean
+  /** `sizes` for the laptop image. */
+  sizes: string
+  /** `sizes` for the phone image. */
+  mobileSizes: string
+  className?: string
+  style?: React.CSSProperties
+  onLoad?: () => void
+}) {
+  const common = { alt, fill: true, priority }
+  const {
+    props: { srcSet: desktopSrcSet, sizes: desktopSizes },
+  } = getImageProps({ ...common, src: getBackendUri(slide.image), sizes })
+  const mobileSrc = slide.mobileImage ? getBackendUri(slide.mobileImage) : getBackendUri(slide.image)
+  const { props: mobile } = getImageProps({ ...common, src: mobileSrc, sizes: mobileSizes })
+
+  return (
+    <picture>
+      <source media="(min-width: 640px)" srcSet={desktopSrcSet} sizes={desktopSizes} />
+      {/* eslint-disable-next-line jsx-a11y/alt-text -- alt comes from getImageProps */}
+      <img
+        {...mobile}
+        draggable={false}
+        onLoad={onLoad}
+        // A cached image can finish before React attaches onLoad; catch it here.
+        ref={(el) => {
+          if (el?.complete && el.naturalWidth) onLoad?.()
+        }}
+        className={className}
+        style={{ ...mobile.style, ...style }}
+      />
+    </picture>
+  )
+}
 
 /** Active banners, heaviest first — the order the dashboard list shows. */
 export function useActiveBanners() {

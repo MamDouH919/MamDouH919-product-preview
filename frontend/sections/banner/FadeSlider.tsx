@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Image from "next/image"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
 import {
   AUTOPLAY_MS,
   SWIPE_THRESHOLD,
   navButton,
+  BannerPicture,
   SliderIndicators,
   useActiveBanners,
   usePlaybackBlockers,
@@ -16,9 +15,11 @@ import {
 
 const FADE_MS = 1000
 
-// Edge to edge: the slide takes the whole width of the page.
+// Edge to edge: the slide takes the whole width of the page. Its ratio matches
+// the upload sizes the dashboard asks for (phone 1080 x 750, laptop 2200 x 1000);
+// very wide screens cap the height, so only they crop a little top and bottom.
 export const FADE_FRAME =
-  "relative w-full overflow-hidden aspect-[16/10] sm:aspect-[16/7] lg:aspect-auto lg:h-[min(560px,40vw)]"
+  "relative w-full overflow-hidden aspect-[36/25] sm:aspect-[11/5] lg:max-h-[640px]"
 
 /** Full-width banners stacked on top of each other; the current one fades in over the last. */
 export default function FadeSlider() {
@@ -129,13 +130,12 @@ export default function FadeSlider() {
               {!loaded[slide._id] && (
                 <div className="absolute inset-0 animate-pulse bg-linear-to-r from-gray-100 via-gray-200 to-gray-100" />
               )}
-              <Image
-                src={getBackendUri(slide.image)}
+              <BannerPicture
+                slide={slide}
                 alt={title}
-                fill
-                draggable={false}
                 priority={index === 0}
                 sizes="100vw"
+                mobileSizes="100vw"
                 onLoad={() => setLoaded((l) => (l[slide._id] ? l : { ...l, [slide._id]: true }))}
                 // A slow push-in while the slide is showing; it holds with autoplay.
                 className={`pointer-events-none object-cover transition-opacity duration-500 ${

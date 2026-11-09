@@ -1,15 +1,14 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import Image from "next/image"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { getBackendUri } from "@/utils/helperFunctions"
 import { useTranslation } from "react-i18next"
 import { useTheme } from "@mui/material/styles"
 import {
   AUTOPLAY_MS,
   SWIPE_THRESHOLD,
   navButton,
+  BannerPicture,
   SliderIndicators,
   useActiveBanners,
   usePlaybackBlockers,
@@ -21,8 +20,15 @@ const DURATION = 600
 // Slide width as a share of the container; the rest is split into the two side peeks.
 // Kept in CSS (not measured in JS) so the server render matches the client and
 // there is no first-paint jump.
+//
+// The frame's aspect ratio is chosen so the slide itself matches the upload sizes
+// the dashboard asks for, and the image shows uncropped:
+//   phone   90% wide, frame 16:10   -> slide 1.44:1 (mobile image 1080 x 750)
+//   tablet  86% wide, frame 64:25   -> slide 2.2:1  (laptop image 2200 x 1000)
+//   laptop  80% wide, frame 11:4    -> slide 2.2:1
+// Very wide screens cap the height, so only they crop a little top and bottom.
 const FRAME =
-  "relative w-full overflow-hidden [--slide:90%] sm:[--slide:86%] lg:[--slide:80%] aspect-[16/10] sm:aspect-[16/8] lg:aspect-auto lg:h-[min(520px,42vw)]"
+  "relative w-full overflow-hidden [--slide:90%] sm:[--slide:86%] lg:[--slide:80%] aspect-[16/10] sm:aspect-[64/25] lg:aspect-[11/4] lg:max-h-[640px]"
 
 export default function PeekSlider() {
   const { t, i18n } = useTranslation()
@@ -177,13 +183,12 @@ export default function PeekSlider() {
                 {!loaded[slide._id] && (
                   <div className="absolute inset-0 animate-pulse bg-linear-to-r from-gray-100 via-gray-200 to-gray-100" />
                 )}
-                <Image
-                  src={getBackendUri(slide.image)}
+                <BannerPicture
+                  slide={slide}
                   alt={title}
-                  fill
-                  draggable={false}
                   priority={index % count === 0}
-                  sizes="(min-width: 1024px) 80vw, 90vw"
+                  sizes="(min-width: 1024px) 80vw, 86vw"
+                  mobileSizes="90vw"
                   onLoad={() => setLoaded((l) => (l[slide._id] ? l : { ...l, [slide._id]: true }))}
                   className={`pointer-events-none object-cover transition-opacity duration-500 ${
                     loaded[slide._id] ? "opacity-100" : "opacity-0"

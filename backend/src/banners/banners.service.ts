@@ -9,14 +9,30 @@ import { tenantImageStorage } from '../common/helpers/upload-storage';
 
 export const bannerImageStorage = tenantImageStorage('banners');
 
+export type BannerFiles = {
+  image?: Express.Multer.File[];
+  mobileImage?: Express.Multer.File[];
+};
+
+// Banners are shown much wider than other images, so they keep more pixels
+// than the 1280px default: room for a 2x laptop screen and a 3x phone.
+const DESKTOP_MAX_WIDTH = 2400;
+const MOBILE_MAX_WIDTH = 1080;
+
 @Injectable()
 export class BannersService {
   constructor(@InjectModel(Banner.name) private bannerModel: Model<Banner>) {}
 
-  async create(createBannerDto: CreateBannerDto, file?: Express.Multer.File): Promise<Banner> {
-    if (file) {
-      const compressed = await compressImage(file);
-      createBannerDto.image = toPublicPath(compressed);
+  async create(createBannerDto: CreateBannerDto, files: BannerFiles = {}): Promise<Banner> {
+    const image = files.image?.[0];
+    const mobileImage = files.mobileImage?.[0];
+    if (image) {
+      createBannerDto.image = toPublicPath(await compressImage(image, { maxWidth: DESKTOP_MAX_WIDTH }));
+    }
+    if (mobileImage) {
+      createBannerDto.mobileImage = toPublicPath(await compressImage(mobileImage, { maxWidth: MOBILE_MAX_WIDTH }));
+    } else if (!createBannerDto.mobileImage) {
+      delete createBannerDto.mobileImage;
     }
     const lastBanner = await this.bannerModel.findOne().sort({ weight: -1 }).exec();
     const banner = new this.bannerModel({
@@ -38,18 +54,32 @@ export class BannersService {
     return banner;
   }
 
-  async update(id: string, updateBannerDto: UpdateBannerDto, file?: Express.Multer.File): Promise<Banner> {
+  async update(id: string, updateBannerDto: UpdateBannerDto, files: BannerFiles = {}): Promise<Banner> {
     const existing = await this.bannerModel.findById(id).exec();
     if (!existing) throw new NotFoundException(`Banner with id ${id} not found`);
 
-    if (file) {
+    const image = files.image?.[0];
+    const mobileImage = files.mobileImage?.[0];
+    const unset: Record<string, 1> = {};
+
+    if (image) {
       if (existing.image) await deleteFile(existing.image);
-      const compressed = await compressImage(file);
-      updateBannerDto.image = toPublicPath(compressed);
+      updateBannerDto.image = toPublicPath(await compressImage(image, { maxWidth: DESKTOP_MAX_WIDTH }));
     }
 
+    if (mobileImage) {
+      if (existing.mobileImage) await deleteFile(existing.mobileImage);
+      updateBannerDto.mobileImage = toPublicPath(await compressImage(mobileImage, { maxWidth: MOBILE_MAX_WIDTH }));
+    } else if (updateBannerDto.mobileImage === '') {
+      // An empty value removes the phone image; the slider falls back to the main one.
+      if (existing.mobileImage) await deleteFile(existing.mobileImage);
+      delete updateBannerDto.mobileImage;
+      unset.mobileImage = 1;
+    }
+
+    const changes = Object.keys(unset).length ? { $set: updateBannerDto, $unset: unset } : updateBannerDto;
     return this.bannerModel
-      .findByIdAndUpdate(id, updateBannerDto, { returnDocument: 'after' })
+      .findByIdAndUpdate(id, changes, { returnDocument: 'after' })
       .exec() as Promise<Banner>;
   }
 

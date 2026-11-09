@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  Alert,
+  AlertTitle,
   Box,
   Button,
   CircularProgress,
@@ -15,6 +17,7 @@ import {
   Switch,
   Tab,
   Tabs,
+  Typography,
 } from "@mui/material";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
 import { ImageInput } from "@/components/MUI/ImageInput";
@@ -26,6 +29,7 @@ import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 
 type BannerFormValues = {
   image: File | string | null;
+  mobileImage: File | string | null;
   title: LocalizedField;
   description: LocalizedField;
   active: boolean;
@@ -36,6 +40,14 @@ interface BannerFormProps {
 }
 
 const LOCALIZED_FIELDS = ["title", "description"] as const;
+
+/** Upload guidance shown above the image inputs; the sizes match the slider frames. */
+const BANNER_SIZE_NOTES = [
+  "bannerSizeNoteDesktop",
+  "bannerSizeNoteMobile",
+  "bannerSizeNoteSafeArea",
+  "bannerSizeNoteFormat",
+] as const;
 
 const BannerForm = ({ defaultData }: BannerFormProps) => {
   const { t } = useTranslation();
@@ -48,6 +60,7 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
   const { control, handleSubmit, register, watch, setValue, formState: { errors } } = useForm<BannerFormValues>({
     defaultValues: {
       image: defaultData?.image ? getBackendUri(defaultData.image) : "",
+      mobileImage: defaultData?.mobileImage ? getBackendUri(defaultData.mobileImage) : "",
       title: {
         ar: defaultData?.title?.ar || "",
         en: defaultData?.title?.en || "",
@@ -69,6 +82,14 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
       if (data.image instanceof File) {
         const compressed = await handleCompression(data.image);
         if (compressed) formData.append("image", compressed);
+      }
+
+      if (data.mobileImage instanceof File) {
+        const compressed = await handleCompression(data.mobileImage);
+        if (compressed) formData.append("mobileImage", compressed);
+      } else if (!data.mobileImage && defaultData?.mobileImage) {
+        // Cleared in the form: the backend removes it and phones fall back to the main image.
+        formData.append("mobileImage", "");
       }
 
       formData.append("active", String(data.active));
@@ -109,11 +130,39 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
   return (
     <Box component="form" onSubmit={handleSubmit(onSubmit)}>
       <Stack spacing={3}>
-        <ImageInput
-          name="image"
-          control={control as any}
-          imagePath={defaultData?.image ? getBackendUri(defaultData.image) : ""}
-        />
+        <Alert severity="info">
+          <AlertTitle>{t("bannerSizeNotesTitle")}</AlertTitle>
+          <Box component="ul" sx={{ m: 0, ps: 2.5, "& li": { mb: 0.5 } }}>
+            {BANNER_SIZE_NOTES.map((key) => (
+              <li key={key}>{t(key)}</li>
+            ))}
+          </Box>
+        </Alert>
+
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="stretch">
+          <Stack spacing={1} flex={2}>
+            <Typography variant="subtitle2">{t("bannerDesktopImage")}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t("bannerDesktopImageHint")}
+            </Typography>
+            <ImageInput
+              name="image"
+              control={control as any}
+              imagePath={defaultData?.image ? getBackendUri(defaultData.image) : ""}
+            />
+          </Stack>
+          <Stack spacing={1} flex={1}>
+            <Typography variant="subtitle2">{t("bannerMobileImage")}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t("bannerMobileImageHint")}
+            </Typography>
+            <ImageInput
+              name="mobileImage"
+              control={control as any}
+              imagePath={defaultData?.mobileImage ? getBackendUri(defaultData.mobileImage) : ""}
+            />
+          </Stack>
+        </Stack>
 
         <FormControlLabel
           control={
