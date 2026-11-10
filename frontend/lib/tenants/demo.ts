@@ -8,14 +8,12 @@ const demo: TenantSeo = {
     titleTemplate: "%s | متجر تجريبي",
     description:
       "متجر تجريبي لاستعراض المنتجات. تعرّف على الأسعار والتفاصيل الكاملة لكل منتج.",
-    keywords: "متجر تجريبي، منتجات، أسعار، تسوق، عرض المنتجات",
   },
   en: {
     title: "Demo Store | Browse Products",
     titleTemplate: "%s | Demo Store",
     description:
       "A demo storefront for previewing products. View prices and full details for every item.",
-    keywords: "demo store, products, prices, shopping, product preview",
   },
   // Assets live under /public/demo/
   icons: {

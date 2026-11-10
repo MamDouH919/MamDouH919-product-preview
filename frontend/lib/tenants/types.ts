@@ -4,7 +4,10 @@ export type LocaleSeo = {
   title: string;
   titleTemplate: string;
   description: string;
-  keywords: string;
+  /** The home page's H1. Should differ from `title` and carry its main keywords; defaults to `title`. */
+  h1?: string;
+  /** The home page's products heading (an H2); defaults to the generic "Products". */
+  productsHeading?: string;
 };
 
 export type TenantSeo = {

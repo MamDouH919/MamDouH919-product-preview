@@ -1,4 +1,3 @@
-import imageCompression from 'browser-image-compression';
 import { getBackendUrl, getTenantKey } from '@/lib/getBackendUrl';
 
 export const getBackendUri = (imgPath: string | undefined | null): string => {
@@ -22,6 +21,8 @@ export const handleCompression = async (originalImage: File) => {
     };
 
     try {
+        // Loaded on use: only the dashboard uploads images, and this module is on every storefront page.
+        const { default: imageCompression } = await import('browser-image-compression');
         const compressedFile = await imageCompression(originalImage, options);
         return compressedFile;
     } catch (error) {

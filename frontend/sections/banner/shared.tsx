@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { preload } from "react-dom"
 import { getImageProps } from "next/image"
 import { getBackendUri } from "@/utils/helperFunctions"
 import type { Banner } from "@/backend-api/banners/types"
@@ -41,12 +42,22 @@ export function BannerPicture({
   style?: React.CSSProperties
   onLoad?: () => void
 }) {
-  const common = { alt, fill: true, priority }
+  // The first banner is the page's LCP: fetched first, never lazily. (`priority`
+  // is deprecated in Next 16, and getImageProps can't add the preload itself.)
+  const common = { alt, fill: true, ...(priority ? { loading: "eager" as const, fetchPriority: "high" as const } : {}) }
   const {
-    props: { srcSet: desktopSrcSet, sizes: desktopSizes },
+    props: { src: desktopSrc, srcSet: desktopSrcSet, sizes: desktopSizes },
   } = getImageProps({ ...common, src: getBackendUri(slide.image), sizes })
   const mobileSrc = slide.mobileImage ? getBackendUri(slide.mobileImage) : getBackendUri(slide.image)
   const { props: mobile } = getImageProps({ ...common, src: mobileSrc, sizes: mobileSizes })
+
+  // <link rel="preload"> in the <head>, one per breakpoint, so the browser starts
+  // on the image it will show before it parses the body. React hoists these and
+  // drops duplicates, so the slider's copies of the same slide add nothing.
+  if (priority) {
+    preload(mobile.src, { as: "image", imageSrcSet: mobile.srcSet, imageSizes: mobile.sizes, media: "(max-width: 639px)", fetchPriority: "high" })
+    preload(desktopSrc, { as: "image", imageSrcSet: desktopSrcSet, imageSizes: desktopSizes, media: "(min-width: 640px)", fetchPriority: "high" })
+  }
 
   return (
     <picture>

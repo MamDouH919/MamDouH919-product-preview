@@ -7,6 +7,13 @@ export enum SectionType {
   HIGHLIGHTS = 'HIGHLIGHTS',
   GALLERY = 'GALLERY',
   LINKS = 'LINKS',
+  FAQ = 'FAQ',
+}
+
+/** A question and its answer, both plain text: the storefront also publishes them as FAQPage structured data. */
+export class FaqItem {
+  question!: LocalizedField;
+  answer!: LocalizedField;
 }
 
 export class HighlightItem {
@@ -65,6 +72,17 @@ export class Section extends Document {
     default: [],
   })
   links!: LinkItem[];
+
+  @Prop({
+    type: [
+      {
+        question: { type: LocalizedFieldSchema },
+        answer: { type: LocalizedFieldSchema },
+      },
+    ],
+    default: [],
+  })
+  faqs!: FaqItem[];
 }
 
 export const SectionSchema = SchemaFactory.createForClass(Section);

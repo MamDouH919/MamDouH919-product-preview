@@ -8,16 +8,12 @@ const mk: TenantSeo = {
     titleTemplate: "%s | إم كيه دنتال هب",
     description:
       "إم كيه دنتال هب (Tänder) لمستلزمات طب الأسنان المستوردة. تصفّح المنتجات وتعرّف على الأسعار والتفاصيل الكاملة لكل منتج.",
-    keywords:
-      "إم كيه دنتال هب، مستلزمات طب الأسنان، مستلزمات أسنان مستوردة، أدوات طب الأسنان، مستلزمات عيادات الأسنان، أسعار مستلزمات الأسنان",
   },
   en: {
     title: "MK Dental Hub | Imported Dental Supplies",
     titleTemplate: "%s | MK Dental Hub",
     description:
       "MK Dental Hub (Tänder) for imported dental supplies. Browse products and view prices and full details for every item.",
-    keywords:
-      "MK Dental Hub, Tänder, dental supplies, imported dental supplies, dental instruments, dental clinic supplies, dental supply prices",
   },
   // Assets live under /public/mk/
   icons: {

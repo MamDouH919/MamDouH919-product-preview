@@ -1,11 +1,11 @@
 "use client";
 
+import { useEffect, useState, type ElementType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import CustomLink from "@/components/CustomLink";
 import DangerouslySetInnerHTML from "@/components/MUI/DangerouslySetInnerHTML";
 import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard";
-import { iconsMap } from "@/components/IconPicker";
 import { searchProducts } from "@/backend-api/products/queries";
 import { PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks";
 import { ProductSort } from "@/backend-api/products/types";
@@ -14,6 +14,27 @@ import { getBackendUri } from "@/utils/helperFunctions";
 import { ButtonItem, loc, safeHref } from "./registry";
 
 export type BlockProps = { block: PageBlock; lang: string };
+
+/**
+ * A Lucide icon picked by name on the dashboard. The library is loaded on its
+ * own, after the page shows, and only when a block has an icon: importing the
+ * name map up front put every icon (360 KB gzipped) in each page's bundle.
+ * The box keeps its size meanwhile, so nothing moves when the icon arrives.
+ */
+function BlockIcon({ name, className }: { name: string; className: string }) {
+  const [Icon, setIcon] = useState<ElementType | null>(null);
+  useEffect(() => {
+    let live = true;
+    import("lucide-react").then((icons) => {
+      const found = (icons as unknown as Record<string, ElementType | undefined>)[name];
+      if (live) setIcon(() => found ?? null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [name]);
+  return Icon ? <Icon className={className} /> : <span aria-hidden className={`inline-block ${className}`} />;
+}
 
 const COLS: Record<number, string> = {
   1: "grid-cols-1",
@@ -248,15 +269,14 @@ export function FeaturesBlock({ block, lang }: BlockProps) {
       <Heading title={loc(d.title, lang)} subtitle={loc(d.subtitle, lang)} />
       <div className={`grid gap-5 ${COLS[d.columns] ?? COLS[3]}`}>
         {items.map((item, i) => {
-          const Icon = item.icon ? iconsMap[item.icon] : undefined;
           return (
             <div
               key={i}
               className="flex flex-col gap-3 rounded-2xl border border-black/5 bg-white/70 p-6 text-start shadow-sm transition-shadow hover:shadow-md"
             >
-              {Icon && (
+              {item.icon && (
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-(--primary-10) text-(--primary)">
-                  <Icon className="h-6 w-6" />
+                  <BlockIcon name={item.icon} className="h-6 w-6" />
                 </span>
               )}
               {loc(item.title, lang) && (

@@ -8,16 +8,12 @@ const localhost: TenantSeo = {
     titleTemplate: "%s | جراڤيتي",
     description:
       "اكتشف مجموعة جراڤيتي من العطور الفاخرة. تعرّف على الأسعار والتفاصيل الكاملة لكل منتج.",
-    keywords:
-      "عطور، عطور فاخرة، جراڤيتي، بخور، أسعار عطور، عطر رجالي، عطر نسائي، تشكيلة عطور",
   },
   en: {
     title: "Gravity | Luxury Perfumes",
     titleTemplate: "%s | Gravity",
     description:
       "Explore Gravity's exclusive luxury perfume collection. View prices and full product details for every fragrance.",
-    keywords:
-      "perfumes, luxury perfumes, Gravity, fragrances, scents, cologne, perfume prices, fragrance collection, men perfume, women perfume",
   },
   icons: {
     shortcut: "/gravity/favicon.ico",

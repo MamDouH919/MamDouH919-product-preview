@@ -2,7 +2,9 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import CategoryClient from "./_CategoryClient"
 import type { Category } from "@/backend-api/categories/types"
-import { fetchBackend, fetchBackendResult, metaDescription, pageMetadata, requestBackendUrl, requestOrigin } from "@/lib/seo"
+import { headers } from "next/headers"
+import { DESCRIPTION_MIN, fetchBackend, fetchBackendResult, metaDescription, pageMetadata, requestBackendUrl, requestOrigin } from "@/lib/seo"
+import { resolveTenantSeo } from "@/lib/tenantSeo"
 import { breadcrumbLd, JsonLd } from "@/lib/jsonLd"
 import type { Product } from "@/backend-api/products/types"
 import { withBackend } from "@/lib/getBackendUrl"
@@ -22,14 +24,19 @@ const getCategory = (slug: string) => fetchBackendResult<Category>(`/categories/
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug: rawSlug, locale } = await params
   const slug = decodeURIComponent(rawSlug)
-  const [result, backendUrl] = await Promise.all([getCategory(slug), requestBackendUrl()])
+  const [result, backendUrl, h] = await Promise.all([getCategory(slug), requestBackendUrl(), headers()])
   if (!result.ok) return {}
 
   const category = result.data
-  const name = loc(category.name, locale)
-  const description =
-    plainText(loc(category.description, locale)) ||
-    (locale === "ar" ? `تسوّق منتجات ${name}: الأسعار والصور والتفاصيل.` : `Shop ${name}: prices, photos and details.`)
+  const name = loc(category.name, locale).replace(/\s+/g, " ").trim()
+  const { siteName } = resolveTenantSeo(h.get("x-forwarded-host") ?? h.get("host"))
+  const own = plainText(loc(category.description, locale)).replace(/\s+/g, " ").trim()
+  // A short description of its own ("Men perfume") is kept, and the rest filled in.
+  const generic =
+    locale === "ar"
+      ? `تسوّق ${name} من ${siteName}: تصفّح كل المنتجات بالأسعار والصور والتفاصيل الكاملة، واختر المناسب لك واطلبه أونلاين بسهولة.`
+      : `Shop ${name} at ${siteName}: browse every product with prices, photos and full details, then pick what suits you and order online with ease.`
+  const description = own.length >= DESCRIPTION_MIN ? own : [own && `${own.replace(/[.،,]$/, "")}.`, generic].filter(Boolean).join(" ")
 
   return pageMetadata({
     locale,

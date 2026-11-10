@@ -87,6 +87,11 @@ type PageSeo = {
   path: string;
   /** Without the site name; the layout's template adds it. Omit for the site's own title. */
   title?: string;
+  /**
+   * Added to `title` in order ("Name | From 300 EGP"), each only while the full
+   * title, site name included, stays within what search results show.
+   */
+  titleExtras?: string[];
   description?: string;
   /** Absolute share-image URL; defaults to the store's. */
   image?: { url: string; width?: number; height?: number; alt?: string };
@@ -101,10 +106,11 @@ type PageSeo = {
  * image and site name. Query strings (filters, sort, search) are left out of
  * the canonical, so every filtered view points search engines at one page.
  */
-export async function pageMetadata({ locale, path, title, description, image, index = true }: PageSeo): Promise<Metadata> {
+export async function pageMetadata({ locale, path, title: baseTitle, titleExtras = [], description, image, index = true }: PageSeo): Promise<Metadata> {
   const [h, origin, locales] = await Promise.all([headers(), requestOrigin(), getStoreLocales()]);
   const tenant = resolveTenantSeo(h.get("x-forwarded-host") ?? h.get("host"));
   const seo = tenant[locale === "ar" ? "ar" : "en"];
+  const title = baseTitle && fitTitle(baseTitle, titleExtras, seo.titleTemplate);
   const url = `${origin}/${locale}${path}`;
   const shareTitle = title ? seo.titleTemplate.replace("%s", title) : seo.title;
   const shareDescription = description || seo.description;
@@ -133,6 +139,27 @@ export async function pageMetadata({ locale, path, title, description, image, in
     },
   };
 }
+
+/** Longest title search results show in full, site name included. */
+const TITLE_MAX = 60;
+
+/** `base`, then each extra that still fits once the template adds the site name. */
+export function fitTitle(base: string, extras: string[], template: string): string {
+  let title = base.replace(/\s+/g, " ").trim();
+  for (const extra of extras) {
+    if (!extra) continue;
+    const next = `${title} | ${extra}`;
+    if (template.replace("%s", next).length > TITLE_MAX) break;
+    title = next;
+  }
+  return title;
+}
+
+/**
+ * Below this, a description is too thin to win the snippet: search engines
+ * write their own from the page instead.
+ */
+export const DESCRIPTION_MIN = 120;
 
 /** Clip to the length search results show, on a word boundary. */
 export function metaDescription(text: string, max = 160): string {

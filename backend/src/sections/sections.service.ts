@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Section } from './schemas/section.schema';
+import { Section, SectionType } from './schemas/section.schema';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
@@ -89,6 +89,12 @@ export class SectionsService {
     const { image, highlightFiles, galleryFiles } = filesByField(files);
 
     if (updateSectionDto.description) updateSectionDto.description = sanitizeDeep(updateSectionDto.description);
+
+    // The form always sends the whole list; a form data body can't carry an empty
+    // array, so none at all on an FAQ section means every question was removed.
+    if (updateSectionDto.type === SectionType.FAQ && updateSectionDto.faqs === undefined) {
+      updateSectionDto.faqs = [];
+    }
 
     if (image) {
       if (existing.image) await deleteFile(existing.image);

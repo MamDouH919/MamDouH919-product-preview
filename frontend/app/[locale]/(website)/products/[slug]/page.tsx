@@ -26,21 +26,39 @@ const getProduct = async (slug: string) => {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug: rawSlug, locale } = await params
   const slug = decodeURIComponent(rawSlug)
-  const [product, origin] = await Promise.all([getProduct(slug), requestOrigin()])
+  const [product, origin, settings] = await Promise.all([
+    getProduct(slug),
+    requestOrigin(),
+    fetchBackend<OfferSettings>("/settings", 60),
+  ])
   if (!product) return {}
 
-  const name = loc(product.name, locale)
-  const description = metaDescription(
-    plainText(loc(product.description, locale) || loc(product.shortDescription, locale)) || name
-  )
+  const ar = locale === "ar"
+  const name = loc(product.name, locale).replace(/\s+/g, " ").trim()
+  const text = plainText(loc(product.description, locale) || loc(product.shortDescription, locale))
+
+  // The cheapest offer as the checkout prices it; zero is "no price", as in the feed.
+  const offers = productOffers(product, settings).filter((o) => o.price > 0)
+  const minPrice = offers.length ? Math.min(...offers.map((o) => o.price)) : undefined
+  const currency = settings?.currency?.[locale]?.trim() || isoCurrency(settings)
+  const amount = minPrice && currency ? `${minPrice} ${currency}` : ""
+  const price = amount && (ar ? `من ${amount}` : `From ${amount}`)
+  const options = [...new Set(product.variants?.map((v) => v.label?.trim()).filter(Boolean))].slice(0, 4)
+
+  // Price and options lead, so they survive the clip; the product's own text fills the rest.
+  const facts = [
+    amount && (ar ? `${name} بسعر يبدأ من ${amount}` : `${name}, from ${amount}`),
+    options.length && (ar ? `متوفر بـ ${options.join(" و")}` : `available in ${options.join(", ")}`),
+  ].filter(Boolean).join(ar ? "، " : ", ")
+  const description = metaDescription([facts && `${facts}.`, text].filter(Boolean).join(" ") || name)
   const firstImage = product.images?.[0]
-  const keywords = (product.tags ?? []) as string[]
 
   return {
     ...(await pageMetadata({
       locale,
       path: `/products/${encodeURIComponent(slug)}`,
       title: name,
+      titleExtras: [product.brand?.trim() ?? "", price],
       description,
       // Previews go through the OG route, which serves a small 1200×630 JPEG; `v`
       // changes with the image so WhatsApp and Facebook don't keep a stale one.
@@ -55,7 +73,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       // A hidden product still resolves by slug for old links; keep it out of search.
       index: product.isActive,
     })),
-    keywords: keywords.join(", ") || undefined,
   }
 }
 

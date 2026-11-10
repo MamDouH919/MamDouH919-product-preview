@@ -156,7 +156,7 @@ const Footer = () => {
                 />
               ) : (
                 siteName && (
-                  <Typography variant="h6" fontWeight={800}>
+                  <Typography variant="h6" component="p" fontWeight={800}>
                     {siteName}
                   </Typography>
                 )

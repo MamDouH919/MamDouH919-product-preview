@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { Container } from "@mui/material"
-import { animate, useInView, useReducedMotion } from "framer-motion"
+import { useInView, useReducedMotion } from "framer-motion"
 import { AnimateIn, StaggerChild, StaggerGroup } from "@/components/Animate"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { hasHtml, useHomeSection } from "./useHomeSection"
@@ -12,6 +12,8 @@ import { hasHtml, useHomeSection } from "./useHomeSection"
  * Counts up to the number inside a value like "12,500+", "4.9" or "$3M",
  * keeping whatever text sits around it. Values with no number show as typed.
  */
+const COUNT_MS = 2000
+
 function CountUp({ value }: { value: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.6 })
@@ -25,12 +27,15 @@ function CountUp({ value }: { value: string }) {
 
   useEffect(() => {
     if (!match || !inView || reducedMotion) return
-    const controls = animate(0, target, {
-      duration: 2,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate: setCurrent,
+    // A plain frame loop, eased out like before: framer-motion's `animate`
+    // brought its whole animation engine into the page for one counter.
+    const start = performance.now()
+    let frame = requestAnimationFrame(function tick(now) {
+      const t = Math.min((now - start) / COUNT_MS, 1)
+      setCurrent(target * (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)))
+      if (t < 1) frame = requestAnimationFrame(tick)
     })
-    return () => controls.stop()
+    return () => cancelAnimationFrame(frame)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView, target, reducedMotion])
 

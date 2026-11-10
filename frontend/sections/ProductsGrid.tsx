@@ -8,7 +8,8 @@ import ProductCard, { ProductCardSkeleton } from "@/components/ProductCard"
 import { Container } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
 
-export default function ProductsGrid() {
+/** `title`: the section's heading; the generic "Products" when not given. */
+export default function ProductsGrid({ title }: { title?: string }) {
   const { data, isLoading } = useProductsQuery()
   const { t, i18n } = useTranslation()
   const theme = useTheme()
@@ -29,7 +30,7 @@ export default function ProductsGrid() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="w-1 h-6 rounded-full bg-(--primary)" />
-            <h2 className="text-xl font-bold text-gray-800">{t("products")}</h2>
+            <h2 className="text-xl font-bold text-gray-800">{title || t("products")}</h2>
           </div>
           {!isLoading && products.length > 0 && (
             <CustomLink

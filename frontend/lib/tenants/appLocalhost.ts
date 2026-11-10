@@ -7,13 +7,11 @@ const appLocalhost: TenantSeo = {
     title: "المتجر الثاني | متجرك",
     titleTemplate: "%s | المتجر الثاني",
     description: "وصف SEO الخاص بالمتجر الثاني.",
-    keywords: "المتجر الثاني، كلمات مفتاحية",
   },
   en: {
     title: "Tenant Two | Your Store",
     titleTemplate: "%s | Tenant Two",
     description: "SEO description for the second tenant.",
-    keywords: "tenant two, keywords",
   },
   // Place these files under /public/tenants/app.localhost/
   icons: {

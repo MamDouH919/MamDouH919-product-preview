@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react"
 import Image from "next/image"
 import { createPortal } from "react-dom"
 import { Container } from "@mui/material"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, m } from "framer-motion"
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { AnimateIn, StaggerChild, StaggerGroup, scaleIn } from "@/components/Animate"
+import { AnimateIn, LazyMotionShell, StaggerChild, StaggerGroup, scaleIn } from "@/components/Animate"
 import { getBackendUri } from "@/utils/helperFunctions"
 import { hasHtml, useHomeSection } from "./useHomeSection"
 
@@ -57,7 +57,8 @@ function Lightbox({
     "flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/20"
 
   return createPortal(
-    <motion.div
+    <LazyMotionShell>
+    <m.div
       className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/90 backdrop-blur-xl"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -67,7 +68,7 @@ function Lightbox({
       aria-modal="true"
     >
       <AnimatePresence mode="wait">
-        <motion.div
+        <m.div
           key={index}
           className="relative h-[80vh] w-[92vw] max-w-6xl"
           initial={{ opacity: 0, scale: 0.96 }}
@@ -77,7 +78,7 @@ function Lightbox({
           onClick={(e) => e.stopPropagation()}
         >
           <Image src={images[index]} alt="" fill sizes="92vw" className="object-contain" />
-        </motion.div>
+        </m.div>
       </AnimatePresence>
 
       <div className="absolute top-5 inset-x-5 flex items-center justify-between">
@@ -109,7 +110,8 @@ function Lightbox({
           </button>
         </div>
       )}
-    </motion.div>,
+    </m.div>
+    </LazyMotionShell>,
     document.body
   )
 }

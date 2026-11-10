@@ -39,7 +39,7 @@ const TrackedOrderView = ({ order, onReset }: { order: TrackedOrder; onReset: ()
       <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} mb={3}>
           <Stack>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" component="h2" fontWeight={700}>
               {t("orderNumber", { number: order.orderNumber })}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -121,7 +121,7 @@ const TrackOrderForm = () => {
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
           <LocalShippingOutlined color="primary" />
-          <Typography variant="h6" fontWeight={700}>
+          <Typography variant="h6" component="h1" fontWeight={700}>
             {t("trackYourOrder")}
           </Typography>
         </Stack>

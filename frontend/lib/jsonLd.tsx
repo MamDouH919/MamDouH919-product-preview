@@ -3,6 +3,7 @@ import { fetchBackend, requestBackendUrl, requestOrigin } from "@/lib/seo"
 import { withBackend } from "@/lib/getBackendUrl"
 import { resolveTenantSeo } from "@/lib/tenantSeo"
 import { ALL_MODULES, type StoreModule } from "@/lib/storeModules"
+import type { Section } from "@/backend-api/sections/types"
 
 /**
  * schema.org structured data shared by the storefront's pages. Google reads it
@@ -109,9 +110,12 @@ export async function storeLd(locale: string) {
   const { origin, backendUrl, settings, tenant, pages } = await storeContext()
   const seo = tenant[locale === "ar" ? "ar" : "en"]
   const logo = settings?.logo ? withBackend(backendUrl, settings.logo) : `${origin}${tenant.ogImage}`
+  // Profiles that are the store's own pages. A WhatsApp link is a phone number,
+  // not a profile: it is already the store's `telephone`.
   const sameAs = (settings?.socialMedia ?? [])
+    .filter((s) => s.key?.toUpperCase() !== "WHATSAPP")
     .map((s) => s.value?.trim())
-    .filter((v): v is string => !!v && /^https?:\/\//i.test(v))
+    .filter((v): v is string => !!v && /^https?:\/\//i.test(v) && !/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(v))
   const telephone = settings?.phone || settings?.whatsapp || undefined
   const orgId = `${origin}/#organization`
   const arabicName = tenant.ar.title.split("|")[0].trim()
@@ -151,4 +155,28 @@ export async function storeLd(locale: string) {
   }
 
   return [organization, website]
+}
+
+/**
+ * schema.org FAQPage from an FAQ section, in this page's language, or null when
+ * it has nothing to publish. Must match what FaqSection shows: Google asks that
+ * every question and answer in the markup be visible on the page.
+ */
+export async function faqLd(sectionName: string, locale: string) {
+  // Same path and revalidate as the page's prefetch, so the request is made once.
+  const section = await fetchBackend<Section>(`/sections/name/${sectionName}`, 60)
+  if (!section || section.active === false) return null
+
+  const pick = (field?: Record<string, string | undefined>) => (field?.[locale] || field?.ar || field?.en || "").trim()
+  const mainEntity = (section.faqs ?? [])
+    .map((f) => ({ question: pick(f.question), answer: pick(f.answer) }))
+    .filter((f) => f.question && f.answer)
+    .map((f) => ({
+      "@type": "Question",
+      name: f.question,
+      acceptedAnswer: { "@type": "Answer", text: f.answer },
+    }))
+  if (!mainEntity.length) return null
+
+  return { "@context": "https://schema.org", "@type": "FAQPage", mainEntity }
 }

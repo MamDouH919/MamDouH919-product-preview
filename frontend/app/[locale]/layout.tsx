@@ -18,7 +18,7 @@ export async function generateMetadata(
   const tenant = resolveTenantSeo(host);
 
   const lang = locale === "ar" ? "ar" : "en";
-  const { title, titleTemplate, description, keywords } = tenant[lang];
+  const { title, titleTemplate, description } = tenant[lang];
   const { siteName, icons } = tenant;
 
   return {
@@ -31,8 +31,6 @@ export async function generateMetadata(
     },
 
     description,
-    keywords,
-
     authors: [{ name: siteName }],
 
     robots: {

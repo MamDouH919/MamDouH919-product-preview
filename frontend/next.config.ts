@@ -27,6 +27,12 @@ function parseRemotePattern(url: string) {
 const nextConfig: NextConfig = {
   images: {
     unoptimized: process.env.NODE_ENV === "development",
+    // AVIF first (about 20% smaller than WebP), WebP for browsers without it.
+    // AVIF takes longer to encode, but only on the first request for each size.
+    formats: ["image/avif", "image/webp"],
+    // Uploads get a new, timestamped name when replaced, so an optimized copy
+    // never goes stale: keep it 30 days instead of re-encoding every 4 hours.
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       ...Array.from(new Set(imageBackends)).map(parseRemotePattern),
       // Uploaded images on Cloudflare R2 (public r2.dev bucket URL)

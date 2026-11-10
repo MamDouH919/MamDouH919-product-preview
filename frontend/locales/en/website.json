@@ -265,6 +265,8 @@
     "exportSuccess": "Database exported successfully",
     "importSuccess": "Database imported successfully",
     "noLinks": "No links added yet",
+    "noFaqs": "No questions added yet",
+    "faqs": "FAQs",
     "noImages": "No images added yet",
     "url": "URL",
     "links": "Links",

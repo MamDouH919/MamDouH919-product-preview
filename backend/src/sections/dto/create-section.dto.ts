@@ -36,6 +36,16 @@ export class HighlightItemDto {
   image?: string;
 }
 
+export class FaqItemDto {
+  @ValidateNested()
+  @Type(() => LocalizedFieldDto)
+  question!: LocalizedFieldDto;
+
+  @ValidateNested()
+  @Type(() => LocalizedFieldDto)
+  answer!: LocalizedFieldDto;
+}
+
 export class CreateSectionDto {
   @ApiProperty({ required: true })
   @IsNotEmpty()
@@ -88,4 +98,11 @@ export class CreateSectionDto {
   @ValidateNested({ each: true })
   @Type(() => LinkItemDto)
   links?: LinkItemDto[];
+
+  @ApiProperty({ required: false, type: [FaqItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FaqItemDto)
+  faqs?: FaqItemDto[];
 }

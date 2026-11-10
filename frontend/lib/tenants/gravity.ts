@@ -6,20 +6,22 @@ const localhost: TenantSeo = {
   siteName: "Gravity",
   siteUrl: GRAVITY_DOMAIN,
   ar: {
-    title: "جراڤيتي | عطور فاخرة",
+    // Title 50–60 characters, description 120–160: what search results show in full.
+    // The price and delivery claims must stay true: update them when they change.
+    title: "جراڤيتي | عطور فاخرة مستوحاة من أشهر الماركات العالمية",
     titleTemplate: "%s | جراڤيتي",
     description:
-      "اكتشف مجموعة جراڤيتي من العطور الفاخرة. تعرّف على الأسعار والتفاصيل الكاملة لكل منتج.",
-    keywords:
-      "عطور، عطور فاخرة، جراڤيتي، بخور، أسعار عطور، عطر رجالي، عطر نسائي، تشكيلة عطور",
+      "تسوّق عطور جراڤيتي الفاخرة المستوحاة من أشهر الماركات العالمية بأسعار تبدأ من 300 جنيه. عطور رجالي وحريمي ويونيسكس مع توصيل سريع لكل محافظات مصر.",
+    h1: "عطور فاخرة مستوحاة من أشهر الماركات",
+    productsHeading: "عطور جراڤيتي الفاخرة",
   },
   en: {
-    title: "Gravity | Luxury Perfumes",
+    title: "Gravity | Luxury Perfumes Inspired by World-Famous Brands",
     titleTemplate: "%s | Gravity",
     description:
-      "Explore Gravity's exclusive luxury perfume collection. View prices and full product details for every fragrance.",
-    keywords:
-      "perfumes, luxury perfumes, Gravity, fragrances, scents, cologne, perfume prices, fragrance collection, men perfume, women perfume",
+      "Shop Gravity luxury perfumes inspired by the world's most famous brands, from 300 EGP. Men's, women's and unisex scents with fast delivery across Egypt.",
+    h1: "Luxury Perfumes Inspired by the World's Most Famous Brands",
+    productsHeading: "Gravity Luxury Perfumes",
   },
   icons: {
     shortcut: "/gravity/favicon.ico",

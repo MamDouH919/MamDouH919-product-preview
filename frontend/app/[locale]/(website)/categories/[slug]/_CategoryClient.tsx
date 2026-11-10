@@ -88,7 +88,7 @@ export default function CategoryPage({ params }: PageProps) {
     return (
       <Box sx={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Box sx={{ textAlign: "center", px: 2 }}>
-          <Typography variant="h6" color="text.secondary" mb={2}>
+          <Typography variant="h6" component="p" color="text.secondary" mb={2}>
             {t("noData")}
           </Typography>
           <CustomLink href="/" style={{ color: theme.palette.primary.main, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>

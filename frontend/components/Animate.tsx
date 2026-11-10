@@ -1,7 +1,18 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { motion, Variants, HTMLMotionProps } from 'framer-motion';
+import { LazyMotion, m, type Variants, type HTMLMotionProps } from 'framer-motion';
+
+/**
+ * `m` + LazyMotion instead of `motion`: the page ships a small shell and the
+ * animation engine (about 60 KB gzipped) loads after it shows, instead of with
+ * every page that has a section. Wrap any other `m.*` in <LazyMotionShell>.
+ */
+export const loadMotionFeatures = () => import('./motionFeatures').then((mod) => mod.default);
+
+export const LazyMotionShell = ({ children }: { children: ReactNode }) => (
+  <LazyMotion features={loadMotionFeatures}>{children}</LazyMotion>
+);
 
 // ── Shared variants ──────────────────────────────────────────────────────────
 
@@ -53,16 +64,18 @@ export const AnimateIn = ({
   amount = 0.2,
   ...rest
 }: AnimateInProps) => (
-  <motion.div
-    initial="hidden"
-    whileInView="visible"
-    viewport={{ once, amount }}
-    variants={variants}
-    transition={delay ? { delay } : undefined}
-    {...rest}
-  >
-    {children}
-  </motion.div>
+  <LazyMotionShell>
+    <m.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once, amount }}
+      variants={variants}
+      transition={delay ? { delay } : undefined}
+      {...rest}
+    >
+      {children}
+    </m.div>
+  </LazyMotionShell>
 );
 
 // ── StaggerGroup — staggers direct children ─────────────────────────────────
@@ -73,15 +86,17 @@ export const StaggerGroup = ({
   amount = 0.15,
   ...rest
 }: AnimateInProps) => (
-  <motion.div
-    initial="hidden"
-    whileInView="visible"
-    viewport={{ once, amount }}
-    variants={staggerContainer}
-    {...rest}
-  >
-    {children}
-  </motion.div>
+  <LazyMotionShell>
+    <m.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once, amount }}
+      variants={staggerContainer}
+      {...rest}
+    >
+      {children}
+    </m.div>
+  </LazyMotionShell>
 );
 
 // ── StaggerChild — must be inside StaggerGroup ──────────────────────────────
@@ -91,7 +106,7 @@ export const StaggerChild = ({
   variants = fadeUp,
   ...rest
 }: AnimateInProps) => (
-  <motion.div variants={variants} {...rest}>
+  <m.div variants={variants} {...rest}>
     {children}
-  </motion.div>
+  </m.div>
 );

@@ -190,8 +190,10 @@ export default function PeekSlider() {
                   sizes="(min-width: 1024px) 80vw, 86vw"
                   mobileSizes="90vw"
                   onLoad={() => setLoaded((l) => (l[slide._id] ? l : { ...l, [slide._id]: true }))}
+                  // The first slide shows as soon as it paints: fading it in after
+                  // hydration held the page's LCP back until all the JS had run.
                   className={`pointer-events-none object-cover transition-opacity duration-500 ${
-                    loaded[slide._id] ? "opacity-100" : "opacity-0"
+                    loaded[slide._id] || index % count === 0 ? "opacity-100" : "opacity-0"
                   }`}
                 />
                 {/* Side slides recede; a soft floor gradient keeps the controls legible. */}

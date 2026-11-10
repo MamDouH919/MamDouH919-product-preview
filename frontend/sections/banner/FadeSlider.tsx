@@ -138,8 +138,10 @@ export default function FadeSlider() {
                 mobileSizes="100vw"
                 onLoad={() => setLoaded((l) => (l[slide._id] ? l : { ...l, [slide._id]: true }))}
                 // A slow push-in while the slide is showing; it holds with autoplay.
+                // The first slide shows as soon as it paints: fading it in after
+                // hydration held the page's LCP back until all the JS had run.
                 className={`pointer-events-none object-cover transition-opacity duration-500 ${
-                  loaded[slide._id] ? "opacity-100" : "opacity-0"
+                  loaded[slide._id] || index === 0 ? "opacity-100" : "opacity-0"
                 }`}
                 style={
                   !reducedMotion && (isActive || index === previous % count)

@@ -43,7 +43,8 @@ export default function CategoriesSlider() {
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, px: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Box sx={{ width: 4, height: 24, borderRadius: 99, bgcolor: "primary.main" }} />
-          <Typography variant="h6" fontWeight={700} color="text.primary">
+          {/* A section of the page, so an H2; same look as before. */}
+          <Typography variant="h6" component="h2" fontWeight={700} color="text.primary">
             {t("categories")}
           </Typography>
         </Box>
@@ -117,7 +118,7 @@ export default function CategoriesSlider() {
                         bgcolor: "grey.200",
                       }}
                     >
-                      <Typography variant="h5" fontWeight={700} color="text.disabled">
+                      <Typography variant="h5" component="span" aria-hidden fontWeight={700} color="text.disabled">
                         {name.charAt(0).toUpperCase()}
                       </Typography>
                     </Box>

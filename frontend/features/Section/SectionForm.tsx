@@ -55,6 +55,11 @@ type LinkFormItem = {
   url: string;
 };
 
+type FaqFormItem = {
+  question: LocalizedField;
+  answer: LocalizedField;
+};
+
 type SectionFormValues = {
   sectionName: string;
   image: File | string | null;
@@ -64,6 +69,7 @@ type SectionFormValues = {
   highlights: HighlightFormItem[];
   gallery: GalleryFormItem[];
   links: LinkFormItem[];
+  faqs: FaqFormItem[];
 };
 
 interface SectionFormProps {
@@ -104,6 +110,10 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
           label: { ar: l.label?.ar || "", en: l.label?.en || "" },
           url: l.url,
         })),
+        faqs: (defaultData?.faqs ?? []).map((f) => ({
+          question: { ar: f.question?.ar || "", en: f.question?.en || "" },
+          answer: { ar: f.answer?.ar || "", en: f.answer?.en || "" },
+        })),
       },
     });
 
@@ -117,6 +127,9 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
 
   const { fields: linkFields, append: appendLink, remove: removeLink } =
     useFieldArray({ control, name: "links" });
+
+  const { fields: faqFields, append: appendFaq, remove: removeFaq } =
+    useFieldArray({ control, name: "faqs" });
 
   const mutation = useMutation({
     mutationFn: async (data: SectionFormValues) => {
@@ -157,6 +170,18 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
           });
           formData.append(`links[${i}][url]`, item.url);
         });
+      }
+
+      if (data.type === "FAQ") {
+        // Only questions with an answer: a question alone can't be published.
+        (data.faqs ?? [])
+          .filter((item) => LANGS.some((lang) => item.question?.[lang]?.trim() && item.answer?.[lang]?.trim()))
+          .forEach((item, i) => {
+            LANGS.forEach((lang) => {
+              if (item.question?.[lang]?.trim()) formData.append(`faqs[${i}][question][${lang}]`, item.question[lang]!.trim());
+              if (item.answer?.[lang]?.trim()) formData.append(`faqs[${i}][answer][${lang}]`, item.answer[lang]!.trim());
+            });
+          });
       }
 
       if (data.type === "GALLERY") {
@@ -243,13 +268,14 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                 <MenuItem value="HIGHLIGHTS">{t("highlights")}</MenuItem>
                 <MenuItem value="GALLERY">{t("gallery")}</MenuItem>
                 <MenuItem value="LINKS">{t("links")}</MenuItem>
+                <MenuItem value="FAQ">{t("faqs")}</MenuItem>
               </Select>
             )}
           />
         </Box>}
 
-        {/* Main image (not used by GALLERY) */}
-        {sectionType !== "GALLERY" && (
+        {/* Main image (not used by GALLERY or FAQ) */}
+        {sectionType !== "GALLERY" && sectionType !== "FAQ" && (
           <ImageInput
             name="image"
             control={control as any}
@@ -426,6 +452,71 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                         placeholder="https://..."
                         {...register(`links.${index}.url`)}
                       />
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+        )}
+
+        {/* Questions and answers (only for FAQ type) */}
+        {sectionType === "FAQ" && (
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+              <Typography variant="subtitle1" fontWeight={700}>
+                {t("faqs")}
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<Add />}
+                variant="outlined"
+                onClick={() => appendFaq({ question: { ar: "", en: "" }, answer: { ar: "", en: "" } })}
+              >
+                {t("add")}
+              </Button>
+            </Stack>
+            <Divider sx={{ mb: 2 }} />
+
+            {faqFields.length === 0 ? (
+              <Typography variant="body2" color="text.disabled">
+                {t("noFaqs")}
+              </Typography>
+            ) : (
+              <Stack spacing={2}>
+                {faqFields.map((field, index) => (
+                  <Paper key={field.id} variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                      <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
+                        #{index + 1}
+                      </Typography>
+                      <Tooltip title={t("delete")}>
+                        <IconButton color="error" size="small" onClick={() => removeFaq(index)}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+
+                    <Stack spacing={1.5}>
+                      {siteLangs.map((lang) => {
+                        const suffix = siteLangs.length > 1 ? ` (${lang.toUpperCase()})` : "";
+                        return (
+                          <Stack key={lang} spacing={1.5}>
+                            <TextField
+                              size="small"
+                              label={`${t("question")}${suffix}`}
+                              {...register(`faqs.${index}.question.${lang}`)}
+                            />
+                            <TextField
+                              size="small"
+                              multiline
+                              minRows={2}
+                              label={`${t("answer")}${suffix}`}
+                              {...register(`faqs.${index}.answer.${lang}`)}
+                            />
+                          </Stack>
+                        );
+                      })}
                     </Stack>
                   </Paper>
                 ))}

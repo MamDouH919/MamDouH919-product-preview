@@ -118,13 +118,13 @@ function FilterPanel({ minPrice, maxPrice, onPriceChange, inStock, onInStockChan
     <div className="flex flex-col divide-y divide-gray-100">
       {showPrice && (
         <section className="pb-5 last:pb-0">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t("price")}</h3>
+          <p className="mb-3 text-sm font-semibold text-gray-900">{t("price")}</p>
           <PriceFilter minPrice={minPrice} maxPrice={maxPrice} onApply={onPriceChange} t={t} />
         </section>
       )}
       {showStock && (
         <section className="pt-5 first:pt-0">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t("availability")}</h3>
+          <p className="mb-3 text-sm font-semibold text-gray-900">{t("availability")}</p>
           <Toggle checked={inStock} onChange={onInStockChange} label={t("inStockOnly")} />
         </section>
       )}
