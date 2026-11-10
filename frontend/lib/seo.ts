@@ -11,7 +11,8 @@ import { FALLBACK_LOCALES, ogLocale, parseStoreLocales, type StoreLocales } from
  */
 export async function requestOrigin(): Promise<string> {
   const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost";
+  // Behind more than one proxy this can be a list ("a.com, b.com"); the first is the client's.
+  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "localhost").split(",")[0].trim();
   const local = /^(localhost|127\.0\.0\.1)$|\.localhost$/.test(host.split(":")[0]);
   // Public stores are only served over https; the proxy in front of Next may
   // still report "http" for its own hop, which would leak into canonicals and feeds.

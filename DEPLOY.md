@@ -91,6 +91,12 @@ location / {
 
 After editing: `sudo nginx -t && sudo systemctl reload nginx`.
 
+For store hosts, use the ready files in [`deploy/nginx/`](deploy/nginx/) instead of writing the block by hand:
+
+- `storefront-upstream.conf` → `/etc/nginx/conf.d/` (once per server)
+- `storefront.conf` → `/etc/nginx/snippets/` (once per server: gzip, static caching, proxy headers)
+- `store.template.conf` → one copy per new store domain; the steps are at the top of the file
+
 ---
 
 ## B. Updating an existing server
