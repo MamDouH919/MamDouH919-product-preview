@@ -6,17 +6,10 @@ import { CreateSubCategoryDto } from './dto/create-sub-category.dto';
 import { UpdateSubCategoryDto } from './dto/update-sub-category.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
+import { buildSlug } from '../common/helpers/slug';
 
 export const subCategoryImageStorage = tenantImageStorage('sub-categories');
 
-function buildSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-');
-}
 
 @Injectable()
 export class SubCategoriesService {
@@ -29,8 +22,10 @@ export class SubCategoriesService {
     }
 
     if (!createSubCategoryDto.slug) {
-      const base = createSubCategoryDto.name.en ?? createSubCategoryDto.name.ar ?? 'sub-category';
-      createSubCategoryDto.slug = await this.uniqueSlug(buildSlug(base));
+      // Arabic letters strip out of a slug, so an Arabic-only name falls back to a plain word.
+      createSubCategoryDto.slug = await this.uniqueSlug(
+        buildSlug(createSubCategoryDto.name?.en ?? '') || buildSlug(createSubCategoryDto.name?.ar ?? '') || 'sub-category',
+      );
     }
 
     const subCategory = new this.subCategoryModel(createSubCategoryDto);
@@ -86,6 +81,9 @@ export class SubCategoriesService {
   async update(id: string, updateSubCategoryDto: UpdateSubCategoryDto, file?: Express.Multer.File): Promise<SubCategory> {
     const existing = await this.subCategoryModel.findById(id).exec();
     if (!existing) throw new NotFoundException(`SubCategory with id ${id} not found`);
+
+    // A slug cleared to nothing keeps the current one; an empty slug can't be a link.
+    if (updateSubCategoryDto.slug === '') delete updateSubCategoryDto.slug;
 
     if (file) {
       if (existing.image) await deleteFile(existing.image);

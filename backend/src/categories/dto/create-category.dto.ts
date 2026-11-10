@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsSlug } from '../../common/helpers/slug';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
@@ -21,9 +22,11 @@ export class CreateCategoryDto {
   @IsString()
   image?: string;
 
+  // Empty means "generate it from the name". Case and spaces are tidied
+  // ("For Him" → for-him); any other character is refused.
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
+  @IsSlug()
   slug?: string;
 
   @ApiProperty({ required: false })

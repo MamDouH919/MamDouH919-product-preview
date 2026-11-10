@@ -14,6 +14,7 @@ import {
     X,
     Telegram
 } from '@mui/icons-material';
+import { normalizeSocialKey, safeSocialUrl } from '@/lib/social';
 
 interface SocialMediaLink {
     code: string;
@@ -135,12 +136,11 @@ export default function SocialMediaLinks({
     const linksMap = React.useMemo(
         () =>
             Object.fromEntries(
-                links.map(l => [
-                    l.code,
-                    {
-                        link: l.link
-                    }
-                ])
+                links
+                    // "TWITTER" (the old key) shows as X; only web links are rendered.
+                    .map(l => ({ code: normalizeSocialKey(l.code), link: safeSocialUrl(l.link) }))
+                    .filter(l => l.link)
+                    .map(l => [l.code, { link: l.link! }])
             ),
         [links]
     );
@@ -170,7 +170,8 @@ export default function SocialMediaLinks({
                             component="a"
                             href={social.url}
                             target="_blank"
-                            rel="noopener noreferrer"
+                            // "me": this profile belongs to the site.
+                            rel="me noopener noreferrer"
                             sx={{
                                 display: 'flex',
                                 flexDirection: 'column',

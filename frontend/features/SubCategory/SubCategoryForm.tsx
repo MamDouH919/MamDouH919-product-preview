@@ -26,6 +26,8 @@ import { SubCategory } from "@/backend-api/sub-categories/types";
 import { useCategoriesQuery } from "@/backend-api/categories/hooks";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
+import SlugField from "@/components/MUI/SlugField";
+import { cleanSlug } from "@/lib/slug";
 
 type SubCategoryFormValues = {
   image: File | string | null;
@@ -79,7 +81,7 @@ const SubCategoryForm = ({ defaultData }: SubCategoryFormProps) => {
       if (data.name.en) formData.append("name[en]", data.name.en);
       if (data.description.ar) formData.append("description[ar]", data.description.ar);
       if (data.description.en) formData.append("description[en]", data.description.en);
-      if (data.slug) formData.append("slug", data.slug);
+      if (cleanSlug(data.slug)) formData.append("slug", cleanSlug(data.slug));
       if (!isEditing) formData.append("category", data.category);
       formData.append("isActive", String(data.isActive));
       formData.append("order", String(data.order));
@@ -151,7 +153,7 @@ const SubCategoryForm = ({ defaultData }: SubCategoryFormProps) => {
           )}
         </LanguageTabs>
 
-        <TextInputComponent name="slug" label={t("slug")} control={control} />
+        <SlugField name="slug" control={control} />
         <TextInputComponent name="order" label={t("order")} control={control} type="number" />
 
         <Button

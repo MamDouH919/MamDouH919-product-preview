@@ -42,6 +42,8 @@ import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 import { getBackendUrl } from "@/lib/getBackendUrl";
 import { useStoreModules } from "@/Hooks/useStoreModules";
+import SlugField from "@/components/MUI/SlugField";
+import { cleanSlug } from "@/lib/slug";
 
 type ImageItem = { file: File | string | null };
 
@@ -96,7 +98,6 @@ const GTIN_PATTERN = /^(\d{8}|\d{12,14})$/;
 const numberText = (n?: number | null) => (n != null ? String(n) : "");
 
 // Mirrors the backend DTO: lowercase English letters, digits, single hyphens.
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const ProductForm = ({ defaultData }: ProductFormProps) => {
   const { t, i18n } = useTranslation();
@@ -229,7 +230,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
       if (!isEditing) formData.append("category", data.category);
       if (data.subCategory) formData.append("subCategory", data.subCategory);
       // On edit an empty slug is still sent, so the server regenerates it.
-      if (data.slug || isEditing) formData.append("slug", data.slug.trim());
+      if (data.slug || isEditing) formData.append("slug", cleanSlug(data.slug));
       if (data.tags) {
         data.tags
           .split(",")
@@ -603,13 +604,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
             />
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextInputComponent
-                  name="slug"
-                  label={t("slug")}
-                  control={control}
-                  helperText={t("slugHint")}
-                  rules={{ pattern: { value: SLUG_PATTERN, message: t("slugInvalid") } }}
-                />
+                <SlugField name="slug" control={control} hint={t("slugHint")} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextInputComponent

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, useWatch, Controller } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -40,8 +40,8 @@ import { SUPPORTED_LOCALES } from "@/lib/locales";
 import { useStoreLocales } from "@/lib/storeLocalesContext";
 import RefundRulesCard from "@/features/Refund/RefundRulesCard";
 import { useStoreModules } from "@/Hooks/useStoreModules";
+import { SOCIAL_KEYS, isShareLink, normalizeSocialKey } from "@/lib/social";
 
-const SOCIAL_KEYS = ["FACEBOOK", "INSTAGRAM", "TWITTER", "LINKEDIN", "YOUTUBE", "TIKTOK", "WHATSAPP", "TELEGRAM"];
 
 type SocialItem = { key: string; value: string };
 
@@ -103,6 +103,7 @@ const SettingsPage = () => {
 
   const { fields: socialFields, append: appendSocial, remove: removeSocial } =
     useFieldArray({ control, name: "socialMedia" });
+  const socialValues = useWatch({ control, name: "socialMedia" });
 
   useEffect(() => {
     dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("settings") }] }));
@@ -128,7 +129,8 @@ const SettingsPage = () => {
         landLine: settings.landLine ?? "",
         email: settings.email ?? "",
         address: settings.address ?? "",
-        socialMedia: settings.socialMedia ?? [],
+        // Old keys ("TWITTER") under their current name, so the select shows them.
+        socialMedia: (settings.socialMedia ?? []).map((s) => ({ ...s, key: normalizeSocialKey(s.key) })),
         primaryColor: settings.primaryColor ?? "#1976d2",
         country: settings.country ?? "",
         returnWindowDays: String(settings.returnWindowDays ?? 14),
@@ -488,6 +490,8 @@ const SettingsPage = () => {
                       fullWidth
                       placeholder="https://..."
                       {...register(`socialMedia.${index}.value`)}
+                      helperText={isShareLink(socialValues?.[index]?.value) ? t("socialShareLinkWarning") : undefined}
+                      slotProps={{ formHelperText: { sx: { color: "warning.main" } } }}
                     />
                     <IconButton color="error" onClick={() => removeSocial(index)} size="small">
                       <Delete />

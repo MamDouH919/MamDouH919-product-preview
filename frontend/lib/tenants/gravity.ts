@@ -33,7 +33,10 @@ const localhost: TenantSeo = {
   },
   manifest: "/gravity/manifest.json",
   ogImage: "/gravity/logo.webp",
-  contentSiteVerify: "-wIhSV_jn_zCy-hWqan_gS2G--R3VhfqH6MpuJchrUs"
+  contentSiteVerify: "-wIhSV_jn_zCy-hWqan_gS2G--R3VhfqH6MpuJchrUs",
+  // TODO: the store's real IDs; each loads only once it is set.
+  // gaId: "G-XXXXXXXXXX",      // GA4 → Admin → Data streams → Measurement ID
+  // fbPixelId: "000000000000000", // Meta Events Manager → Data sources → Pixel ID
 };
 
 export default localhost;

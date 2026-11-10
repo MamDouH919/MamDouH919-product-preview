@@ -6,17 +6,10 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
+import { buildSlug } from '../common/helpers/slug';
 
 export const categoryImageStorage = tenantImageStorage('categories');
 
-function buildSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-');
-}
 
 @Injectable()
 export class CategoriesService {
@@ -29,8 +22,10 @@ export class CategoriesService {
     }
 
     if (!createCategoryDto.slug) {
-      const base = createCategoryDto.name.en ?? createCategoryDto.name.ar ?? 'category';
-      createCategoryDto.slug = await this.uniqueSlug(buildSlug(base));
+      // Arabic letters strip out of a slug, so an Arabic-only name falls back to a plain word.
+      createCategoryDto.slug = await this.uniqueSlug(
+        buildSlug(createCategoryDto.name?.en ?? '') || buildSlug(createCategoryDto.name?.ar ?? '') || 'category',
+      );
     }
 
     const category = new this.categoryModel(createCategoryDto);
@@ -64,6 +59,9 @@ export class CategoriesService {
   async update(id: string, updateCategoryDto: UpdateCategoryDto, file?: Express.Multer.File): Promise<Category> {
     const existing = await this.categoryModel.findById(id).exec();
     if (!existing) throw new NotFoundException(`Category with id ${id} not found`);
+
+    // A slug cleared to nothing keeps the current one; an empty slug can't be a link.
+    if (updateCategoryDto.slug === '') delete updateCategoryDto.slug;
 
     if (file) {
       if (existing.image) await deleteFile(existing.image);

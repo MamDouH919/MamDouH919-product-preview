@@ -87,6 +87,13 @@ export class Product extends Document {
   @Prop({ required: true, unique: true })
   slug!: string;
 
+  /**
+   * Slugs this product had before, so links to them still find it and the
+   * storefront can redirect to `slug` (a 308) instead of a 404.
+   */
+  @Prop({ type: [String], default: [], index: true })
+  previousSlugs!: string[];
+
   @Prop({ type: [String], default: [] })
   tags!: string[];
 

@@ -11,6 +11,9 @@ import { Prefetched } from '@/lib/prefetch';
 import { SETTINGS_QUERY_KEY } from '@/backend-api/settings/hooks';
 import { CATEGORIES_QUERY_KEY } from '@/backend-api/categories/hooks';
 import { PAGES_QUERY_KEY } from '@/backend-api/pages/hooks';
+import { headers } from 'next/headers';
+import { resolveTenantSeo } from '@/lib/tenantSeo';
+import Analytics from '@/components/Analytics';
 
 /** What the header and footer show on every page: its links are the site's internal linking. */
 const SHELL = [
@@ -23,10 +26,14 @@ export default async function Layout({
   children,
 }: {
   children: React.ReactNode
-}) {  
+}) {
+  const h = await headers();
+  const tenant = resolveTenantSeo(h.get('x-forwarded-host') ?? h.get('host'));
 
   return (
     <Prefetched entries={SHELL}>
+    {/* The storefront only: dashboard visits aren't shoppers. */}
+    <Analytics gaId={tenant.gaId} fbPixelId={tenant.fbPixelId} />
     <GetCustomerLogged>
     <Box
       sx={{

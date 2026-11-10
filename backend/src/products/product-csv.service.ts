@@ -8,6 +8,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { parseCsv, toCsv, unguard } from '../common/helpers/csv';
+import { cleanSlug, SLUG_PATTERN } from '../common/helpers/slug';
 import { MoneyError, parseMoney, westernDigits } from '../common/money/money';
 
 /**
@@ -171,12 +172,18 @@ export class ProductCsvService {
       throw new BadRequestException(`At most ${MAX_ROWS} rows per import — split the file`);
     }
 
-    return table.slice(1).map((cells, i) => ({
-      line: i + 2,
-      cells: Object.fromEntries(
-        header.map((h, c) => [h, unguard((cells[c] ?? '').trim())]).filter(([h]) => h),
-      ) as Row['cells'],
-    }));
+    return table.slice(1).map((cells, i) => {
+      const row: Row = {
+        line: i + 2,
+        cells: Object.fromEntries(
+          header.map((h, c) => [h, unguard((cells[c] ?? '').trim())]).filter(([h]) => h),
+        ) as Row['cells'],
+      };
+      // Tidied as the dashboard does ("Candy perfume" → candy-perfume); what
+      // still isn't a slug is reported when the row is planned.
+      if (row.cells.slug) row.cells.slug = cleanSlug(row.cells.slug);
+      return row;
+    });
   }
 
   private async plan(rows: Row[]): Promise<Plan[]> {
@@ -237,6 +244,9 @@ export class ProductCsvService {
 
     // Parsers that report into `errors` and return undefined for blank or bad cells.
     const line = group[0].line;
+    if (first.slug && !SLUG_PATTERN.test(first.slug)) {
+      err(line, `slug "${first.slug}" may only contain English letters, numbers, spaces and hyphens`);
+    }
     const num = (value: string | undefined, field: string, ln = line, int = false) => {
       if (!value) return undefined;
       const n = Number(westernDigits(value).replace(/\s/g, ''));
@@ -425,7 +435,14 @@ export class ProductCsvService {
       if (plan.set.slug && (await this.productModel.exists({ slug: plan.set.slug, _id: { $ne: product._id } }))) {
         throw new BadRequestException(`slug "${String(plan.set.slug)}" is already used by another product`);
       }
-      await this.productModel.updateOne({ _id: product._id }, { $set: plan.set }).exec();
+      // A new slug keeps the old one, so links to it still resolve (and redirect).
+      const set = plan.set.slug
+        ? {
+            ...plan.set,
+            previousSlugs: [...new Set([...(product.previousSlugs ?? []), product.slug])].filter((x) => x !== plan.set.slug),
+          }
+        : plan.set;
+      await this.productModel.updateOne({ _id: product._id }, { $set: set }).exec();
     }
     // Targeted writes, never a whole-array save: a sale landing meanwhile keeps its stock.
     for (const { variantId, set } of plan.variantSets) {

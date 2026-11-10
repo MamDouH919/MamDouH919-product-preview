@@ -12,18 +12,10 @@ import { tenantImageStorage } from '../common/helpers/upload-storage';
 import { InventoryService } from '../inventory/inventory.service';
 import { MovementType } from '../inventory/enums/movement-type.enum';
 import { withTransaction } from '../common/tenant/with-transaction';
+import { buildSlug } from '../common/helpers/slug';
 
 export const productImageStorage = tenantImageStorage('products');
 
-function buildSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 @Injectable()
 export class ProductsService {
@@ -358,12 +350,17 @@ export class ProductsService {
     return product;
   }
 
+  /**
+   * The product at this slug, or the one that had it before (an old link, or
+   * one typed in another case: "Candy" for "candy"). The result's own `slug`
+   * tells the caller when it was the latter, so it can redirect.
+   */
   async findBySlug(slug: string): Promise<Product> {
-    const product = await this.productModel
-      .findOne({ slug })
-      .populate('category', 'name slug')
-      .populate('subCategory', 'name slug')
-      .exec();
+    const populated = (filter: object) =>
+      this.productModel.findOne(filter).populate('category', 'name slug').populate('subCategory', 'name slug').exec();
+    const product =
+      (await populated({ slug })) ??
+      (await populated({ $or: [{ slug: slug.toLowerCase() }, { previousSlugs: { $in: [slug, slug.toLowerCase()] } }] }));
     if (!product) throw new NotFoundException(`Product "${slug}" not found`);
     return product;
   }
@@ -429,8 +426,16 @@ export class ProductsService {
       updateProductDto.images = keptImages;
     }
 
+    // A new slug keeps the old one, so links to it still resolve (and redirect).
+    const slugChanged = !!updateProductDto.slug && updateProductDto.slug !== existing.slug;
+    const previousSlugs = slugChanged
+      ? [...new Set([...(existing.previousSlugs ?? []), existing.slug])].filter((s) => s !== updateProductDto.slug)
+      : undefined;
+
     const updated = (await this.productModel
-      .findByIdAndUpdate(id, updateProductDto, { returnDocument: 'after' })
+      .findByIdAndUpdate(id, previousSlugs ? { ...updateProductDto, previousSlugs } : updateProductDto, {
+        returnDocument: 'after',
+      })
       .populate('category', 'name slug')
       .populate('subCategory', 'name slug')
       .exec()) as Product;

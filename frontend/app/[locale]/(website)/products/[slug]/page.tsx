@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { headers } from "next/headers"
 import { resolveTenantSeo } from "@/lib/tenantSeo"
 import ProductDetailClient from "./_ProductDetailClient"
@@ -13,6 +13,7 @@ import { loc, offerLink, plainText, productOffers, type OfferSettings } from "@/
 
 interface PageProps {
   params: Promise<{ slug: string; locale: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 // Same URL and revalidate in metadata and page, so Next makes the request once.
@@ -180,7 +181,7 @@ async function ProductJsonLd({ slug, locale }: { slug: string; locale: string })
   )
 }
 
-export default async function ProductDetailPage({ params }: PageProps) {
+export default async function ProductDetailPage({ params, searchParams }: PageProps) {
   const { slug: rawSlug, locale } = await params
   // A real 404 for a product that doesn't exist; a backend hiccup still renders the page.
   const slug = decodeURIComponent(rawSlug)
@@ -189,6 +190,18 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   // The keys useProductBySlugQuery and useRelatedProductsQuery(id, 4) use.
   const product = result.ok ? result.data : null
+
+  // An old slug, or this one in another case ("Candy"): the backend found the
+  // product by it. Send links and search engines on to its current address,
+  // permanently, keeping the query (a selected variant).
+  if (product && product.slug !== slug) {
+    const query = new URLSearchParams()
+    for (const [key, value] of Object.entries(await searchParams)) {
+      for (const v of [value].flat()) if (v !== undefined) query.append(key, v)
+    }
+    const search = query.size ? `?${query}` : ""
+    permanentRedirect(`/${locale}/products/${encodeURIComponent(product.slug)}${search}`)
+  }
   const entries = product
     ? [
         { key: [PRODUCTS_QUERY_KEY, "slug", slug], path: `/products/slug/${encodeURIComponent(slug)}` },

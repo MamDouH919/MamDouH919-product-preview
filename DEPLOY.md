@@ -162,6 +162,11 @@ npm run migrate:inventory -- $HOST
 npm run normalize-ids -- $HOST              # report
 npm run normalize-ids -- $HOST --apply
 
+# Product slugs in lowercase ("Candy" → "candy"); old links redirect to the new ones.
+# Fix a typo in the same run with --rename, e.g. --rename Velvet-coffe=velvet-coffee
+npm run normalize-slugs -- $HOST            # report
+npm run normalize-slugs -- $HOST --apply
+
 # Finance: prepares old orders for the books and runs the reconciliation checks
 npm run finance:backfill -- $HOST           # report
 npm run finance:backfill -- $HOST --apply

@@ -23,6 +23,7 @@
     "migrate:inventory": "ts-node -r tsconfig-paths/register scripts/migrate-inventory.ts",
     "finance:backfill": "ts-node -r tsconfig-paths/register scripts/finance-backfill.ts",
     "normalize-ids": "ts-node -r tsconfig-paths/register scripts/normalize-ids.ts",
+    "normalize-slugs": "ts-node -r tsconfig-paths/register scripts/normalize-slugs.ts",
     "migrate:r2": "ts-node -r tsconfig-paths/register scripts/migrate-uploads-to-r2.ts",
     "seed:products": "ts-node -r tsconfig-paths/register scripts/seed-products.ts",
     "seed:sections": "ts-node -r tsconfig-paths/register scripts/seed-sections.ts",

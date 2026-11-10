@@ -21,6 +21,8 @@ import { CATEGORIES_QUERY_KEY } from "@/backend-api/categories/hooks";
 import { Category } from "@/backend-api/categories/types";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
+import SlugField from "@/components/MUI/SlugField";
+import { cleanSlug } from "@/lib/slug";
 
 type CategoryFormValues = {
   image: File | string | null;
@@ -71,7 +73,7 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
       if (data.name.en) formData.append("name[en]", data.name.en);
       if (data.description.ar) formData.append("description[ar]", data.description.ar);
       if (data.description.en) formData.append("description[en]", data.description.en);
-      if (data.slug) formData.append("slug", data.slug);
+      if (cleanSlug(data.slug)) formData.append("slug", cleanSlug(data.slug));
       formData.append("isActive", String(data.isActive));
       formData.append("order", String(data.order));
       // Sent empty on edit too, so clearing the field clears it.
@@ -126,7 +128,7 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
           )}
         </LanguageTabs>
 
-        <TextInputComponent name="slug" label={t("slug")} control={control} />
+        <SlugField name="slug" control={control} />
         <TextInputComponent name="order" label={t("order")} control={control} type="number" />
         <TextInputComponent
           name="googleProductCategory"

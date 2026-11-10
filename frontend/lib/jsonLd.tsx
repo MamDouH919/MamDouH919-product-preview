@@ -4,6 +4,7 @@ import { withBackend } from "@/lib/getBackendUrl"
 import { resolveTenantSeo } from "@/lib/tenantSeo"
 import { ALL_MODULES, type StoreModule } from "@/lib/storeModules"
 import type { Section } from "@/backend-api/sections/types"
+import { profileUrl } from "@/lib/social"
 
 /**
  * schema.org structured data shared by the storefront's pages. Google reads it
@@ -110,12 +111,12 @@ export async function storeLd(locale: string) {
   const { origin, backendUrl, settings, tenant, pages } = await storeContext()
   const seo = tenant[locale === "ar" ? "ar" : "en"]
   const logo = settings?.logo ? withBackend(backendUrl, settings.logo) : `${origin}${tenant.ogImage}`
-  // Profiles that are the store's own pages. A WhatsApp link is a phone number,
-  // not a profile: it is already the store's `telephone`.
-  const sameAs = (settings?.socialMedia ?? [])
-    .filter((s) => s.key?.toUpperCase() !== "WHATSAPP")
-    .map((s) => s.value?.trim())
-    .filter((v): v is string => !!v && /^https?:\/\//i.test(v) && !/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(v))
+  // The store's own profiles (see profileUrl for what is left out), once each.
+  const sameAs = [
+    ...new Set(
+      (settings?.socialMedia ?? []).map((s) => profileUrl(s.key, s.value)).filter((v): v is string => !!v),
+    ),
+  ]
   const telephone = settings?.phone || settings?.whatsapp || undefined
   const orgId = `${origin}/#organization`
   const arabicName = tenant.ar.title.split("|")[0].trim()
