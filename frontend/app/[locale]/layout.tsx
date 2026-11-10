@@ -5,7 +5,7 @@ import "../globals.css";
 import Providers from "@/lib/Providers";
 import { notFound } from "next/navigation";
 import { resolveTenantSeo } from "@/lib/tenantSeo";
-import { fetchBackend, getStoreLocales } from "@/lib/seo";
+import { fetchBackend, getStoreLocales, requestOrigin, storeShareImage } from "@/lib/seo";
 import { isRtl, isSupportedLocale, ogLocale } from "@/lib/locales";
 
 
@@ -20,6 +20,7 @@ export async function generateMetadata(
   const lang = locale === "ar" ? "ar" : "en";
   const { title, titleTemplate, description } = tenant[lang];
   const { siteName, icons } = tenant;
+  const image = await storeShareImage(await requestOrigin(), siteName);
 
   return {
     metadataBase: new URL(tenant.siteUrl),
@@ -49,16 +50,16 @@ export async function generateMetadata(
       title,
       description,
       locale: ogLocale(locale),
-      // The store's logo, at whatever size it is: claiming 1200×630 for it made
-      // Facebook and WhatsApp crop or drop the preview.
-      images: [{ url: tenant.ogImage, alt: title }],
+      // 1200×630 JPEG built from the logo (app/api/og/store): the logo itself
+      // is square WebP, which Facebook and WhatsApp crop or drop.
+      images: [image],
     },
 
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [tenant.ogImage],
+      images: [image.url],
     },
   };
 }

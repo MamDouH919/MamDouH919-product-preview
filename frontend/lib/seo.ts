@@ -114,7 +114,7 @@ export async function pageMetadata({ locale, path, title: baseTitle, titleExtras
   const url = `${origin}/${locale}${path}`;
   const shareTitle = title ? seo.titleTemplate.replace("%s", title) : seo.title;
   const shareDescription = description || seo.description;
-  const images = [image ?? { url: tenant.ogImage, alt: tenant.siteName }];
+  const images = [image ?? (await storeShareImage(origin, tenant.siteName))];
 
   return {
     ...(title ? { title } : {}),
@@ -138,6 +138,17 @@ export async function pageMetadata({ locale, path, title: baseTitle, titleExtras
       images: images.map((i) => i.url),
     },
   };
+}
+
+/**
+ * The store's 1200×630 share image (app/api/og/store), for pages without one
+ * of their own. `v` follows the logo's file name, so a new logo isn't kept
+ * away by WhatsApp's and Facebook's caches.
+ */
+export async function storeShareImage(origin: string, alt: string) {
+  const settings = await fetchBackend<{ logo?: string }>("/settings", 60);
+  const v = settings?.logo?.split("/").pop();
+  return { url: `${origin}/api/og/store${v ? `?v=${encodeURIComponent(v)}` : ""}`, width: 1200, height: 630, alt };
 }
 
 /** Longest title search results show in full, site name included. */
