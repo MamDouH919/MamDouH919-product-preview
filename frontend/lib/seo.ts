@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import config from "@/config.json";
 import { backendUrlForHost } from "@/lib/getBackendUrl";
 import { resolveTenantSeo } from "@/lib/tenantSeo";
-
-export const LOCALES = config.app.languages;
-export const DEFAULT_LOCALE = config.app.defaultLanguage;
+import { FALLBACK_LOCALES, ogLocale, parseStoreLocales, type StoreLocales } from "@/lib/locales";
 
 /**
  * The storefront origin this request came in on, e.g. "https://gravity.novaslash.com".
@@ -53,12 +50,33 @@ export async function fetchBackend<T>(path: string, revalidate = 300): Promise<T
   return result.ok ? result.data : null;
 }
 
-/** `{ en: origin/en/path, ar: origin/ar/path, x-default: … }` for hreflang alternates. */
-export function languageAlternates(origin: string, path: string): Record<string, string> {
+/**
+ * The languages this request's store is published in, as set on the platform
+ * dashboard. Cached like the layout's settings, so a change shows within a
+ * minute. When the API can't be asked, the defaults — never an error, so
+ * metadata, sitemap and feeds keep answering.
+ */
+export async function getStoreLocales(): Promise<StoreLocales> {
+  const result = await fetchBackendResult<unknown>("/settings/languages", 60);
+  return (result.ok && parseStoreLocales(result.data)) || FALLBACK_LOCALES;
+}
+
+/**
+ * `{ en: origin/en/path, ar: origin/ar/path, x-default: … }` for hreflang
+ * alternates, in the store's languages only. A store in one language gets
+ * none: hreflang only links translations, and listing a page as its own
+ * alternate says nothing.
+ */
+export function languageAlternates(
+  origin: string,
+  path: string,
+  { languages, defaultLanguage }: StoreLocales
+): Record<string, string> | undefined {
+  if (languages.length < 2) return undefined;
   const alternates: Record<string, string> = Object.fromEntries(
-    LOCALES.map((locale) => [locale, `${origin}/${locale}${path}`])
+    languages.map((locale) => [locale, `${origin}/${locale}${path}`])
   );
-  alternates["x-default"] = `${origin}/${DEFAULT_LOCALE}${path}`;
+  alternates["x-default"] = `${origin}/${defaultLanguage}${path}`;
   return alternates;
 }
 
@@ -83,8 +101,7 @@ type PageSeo = {
  * the canonical, so every filtered view points search engines at one page.
  */
 export async function pageMetadata({ locale, path, title, description, image, index = true }: PageSeo): Promise<Metadata> {
-  const h = await headers();
-  const origin = await requestOrigin();
+  const [h, origin, locales] = await Promise.all([headers(), requestOrigin(), getStoreLocales()]);
   const tenant = resolveTenantSeo(h.get("x-forwarded-host") ?? h.get("host"));
   const seo = tenant[locale === "ar" ? "ar" : "en"];
   const url = `${origin}/${locale}${path}`;
@@ -95,7 +112,7 @@ export async function pageMetadata({ locale, path, title, description, image, in
   return {
     ...(title ? { title } : {}),
     description: shareDescription,
-    alternates: { canonical: url, languages: languageAlternates(origin, path) },
+    alternates: { canonical: url, languages: languageAlternates(origin, path, locales) },
     robots: { index, follow: true },
     openGraph: {
       type: "website",
@@ -103,8 +120,8 @@ export async function pageMetadata({ locale, path, title, description, image, in
       siteName: tenant.siteName,
       title: shareTitle,
       description: shareDescription,
-      locale: locale === "ar" ? "ar_AR" : "en_US",
-      alternateLocale: LOCALES.filter((l) => l !== locale).map((l) => (l === "ar" ? "ar_AR" : "en_US")),
+      locale: ogLocale(locale),
+      alternateLocale: locales.languages.filter((l) => l !== locale).map(ogLocale),
       images,
     },
     twitter: {

@@ -1,4 +1,4 @@
-import config from "@/config.json"
+import { SUPPORTED_LOCALES } from "@/lib/locales"
 
 /**
  * Mentions of the store's own products, categories and sub-categories inside
@@ -31,7 +31,7 @@ export function mentionHref(
   }
 }
 
-const LOCALE_PREFIX = new RegExp(`^/(?:${config.app.languages.join("|")})(?:/|$)`)
+const LOCALE_PREFIX = new RegExp(`^/(?:${SUPPORTED_LOCALES.join("|")})(?:/|$)`)
 
 /** Prefixes every mention link in `html` with `locale`, so it opens in the reader's language without a redirect. */
 export function localizeMentions(html: string, locale: string | undefined): string {

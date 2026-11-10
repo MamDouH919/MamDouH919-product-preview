@@ -4,7 +4,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 
 import { useMemo } from 'react';
 import getTheme from './theme';
-import config from '@/config.json';
+import { isRtl as isRtlLocale } from './locales';
 import { Toaster } from 'sonner';
 
 import { cairo } from "./fonts";
@@ -17,7 +17,7 @@ export default function ThemeRegistry({
   children: React.ReactNode;
   locale: string;
 }) {
-  const isRtl = config.app.rtlLanguages.includes(locale);
+  const isRtl = isRtlLocale(locale);
 
   const primaryColor = useAppSelector((state) => state.settings.primaryColor);
 

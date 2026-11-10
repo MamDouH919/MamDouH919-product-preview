@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
@@ -23,8 +23,6 @@ import {
   Select,
   Stack,
   Switch,
-  Tab,
-  Tabs,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -32,6 +30,8 @@ import Grid from "@mui/material/Grid";
 import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
+import LanguageTabs from "@/components/LanguageTabs";
+import { SUPPORTED_LOCALES } from "@/lib/locales";
 import { ImageInput } from "@/components/MUI/ImageInput";
 import { createProduct, updateProduct } from "@/backend-api/products/mutations";
 import { PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks";
@@ -86,7 +86,9 @@ interface ProductFormProps {
   defaultData?: Product;
 }
 
-const LANGS = ["ar", "en"] as const;
+// Texts are sent for every language that has one, the store's or not, so
+// turning a language off on the platform and back on loses nothing.
+const LANGS = SUPPORTED_LOCALES;
 
 // Mirrors the backend DTO: EAN-8, UPC-12, EAN-13 or GTIN-14.
 const GTIN_PATTERN = /^(\d{8}|\d{12,14})$/;
@@ -100,7 +102,6 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState(0);
   const lang = i18n.language;
 
   const isEditing = !!defaultData;
@@ -268,23 +269,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
         {/* ── 1. Basic info: what the customer reads ── */}
         <FormSection step={1} title={t("productBasicInfo")} hint={t("productBasicInfoHint")}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth" sx={{ mb: 2 }}>
-            {LANGS.map((l) => (
-              <Tab
-                key={l}
-                label={t(l === "ar" ? "arabic" : "english")}
-                iconPosition="end"
-                icon={
-                  tabHasError(l) ? (
-                    <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", display: "inline-block", ml: 0.5 }} />
-                  ) : undefined
-                }
-              />
-            ))}
-          </Tabs>
-
-          {LANGS.map((l, i) => (
-            <Stack key={l} spacing={2} sx={{ display: activeTab === i ? "flex" : "none" }}>
+          <LanguageTabs hasError={tabHasError}>
+            {(l) => (
+            <>
               <TextInputComponent name={`name.${l}`} label={t("name")} control={control} required />
               <TextInputComponent
                 name={`shortDescription.${l}`}
@@ -302,8 +289,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                 rows={5}
                 helperText={t("descriptionHint")}
               />
-            </Stack>
-          ))}
+            </>
+            )}
+          </LanguageTabs>
         </FormSection>
 
         {/* ── 2. Images ── */}

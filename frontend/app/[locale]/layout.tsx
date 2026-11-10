@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import { cairo } from "@/lib/fonts";
 import "../globals.css";
 import Providers from "@/lib/Providers";
-import config from "@/config.json";
+import { notFound } from "next/navigation";
 import { resolveTenantSeo } from "@/lib/tenantSeo";
-import { fetchBackend } from "@/lib/seo";
+import { fetchBackend, getStoreLocales } from "@/lib/seo";
+import { isRtl, isSupportedLocale, ogLocale } from "@/lib/locales";
 
 
 export async function generateMetadata(
@@ -49,7 +50,7 @@ export async function generateMetadata(
       siteName,
       title,
       description,
-      locale: locale === "ar" ? "ar_AR" : "en_US",
+      locale: ogLocale(locale),
       // The store's logo, at whatever size it is: claiming 1200×630 for it made
       // Facebook and WhatsApp crop or drop the preview.
       images: [{ url: tenant.ogImage, alt: title }],
@@ -72,25 +73,31 @@ export default async function RootLayout({
   params: Promise<{ locale: string }>;
 }>) {
   const { locale } = await params;
-  const isRtl = config.app.rtlLanguages.includes(locale);
+  // "/xx/..." for a language the site has no translations for. One it has but
+  // the store isn't published in never gets here: the proxy redirects it.
+  if (!isSupportedLocale(locale)) notFound();
+  const rtl = isRtl(locale);
 
 
   const host = (await headers()).get("host");
   const tenant = resolveTenantSeo(host);
   // Fresh within a minute of a change in the dashboard; the client refreshes it too.
-  const settings = await fetchBackend<Record<string, unknown>>("/settings", 60);
+  const [settings, storeLocales] = await Promise.all([
+    fetchBackend<Record<string, unknown>>("/settings", 60),
+    getStoreLocales(),
+  ]);
 
   return (
     <html
       lang={locale}
-      dir={isRtl ? "rtl" : "ltr"}
+      dir={rtl ? "rtl" : "ltr"}
       className={`${cairo.variable} h-full antialiased`}
     >
       <head>
         {tenant.contentSiteVerify && <meta name="google-site-verification" content={tenant.contentSiteVerify} />}
       </head>
       <body className="min-h-full flex flex-col">
-        <Providers locale={locale} initialSettings={settings}>
+        <Providers locale={locale} initialSettings={settings} storeLocales={storeLocales}>
           {children}
         </Providers>
       </body>

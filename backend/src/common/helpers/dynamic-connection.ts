@@ -13,6 +13,7 @@ import { tenantSchemas } from '../tenant/tenant-schemas';
 import { supportsTransactions } from '../tenant/with-transaction';
 import { TenantRecord, TenantRegistry } from '../tenant/tenant-registry';
 import { DEFAULT_PLAN, PLAN_MODULES, StoreModule, StorePlan } from '../tenant/store-plan';
+import { resolveStoreLanguages, StoreLanguages } from '../tenant/store-languages';
 
 /** How often each instance re-reads the registry, so edits made on another instance arrive. */
 const REGISTRY_REFRESH_MS = 30_000;
@@ -35,6 +36,13 @@ export interface TenantConfig {
     aliasOf?: string;
     /** Left out means DEFAULT_PLAN. An alias always follows its primary host's plan. */
     plan?: StorePlan;
+    /**
+     * The languages the storefront is published in, and the one "/" opens in.
+     * Left out means DEFAULT_LANGUAGES / DEFAULT_LANGUAGE. An alias always
+     * follows its primary host's.
+     */
+    languages?: string[];
+    defaultLanguage?: string;
 }
 
 /**
@@ -67,6 +75,7 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
             }
             continue;
         }
+        resolveStoreLanguages(host, cfg.languages, cfg.defaultLanguage);
         const key = databaseKey(cfg.mongoUri);
         const owner = owners.get(key);
         if (owner) {
@@ -85,8 +94,15 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
  */
 export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
     const all: Record<string, TenantConfig> = {};
-    for (const { host, mongoUri, frontendUrl, aliasOf, plan } of records) {
-        all[host] = { mongoUri, frontendUrl, plan, ...(aliasOf ? { aliasOf } : {}) };
+    for (const { host, mongoUri, frontendUrl, aliasOf, plan, languages, defaultLanguage } of records) {
+        all[host] = {
+            mongoUri,
+            frontendUrl,
+            plan,
+            ...(languages?.length ? { languages } : {}),
+            ...(defaultLanguage ? { defaultLanguage } : {}),
+            ...(aliasOf ? { aliasOf } : {}),
+        };
     }
     validateTenantMap(all);
     const disabled = new Set(records.filter((r) => r.disabled).map((r) => r.host));
@@ -218,6 +234,17 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
         const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
         const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
         return primary?.plan ?? DEFAULT_PLAN;
+    }
+
+    /**
+     * The languages the store's site is published in; an alias answers with
+     * its primary host's. An unknown host gets the defaults.
+     */
+    getLanguages(host: string): StoreLanguages {
+        const tenantMap = this.loadTenantMap();
+        const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
+        const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
+        return resolveStoreLanguages(host, primary?.languages, primary?.defaultLanguage);
     }
 
     getModules(host: string): readonly StoreModule[] {

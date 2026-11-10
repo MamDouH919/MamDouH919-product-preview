@@ -134,7 +134,7 @@ const Header = () => {
                             <Link href="/" />
                         </Stack>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
-                            <LanguageIcon />
+                            <LanguageIcon scope="dashboard" />
                             <Tooltip title={t('changePassword')}>
                                 <IconButton
                                     color="primary"

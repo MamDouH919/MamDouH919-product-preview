@@ -22,6 +22,9 @@ interface StoredTenant {
   disabled: boolean;
   /** Missing on stores registered before plans existed; read as DEFAULT_PLAN. */
   plan?: StorePlan;
+  /** Missing on stores registered before languages were set here; read as the defaults. */
+  languages?: string[];
+  defaultLanguage?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +37,9 @@ const StoredTenantSchema = new Schema<StoredTenant>(
     aliasOf: { type: String },
     disabled: { type: Boolean, default: false },
     plan: { type: String, enum: Object.values(StorePlan), default: DEFAULT_PLAN },
+    // No defaults: an unset value keeps following DEFAULT_LANGUAGES / DEFAULT_LANGUAGE.
+    languages: { type: [String], default: undefined },
+    defaultLanguage: { type: String },
   },
   { timestamps: true, collection: 'tenants' },
 );
@@ -66,6 +72,8 @@ export class TenantRegistry {
       ...(doc.aliasOf ? { aliasOf: doc.aliasOf } : {}),
       disabled: Boolean(doc.disabled),
       plan: doc.plan ?? DEFAULT_PLAN,
+      ...(doc.languages?.length ? { languages: [...doc.languages] } : {}),
+      ...(doc.defaultLanguage ? { defaultLanguage: doc.defaultLanguage } : {}),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     }));

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
@@ -17,8 +16,6 @@ import {
   Paper,
   Select,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -27,6 +24,9 @@ import Grid from "@mui/material/Grid";
 import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
+import LanguageTabs from "@/components/LanguageTabs";
+import { SUPPORTED_LOCALES } from "@/lib/locales";
+import { useStoreLocales } from "@/lib/storeLocalesContext";
 import { ImageInput } from "@/components/MUI/ImageInput";
 import Editor from "@/components/TextEditor";
 import { createSection, updateSection } from "@/backend-api/sections/mutations";
@@ -36,7 +36,9 @@ import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 import { useAppSelector } from "@/Store/store";
 
-const LANGS = ["ar", "en"] as const;
+// Texts are sent for every language that has one, the store's or not, so
+// turning a language off on the platform and back on loses nothing.
+const LANGS = SUPPORTED_LOCALES;
 
 type HighlightFormItem = {
   key: LocalizedField;
@@ -72,7 +74,6 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState(0);
   const isSuper = useAppSelector((state) => state.auth.isSuper);
 
   const isEditing = !!defaultData;
@@ -183,10 +184,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
     },
   });
 
-  const tabs = [
-    { label: t("arabic"), lang: "ar" as const },
-    { label: t("english"), lang: "en" as const },
-  ];
+  const { languages: siteLangs } = useStoreLocales();
 
   const tabHasError = (lang: string) =>
     !!(errors as any).title?.[lang] || !!(errors as any).description?.[lang];
@@ -261,32 +259,11 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
 
         {/* Language tabs */}
         <>
-            <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth">
-              {tabs.map((tab, i) => (
-                <Tab
-                  key={tab.lang}
-                  label={tab.label}
-                  iconPosition="end"
-                  icon={
-                    tabHasError(tab.lang) ? (
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8, height: 8, borderRadius: "50%",
-                          bgcolor: "error.main", display: "inline-block", ml: 0.5,
-                        }}
-                      />
-                    ) : undefined
-                  }
-                  value={i}
-                />
-              ))}
-            </Tabs>
-
-            {tabs.map((tab, i) => (
-              <Stack key={tab.lang} spacing={2} sx={{ display: activeTab === i ? "flex" : "none" }}>
+            <LanguageTabs hasError={tabHasError}>
+              {(lang) => (
+              <>
                 <TextInputComponent
-                  name={`title.${tab.lang}`}
+                  name={`title.${lang}`}
                   label={t("title")}
                   control={control}
                   required
@@ -294,11 +271,11 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                 <Grid size={{ xs: 12 }}>
                   <Typography variant="h5" mb={1}>{t("description")}</Typography>
                   <Controller
-                    name={`description.${tab.lang}` as any}
+                    name={`description.${lang}` as any}
                     control={control}
                     render={({ field, fieldState }) => (
                       <div>
-                        <Editor value={field.value} onChange={field.onChange} lang={tab.lang as "ar" | "en"} />
+                        <Editor value={field.value} onChange={field.onChange} lang={lang} />
                         {fieldState.error && (
                           <Typography color="error">{fieldState.error.message}</Typography>
                         )}
@@ -306,8 +283,9 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                     )}
                   />
                 </Grid>
-              </Stack>
-            ))}
+              </>
+              )}
+            </LanguageTabs>
         </>
 
         {/* Highlights (only for HIGHLIGHTS type) */}
@@ -378,7 +356,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                         {t("label")} ({t("perLanguage")})
                       </Typography>
                       <Stack spacing={1.5}>
-                        {LANGS.map((lang) => (
+                        {siteLangs.map((lang) => (
                           <TextField
                             key={lang}
                             size="small"
@@ -434,16 +412,14 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                     </Stack>
 
                     <Stack spacing={1.5}>
-                      <TextField
-                        size="small"
-                        label={`${t("label")} (AR)`}
-                        {...register(`links.${index}.label.ar`)}
-                      />
-                      <TextField
-                        size="small"
-                        label={`${t("label")} (EN)`}
-                        {...register(`links.${index}.label.en`)}
-                      />
+                      {siteLangs.map((lang) => (
+                        <TextField
+                          key={lang}
+                          size="small"
+                          label={siteLangs.length > 1 ? `${t("label")} (${lang.toUpperCase()})` : t("label")}
+                          {...register(`links.${index}.label.${lang}`)}
+                        />
+                      ))}
                       <TextField
                         size="small"
                         label={t("url")}

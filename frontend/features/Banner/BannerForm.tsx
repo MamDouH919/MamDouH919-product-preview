@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
@@ -15,11 +14,10 @@ import {
   FormControlLabel,
   Stack,
   Switch,
-  Tab,
-  Tabs,
   Typography,
 } from "@mui/material";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
+import LanguageTabs from "@/components/LanguageTabs";
 import { ImageInput } from "@/components/MUI/ImageInput";
 import { createBanner, updateBanner } from "@/backend-api/banners/mutations";
 import { BANNERS_QUERY_KEY } from "@/backend-api/banners/hooks";
@@ -53,7 +51,6 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState(0);
 
   const isEditing = !!defaultData;
 
@@ -122,11 +119,6 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
   const tabHasError = (lang: string) =>
     LOCALIZED_FIELDS.some((field) => !!(errors as any)[field]?.[lang]);
 
-  const tabs = [
-    { label: t("arabic"), value: 0, lang: "arabic" },
-    { label: t("english"), value: 1, lang: "english" },
-  ];
-
   return (
     <Box component="form" onSubmit={handleSubmit(onSubmit)}>
       <Stack spacing={3}>
@@ -175,62 +167,21 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
           label={t("active")}
         />
 
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          variant="fullWidth"
-        >
-          {tabs.map((tab) => (
-            <Tab
-              key={tab.value}
-              label={tab.label}
-              iconPosition="end"
-              icon={
-                tabHasError(tab.lang) ? (
-                  <Box
-                    component="span"
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      bgcolor: "error.main",
-                      display: "inline-block",
-                      ml: 0.5,
-                    }}
-                  />
-                ) : undefined
-              }
-            />
-          ))}
-        </Tabs>
-
-        <Stack spacing={2} sx={{ display: activeTab === 0 ? "block" : "none" }}>
-          {LOCALIZED_FIELDS.map((field) => (
-            <TextInputComponent
-              key={field}
-              name={`${field}.ar`}
-              label={t(field)}
-              control={control}
-              required={field === "title"}
-              multiline={field === "description"}
-              rows={field === "description" ? 4 : undefined}
-            />
-          ))}
-        </Stack>
-
-        <Stack spacing={2} sx={{ display: activeTab === 1 ? "block" : "none" }}>
-          {LOCALIZED_FIELDS.map((field) => (
-            <TextInputComponent
-              key={field}
-              name={`${field}.en`}
-              label={t(field)}
-              control={control}
-              required={field === "title"}
-              multiline={field === "description"}
-              rows={field === "description" ? 4 : undefined}
-            />
-          ))}
-        </Stack>
+        <LanguageTabs hasError={tabHasError}>
+          {(lang) =>
+            LOCALIZED_FIELDS.map((field) => (
+              <TextInputComponent
+                key={field}
+                name={`${field}.${lang}`}
+                label={t(field)}
+                control={control}
+                required={field === "title"}
+                multiline={field === "description"}
+                rows={field === "description" ? 4 : undefined}
+              />
+            ))
+          }
+        </LanguageTabs>
 
         <Button
           type="submit"

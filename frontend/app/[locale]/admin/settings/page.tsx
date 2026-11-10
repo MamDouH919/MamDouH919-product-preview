@@ -36,7 +36,8 @@ import { setSettings, updateColor } from "@/Store/slices/settings";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { SUPPORTED_COUNTRIES } from "@/backend-api/price-list/types";
 import { PRICE_LIST_QUERY_KEY, ZONES_QUERY_KEY } from "@/backend-api/price-list/hooks";
-import config from "@/config.json";
+import { SUPPORTED_LOCALES } from "@/lib/locales";
+import { useStoreLocales } from "@/lib/storeLocalesContext";
 import RefundRulesCard from "@/features/Refund/RefundRulesCard";
 import { useStoreModules } from "@/Hooks/useStoreModules";
 
@@ -62,7 +63,11 @@ type SettingsFormValues = {
   showPrices: boolean;
 };
 
-const LANGS = config.app.languages as string[];
+/**
+ * Texts are kept for every supported language, so turning a language off on
+ * the platform and back on loses nothing; only the store's own are shown.
+ */
+const ALL_LANGS: readonly string[] = SUPPORTED_LOCALES;
 
 const SettingsPage = () => {
   const { t } = useTranslation();
@@ -70,6 +75,7 @@ const SettingsPage = () => {
   const dispatch = useAppDispatch();
   const isSuper = useAppSelector((s) => s.auth.isSuper);
   const [activeTab, setActiveTab] = useState(0);
+  const { languages: LANGS, multilingual } = useStoreLocales();
   const { data: settings, isLoading } = useSettingsQuery();
   // Delivery, returns and refunds only mean something to a store that takes orders.
   const { has } = useStoreModules();
@@ -77,9 +83,9 @@ const SettingsPage = () => {
 
   const { control, handleSubmit, reset, register, formState: { errors } } = useForm<SettingsFormValues>({
     defaultValues: {
-      siteTitle: Object.fromEntries(LANGS.map((l) => [l, ""])),
-      siteDescription: Object.fromEntries(LANGS.map((l) => [l, ""])),
-      currency: Object.fromEntries(LANGS.map((l) => [l, ""])),
+      siteTitle: Object.fromEntries(ALL_LANGS.map((l) => [l, ""])),
+      siteDescription: Object.fromEntries(ALL_LANGS.map((l) => [l, ""])),
+      currency: Object.fromEntries(ALL_LANGS.map((l) => [l, ""])),
       logo: null,
       favicon: null,
       phone: "",
@@ -107,13 +113,13 @@ const SettingsPage = () => {
     if (settings) {
       reset({
         siteTitle: Object.fromEntries(
-          LANGS.map((l) => [l, (settings.siteTitle as any)?.[l] || ""])
+          ALL_LANGS.map((l) => [l, (settings.siteTitle as any)?.[l] || ""])
         ),
         siteDescription: Object.fromEntries(
-          LANGS.map((l) => [l, (settings.siteDescription as any)?.[l] || ""])
+          ALL_LANGS.map((l) => [l, (settings.siteDescription as any)?.[l] || ""])
         ),
         currency: Object.fromEntries(
-          LANGS.map((l) => [l, (settings.currency as any)?.[l] || ""])
+          ALL_LANGS.map((l) => [l, (settings.currency as any)?.[l] || ""])
         ),
         logo: settings.logo ? getBackendUri(settings.logo) : null,
         favicon: settings.favicon ? getBackendUri(settings.favicon) : null,
@@ -137,7 +143,7 @@ const SettingsPage = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: (data: SettingsFormValues) => {
       const formData = new FormData();
-      LANGS.forEach((lang) => {
+      ALL_LANGS.forEach((lang) => {
         const title = (data.siteTitle as any)?.[lang];
         const desc = (data.siteDescription as any)?.[lang];
         const cur = (data.currency as any)?.[lang];
@@ -198,7 +204,7 @@ const SettingsPage = () => {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
 
-                <Tabs
+                {multilingual && <Tabs
                   value={activeTab}
                   onChange={(_, v) => setActiveTab(v)}
                   variant="fullWidth"
@@ -220,7 +226,7 @@ const SettingsPage = () => {
                       ) : undefined}
                     />
                   ))}
-                </Tabs>
+                </Tabs>}
 
                 {LANGS.map((lang, i) => (
                   <Stack

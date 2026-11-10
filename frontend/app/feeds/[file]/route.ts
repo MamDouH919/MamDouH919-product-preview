@@ -1,10 +1,11 @@
 import { headers } from "next/headers"
-import { fetchBackend, isoCurrency, LOCALES, requestBackendUrl, requestOrigin } from "@/lib/seo"
+import { fetchBackend, getStoreLocales, isoCurrency, requestBackendUrl, requestOrigin } from "@/lib/seo"
+import { isSupportedLocale } from "@/lib/locales"
 import { resolveTenantSeo } from "@/lib/tenantSeo"
 import { buildGoogleFeed, feedImageUrls, type FeedProduct, type FeedSettings } from "@/lib/merchantFeed"
 
 /**
- * Google Merchant Center product feed, one per language:
+ * Google Merchant Center product feed, one per language the store is published in:
  *   /feeds/google-ar.xml, /feeds/google-en.xml
  * Per tenant, like the sitemap: the request host decides the store.
  * Register each URL in Merchant Center as a scheduled fetch (daily).
@@ -39,7 +40,9 @@ async function brokenLegacyImages(products: FeedProduct[], backendUrl: string): 
 
 export async function GET(_req: Request, { params }: { params: Promise<{ file: string }> }) {
   const locale = FILE.exec((await params).file)?.[1]
-  if (!locale || !LOCALES.includes(locale)) return new Response("Not found", { status: 404 })
+  if (!isSupportedLocale(locale)) return new Response("Not found", { status: 404 })
+  // A feed of pages that only redirect would be rejected product by product.
+  if (!(await getStoreLocales()).languages.includes(locale)) return new Response("Not found", { status: 404 })
 
   const [origin, backendUrl, h, products, settings] = await Promise.all([
     requestOrigin(),

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { DEFAULT_LOCALE, fetchBackend, languageAlternates, requestBackendUrl, requestOrigin } from "@/lib/seo";
+import { fetchBackend, getStoreLocales, languageAlternates, requestBackendUrl, requestOrigin } from "@/lib/seo";
 import { withBackend } from "@/lib/getBackendUrl";
 
 type Entry = { slug: string; updatedAt?: string; image?: string };
@@ -7,25 +7,30 @@ type SitemapData = { products: Entry[]; categories: Entry[]; pages: Entry[] };
 
 /**
  * Every public storefront URL for the tenant this request came in on. One
- * entry per page in the default language, with the other languages listed as
- * hreflang alternates, so search engines see one page in two languages rather
- * than two competing ones.
+ * entry per page in the store's default language, with its other languages
+ * (if any) listed as hreflang alternates, so search engines see one page in
+ * several languages rather than competing copies. Languages the store isn't
+ * published in are left out: their URLs only redirect.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [origin, backendUrl, data] = await Promise.all([
+  const [origin, backendUrl, data, locales] = await Promise.all([
     requestOrigin(),
     requestBackendUrl(),
     fetchBackend<SitemapData>("/sitemap", 3600),
+    getStoreLocales(),
   ]);
 
   const entry = (
     path: string,
     options: Partial<MetadataRoute.Sitemap[number]> = {}
-  ): MetadataRoute.Sitemap[number] => ({
-    url: `${origin}/${DEFAULT_LOCALE}${path}`,
-    alternates: { languages: languageAlternates(origin, path) },
-    ...options,
-  });
+  ): MetadataRoute.Sitemap[number] => {
+    const languages = languageAlternates(origin, path, locales);
+    return {
+      url: `${origin}/${locales.defaultLanguage}${path}`,
+      ...(languages ? { alternates: { languages } } : {}),
+      ...options,
+    };
+  };
 
   const lastModified = (e: Entry) => (e.updatedAt ? new Date(e.updatedAt) : undefined);
 

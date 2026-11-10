@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
-import { LOCALES, requestOrigin } from "@/lib/seo";
+import { requestOrigin } from "@/lib/seo";
+import { SUPPORTED_LOCALES } from "@/lib/locales";
 
 /** Per tenant: reading the request host makes this render per request, not once at build. */
 export default async function robots(): Promise<MetadataRoute.Robots> {
@@ -12,7 +13,9 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: LOCALES.flatMap((locale) => privatePaths.map((path) => `/${locale}/${path}`)),
+      // Every supported locale, not just the store's: a language it isn't
+      // published in only redirects, but its private paths stay private anyway.
+      disallow: SUPPORTED_LOCALES.flatMap((locale) => privatePaths.map((path) => `/${locale}/${path}`)),
     },
     sitemap: `${origin}/sitemap.xml`,
   };

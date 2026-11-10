@@ -1,6 +1,22 @@
 import { useState, type FormEvent } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@mui/material';
-import { PLAN_LABELS, type StorePlan, type Tenant } from '../api';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
+  FormLabel,
+  MenuItem,
+  Stack,
+  TextField,
+} from '@mui/material';
+import { LANGUAGE_LABELS, PLAN_LABELS, type StoreLanguage, type StorePlan, type Tenant } from '../api';
 import { useCreateTenant, useUpdateTenant } from '../hooks/useTenants';
 
 interface Props {
@@ -40,6 +56,36 @@ const PLAN_HINTS: Record<StorePlan, string> = {
   catalog: 'Products and the website only. Visitors ask on WhatsApp; nothing is ordered online.',
 };
 
+const ALL_LANGUAGES = Object.keys(LANGUAGE_LABELS) as StoreLanguage[];
+/** What a store is published in when nobody has said otherwise — the API's defaults. */
+const DEFAULT_LANGUAGES: StoreLanguage[] = ['en', 'ar'];
+const DEFAULT_LANGUAGE: StoreLanguage = 'ar';
+
+const names = (langs: StoreLanguage[]) => list(langs.map((l) => LANGUAGE_LABELS[l].replace(/ \(.*\)$/, '')));
+
+/** What a change of languages does to the live site and its place in search results. */
+function languageNotes(tenant: Tenant, languages: StoreLanguage[], defaultLanguage: StoreLanguage): string[] {
+  const notes: string[] = [];
+  const removed = tenant.languages.filter((l) => !languages.includes(l));
+  const added = languages.filter((l) => !tenant.languages.includes(l));
+  if (removed.length) {
+    notes.push(
+      `Pages in ${names(removed)} will redirect permanently (301) to the same page in ${names([defaultLanguage])}, ` +
+        'so their links and search ranking carry over. Turning a language back on later starts its pages in search from scratch.',
+    );
+  }
+  if (added.length) {
+    notes.push(
+      `The site gets ${names(added)} pages. Fill in their texts in the store's dashboard first: ` +
+        'pages with missing translations hurt how search engines rate the whole site.',
+    );
+  }
+  if (defaultLanguage !== tenant.defaultLanguage) {
+    notes.push(`The home page will open in ${names([defaultLanguage])}, and search engines will treat it as the main version.`);
+  }
+  return notes;
+}
+
 export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const editing = Boolean(tenant);
   const [host, setHost] = useState(tenant?.host ?? '');
@@ -48,6 +94,8 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const [mongoUri, setMongoUri] = useState('');
   const [aliasOf, setAliasOf] = useState(tenant?.aliasOf ?? '');
   const [plan, setPlan] = useState<StorePlan>(tenant?.plan ?? 'full');
+  const [languages, setLanguages] = useState<StoreLanguage[]>(tenant?.languages ?? DEFAULT_LANGUAGES);
+  const [defaultLanguage, setDefaultLanguage] = useState<StoreLanguage>(tenant?.defaultLanguage ?? DEFAULT_LANGUAGE);
   const create = useCreateTenant();
   const update = useUpdateTenant();
   const mutation = editing ? update : create;
@@ -62,6 +110,17 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
     if (!urlTouched) setFrontendUrl(clean ? `https://${clean.replace(/^api[.-](?=.+\.)/, '')}` : '');
   };
 
+  const toggleLanguage = (lang: StoreLanguage, on: boolean) => {
+    const next = ALL_LANGUAGES.filter((l) => (l === lang ? on : languages.includes(l)));
+    if (!next.length) return; // A store is always published in at least one language.
+    setLanguages(next);
+    if (!next.includes(defaultLanguage)) setDefaultLanguage(next[0]);
+  };
+
+  // The default first: the order the storefront lists them in.
+  const languageFields = { languages: [defaultLanguage, ...languages.filter((l) => l !== defaultLanguage)], defaultLanguage };
+  const notes = editing && !aliasOf && !tenant!.aliasOf ? languageNotes(tenant!, languages, defaultLanguage) : [];
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (tenant) {
@@ -70,13 +129,13 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
         patch: {
           frontendUrl,
           aliasOf: aliasOf || null,
-          ...(aliasOf ? {} : { plan }),
+          ...(aliasOf ? {} : { plan, ...languageFields }),
           ...(mongoUri.trim() ? { mongoUri: mongoUri.trim() } : {}),
         },
       });
       onSaved(`${tenant.host} updated`);
     } else {
-      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan }) });
+      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields }) });
       onSaved(`${host} added`);
     }
     onClose();
@@ -157,6 +216,54 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
           {editing && !aliasOf && plan !== tenant!.plan && (
             <Alert severity="info">
               {switchNote(tenant!.plan, plan)}
+            </Alert>
+          )}
+          {!aliasOf && (
+            <FormControl component="fieldset">
+              <FormLabel component="legend">Website languages</FormLabel>
+              <FormGroup row>
+                {ALL_LANGUAGES.map((l) => (
+                  <FormControlLabel
+                    key={l}
+                    label={LANGUAGE_LABELS[l]}
+                    control={
+                      <Checkbox
+                        checked={languages.includes(l)}
+                        disabled={languages.length === 1 && languages.includes(l)}
+                        onChange={(e) => toggleLanguage(l, e.target.checked)}
+                      />
+                    }
+                  />
+                ))}
+              </FormGroup>
+              <FormHelperText>
+                {languages.length === 1
+                  ? `The site is published in ${names(languages)} only: no language switcher, and the store's dashboard asks for ${names(languages)} texts only.`
+                  : 'Each page is published in every language, linked for search engines with hreflang.'}
+              </FormHelperText>
+            </FormControl>
+          )}
+          {!aliasOf && (
+            <TextField
+              select
+              label="Default language"
+              helperText={'Where the home page "/" opens, and the version search engines show by default.'}
+              value={defaultLanguage}
+              disabled={languages.length === 1}
+              onChange={(e) => setDefaultLanguage(e.target.value as StoreLanguage)}
+            >
+              {languages.map((l) => (
+                <MenuItem key={l} value={l}>
+                  {LANGUAGE_LABELS[l]}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+          {notes.length > 0 && (
+            <Alert severity="warning">
+              {notes.map((n) => (
+                <div key={n}>{n}</div>
+              ))}
             </Alert>
           )}
         </Stack>

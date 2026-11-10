@@ -1,7 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
+  IsIn,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -12,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { StorePlan } from '../../common/tenant/store-plan';
+import { SUPPORTED_LANGUAGES, type StoreLanguage } from '../../common/tenant/store-languages';
 
 /** A bare hostname: lower-case labels, no port, no scheme. */
 const HOST_PATTERN = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
@@ -48,6 +53,23 @@ export class CreateTenantDto {
   @IsOptional()
   @IsEnum(StorePlan)
   plan?: StorePlan;
+
+  @ApiPropertyOptional({
+    enum: SUPPORTED_LANGUAGES,
+    isArray: true,
+    description: 'Languages the storefront is published in. Ignored on an alias, which follows its primary host',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Pick at least one language' })
+  @ArrayUnique()
+  @IsIn(SUPPORTED_LANGUAGES, { each: true, message: `languages must be among: ${SUPPORTED_LANGUAGES.join(', ')}` })
+  languages?: StoreLanguage[];
+
+  @ApiPropertyOptional({ enum: SUPPORTED_LANGUAGES, description: 'Where "/" leads; must be one of `languages`' })
+  @IsOptional()
+  @IsIn(SUPPORTED_LANGUAGES, { message: `defaultLanguage must be one of: ${SUPPORTED_LANGUAGES.join(', ')}` })
+  defaultLanguage?: StoreLanguage;
 }
 
 export class UpdateTenantDto {
@@ -78,6 +100,23 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsEnum(StorePlan)
   plan?: StorePlan;
+
+  @ApiPropertyOptional({
+    enum: SUPPORTED_LANGUAGES,
+    isArray: true,
+    description: 'Languages the storefront is published in. Ignored on an alias, which follows its primary host',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Pick at least one language' })
+  @ArrayUnique()
+  @IsIn(SUPPORTED_LANGUAGES, { each: true, message: `languages must be among: ${SUPPORTED_LANGUAGES.join(', ')}` })
+  languages?: StoreLanguage[];
+
+  @ApiPropertyOptional({ enum: SUPPORTED_LANGUAGES, description: 'Where "/" leads; must be one of `languages`' })
+  @IsOptional()
+  @IsIn(SUPPORTED_LANGUAGES, { message: `defaultLanguage must be one of: ${SUPPORTED_LANGUAGES.join(', ')}` })
+  defaultLanguage?: StoreLanguage;
 }
 
 export class SeedUserDto {

@@ -7,6 +7,7 @@ import {
 } from '../common/helpers/dynamic-connection';
 import { TenantRecord } from '../common/tenant/tenant-registry';
 import { DEFAULT_PLAN, StorePlan } from '../common/tenant/store-plan';
+import { resolveStoreLanguages, type StoreLanguage } from '../common/tenant/store-languages';
 import { seedTenant } from '../common/tenant/seed-tenant';
 import { supportsTransactions } from '../common/tenant/with-transaction';
 import { User, UserSchema } from '../auth/schemas/user.schema';
@@ -20,6 +21,9 @@ export interface TenantView {
   disabled: boolean;
   /** An alias's own plan is ignored: it serves its primary host's. */
   plan: StorePlan;
+  /** The storefront's languages, defaults filled in. An alias's own are ignored: it serves its primary host's. */
+  languages: StoreLanguage[];
+  defaultLanguage: StoreLanguage;
   /** The connection string with any user:password replaced by `***`. */
   database: string;
   /** Whether this API instance holds an open connection to it right now. */
@@ -66,6 +70,8 @@ export class PlatformTenantsService {
       ...(dto.aliasOf ? { aliasOf: dto.aliasOf } : {}),
       disabled: false,
       plan: dto.plan ?? DEFAULT_PLAN,
+      ...(dto.languages ? { languages: dto.languages } : {}),
+      ...(dto.defaultLanguage ? { defaultLanguage: dto.defaultLanguage } : {}),
     };
     this.assertValid([...records, record], registry.uri);
 
@@ -85,7 +91,11 @@ export class PlatformTenantsService {
       frontendUrl: dto.frontendUrl ? stripSlash(dto.frontendUrl) : current.frontendUrl,
       disabled: dto.disabled ?? current.disabled,
       plan: dto.plan ?? current.plan,
+      languages: dto.languages ?? current.languages,
+      defaultLanguage: dto.defaultLanguage ?? current.defaultLanguage,
     };
+    if (!next.languages) delete next.languages;
+    if (!next.defaultLanguage) delete next.defaultLanguage;
     // An orders-only store keeps its stock and money outside the system from
     // day one, so there are no books to start from: it never becomes full.
     if (current.plan === StorePlan.ORDERS && next.plan === StorePlan.FULL) {
@@ -191,6 +201,7 @@ export class PlatformTenantsService {
       aliasOf: record.aliasOf ?? null,
       disabled: record.disabled,
       plan: record.plan,
+      ...resolveStoreLanguages(record.host, record.languages, record.defaultLanguage),
       database: redactMongoUri(record.mongoUri),
       connected: this.tenants.isConnected(record.host),
       createdAt: record.createdAt,

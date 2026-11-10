@@ -65,7 +65,8 @@ import { createPage, updatePage } from "@/backend-api/pages/mutations";
 import { PAGES_QUERY_KEY } from "@/backend-api/pages/hooks";
 import { Page, PageBlock, PageBlockType, PagePayload } from "@/backend-api/pages/types";
 import { LocalizedField } from "@/backend-api/globalTypes";
-import { BLOCK_DEFINITIONS, BLOCKS_BY_TYPE, Lang, LANGS, blockSummary, createBlock, newBlockId } from "./blocks/registry";
+import { useStoreLocales } from "@/lib/storeLocalesContext";
+import { BLOCK_DEFINITIONS, BLOCKS_BY_TYPE, Lang, blockSummary, createBlock, newBlockId } from "./blocks/registry";
 import { BLOCK_EDITORS, StyleEditor } from "./blocks/editors";
 import { ColorInput, ImageField, LText, SelectInput, TextInput } from "./blocks/fields";
 import PageRenderer from "./PageRenderer";
@@ -315,7 +316,11 @@ export default function PageBuilder({ defaultData }: PageBuilderProps) {
   const [draft, setDraft] = useState<PagePayload>(initial);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initial));
   const [slugTouched, setSlugTouched] = useState(isEditing);
-  const [lang, setLang] = useState<Lang>((LANGS as readonly string[]).includes(i18n.language) ? (i18n.language as Lang) : "ar");
+  // Edit in the dashboard's language when the site has it, else the site's default.
+  const { languages: siteLangs, defaultLanguage, multilingual } = useStoreLocales();
+  const [lang, setLang] = useState<Lang>(
+    (siteLangs as readonly string[]).includes(i18n.language) ? (i18n.language as Lang) : defaultLanguage
+  );
   const [panel, setPanel] = useState<"blocks" | "settings" | "seo">("blocks");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ open: boolean; index: number }>({ open: false, index: 0 });
@@ -472,15 +477,15 @@ export default function PageBuilder({ defaultData }: PageBuilderProps) {
             </Stack>
           </Box>
 
-          <Tooltip title={t("editingLanguage")}>
+          {multilingual && <Tooltip title={t("editingLanguage")}>
             <ToggleButtonGroup size="small" exclusive value={lang} onChange={(_, v) => v && setLang(v)}>
-              {LANGS.map((l) => (
+              {siteLangs.map((l) => (
                 <ToggleButton key={l} value={l} sx={{ px: 1.5, fontWeight: 700 }}>
                   {l.toUpperCase()}
                 </ToggleButton>
               ))}
             </ToggleButtonGroup>
-          </Tooltip>
+          </Tooltip>}
 
           {showPreview && (
             <ToggleButtonGroup size="small" exclusive value={device} onChange={(_, v) => v && setDevice(v)} sx={{ display: { xs: "none", lg: "flex" } }}>

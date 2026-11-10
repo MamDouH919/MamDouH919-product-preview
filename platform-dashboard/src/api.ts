@@ -13,6 +13,14 @@ export const PLAN_LABELS: Record<StorePlan, string> = {
   catalog: 'Catalog only',
 };
 
+/** Languages the storefront has translations for. Mirrors the API's SUPPORTED_LANGUAGES. */
+export type StoreLanguage = 'en' | 'ar';
+
+export const LANGUAGE_LABELS: Record<StoreLanguage, string> = {
+  en: 'English',
+  ar: 'Arabic (العربية)',
+};
+
 export interface Tenant {
   host: string;
   frontendUrl: string;
@@ -20,6 +28,9 @@ export interface Tenant {
   disabled: boolean;
   /** An alias's own plan is ignored: it serves its primary host's. */
   plan: StorePlan;
+  /** The storefront's languages; an alias's own are ignored, it serves its primary host's. */
+  languages: StoreLanguage[];
+  defaultLanguage: StoreLanguage;
   /** Connection string with credentials replaced by `***`. */
   database: string;
   connected: boolean;
@@ -33,6 +44,8 @@ export interface TenantInput {
   frontendUrl: string;
   aliasOf?: string;
   plan?: StorePlan;
+  languages?: StoreLanguage[];
+  defaultLanguage?: StoreLanguage;
 }
 
 export interface TenantPatch {
@@ -41,6 +54,8 @@ export interface TenantPatch {
   aliasOf?: string | null;
   disabled?: boolean;
   plan?: StorePlan;
+  languages?: StoreLanguage[];
+  defaultLanguage?: StoreLanguage;
 }
 
 export interface TenantCheck {

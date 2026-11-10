@@ -36,7 +36,18 @@ export class SettingsController {
       ...setting.toJSON(),
       plan: this.tenants.getPlan(host),
       modules: this.tenants.getModules(host),
+      ...this.tenants.getLanguages(host),
     };
+  }
+
+  /**
+   * Public. The languages the storefront is published in and the one "/"
+   * opens in. Read from the tenant registry in memory, so the frontend's proxy
+   * can ask on its routing path without a database read.
+   */
+  @Get('languages')
+  languages(@Req() req: Request) {
+    return this.tenants.getLanguages(req['tenant'] ?? req.hostname);
   }
 
   // A role decides who may change the store's settings, as for mail settings —

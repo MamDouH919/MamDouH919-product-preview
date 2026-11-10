@@ -22,6 +22,7 @@ import { useAppSelector } from "@/Store/store";
 import { useStoreModules } from "@/Hooks/useStoreModules";
 import { getBackendUri } from "@/utils/helperFunctions";
 import LanguageIcon from "@/components/LanguageIcon";
+import { useStoreLocales } from "@/lib/storeLocalesContext";
 import AccountMenu from "@/components/AccountMenu";
 import CartButton from "@/components/CartButton";
 import SearchButton from "@/components/SearchButton";
@@ -205,6 +206,7 @@ const Navbar = () => {
 
   const { logo } = useAppSelector((state) => state.settings);
   const { has } = useStoreModules();
+  const { multilingual } = useStoreLocales();
   const { data: categoriesData } = useCategoriesQuery();
   const categories = (categoriesData ?? [])
     .filter((c) => c.isActive)
@@ -460,6 +462,7 @@ const Navbar = () => {
                   );
                 })}
 
+                {multilingual && (
                 <Box
                   className="mobile-item"
                   style={{ "--i": links.length } as React.CSSProperties}
@@ -473,6 +476,7 @@ const Navbar = () => {
                 >
                   <LanguageIcon />
                 </Box>
+                )}
               </MobileMenu>
             </Collapse>
           </HeaderCard>

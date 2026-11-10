@@ -16,10 +16,9 @@ import {
   FormControl,
   Stack,
   Switch,
-  Tab,
-  Tabs,
 } from "@mui/material";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
+import LanguageTabs from "@/components/LanguageTabs";
 import { ImageInput } from "@/components/MUI/ImageInput";
 import { createSubCategory, updateSubCategory } from "@/backend-api/sub-categories/mutations";
 import { SUB_CATEGORIES_QUERY_KEY } from "@/backend-api/sub-categories/hooks";
@@ -27,7 +26,6 @@ import { SubCategory } from "@/backend-api/sub-categories/types";
 import { useCategoriesQuery } from "@/backend-api/categories/hooks";
 import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
-import { useState } from "react";
 
 type SubCategoryFormValues = {
   image: File | string | null;
@@ -47,7 +45,6 @@ const SubCategoryForm = ({ defaultData }: SubCategoryFormProps) => {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState(0);
   const lang = i18n.language;
 
   const isEditing = !!defaultData;
@@ -145,36 +142,14 @@ const SubCategoryForm = ({ defaultData }: SubCategoryFormProps) => {
           label={t("active")}
         />
 
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="fullWidth">
-          <Tab
-            label={t("arabic")}
-            iconPosition="end"
-            icon={
-              tabHasError("ar") ? (
-                <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", display: "inline-block", ml: 0.5 }} />
-              ) : undefined
-            }
-          />
-          <Tab
-            label={t("english")}
-            iconPosition="end"
-            icon={
-              tabHasError("en") ? (
-                <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", display: "inline-block", ml: 0.5 }} />
-              ) : undefined
-            }
-          />
-        </Tabs>
-
-        <Stack spacing={2} sx={{ display: activeTab === 0 ? "flex" : "none" }}>
-          <TextInputComponent name="name.ar" label={t("name")} control={control} required />
-          <TextInputComponent name="description.ar" label={t("description")} control={control} multiline rows={3} />
-        </Stack>
-
-        <Stack spacing={2} sx={{ display: activeTab === 1 ? "flex" : "none" }}>
-          <TextInputComponent name="name.en" label={t("name")} control={control} required />
-          <TextInputComponent name="description.en" label={t("description")} control={control} multiline rows={3} />
-        </Stack>
+        <LanguageTabs hasError={tabHasError}>
+          {(lang) => (
+            <>
+              <TextInputComponent name={`name.${lang}`} label={t("name")} control={control} required />
+              <TextInputComponent name={`description.${lang}`} label={t("description")} control={control} multiline rows={3} />
+            </>
+          )}
+        </LanguageTabs>
 
         <TextInputComponent name="slug" label={t("slug")} control={control} />
         <TextInputComponent name="order" label={t("order")} control={control} type="number" />

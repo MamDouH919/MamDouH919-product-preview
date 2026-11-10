@@ -1,4 +1,4 @@
-import config from "@/config.json";
+import { splitLocale } from "@/lib/locales";
 
 /** What the store is sold as; set on the platform, never by the store. Mirrors the API's StorePlan. */
 export type StorePlan = "catalog" | "orders" | "full";
@@ -39,12 +39,10 @@ const ROUTE_MODULES: [string, StoreModule[]][] = [
     ["/admin/books", ["finance"]],
 ];
 
-const LOCALES = config.app.languages as string[];
-
 /** The modules a path needs. Takes it with or without the leading locale ("/ar/admin/orders" or "/admin/orders"). */
 export function requiredModules(pathname: string): StoreModule[] {
-    const segments = pathname.split("/");
-    const path = LOCALES.includes(segments[1]) ? "/" + segments.slice(2).join("/") : pathname;
+    const { locale, rest } = splitLocale(pathname);
+    const path = locale ? rest || "/" : pathname;
     const match = ROUTE_MODULES.find(([prefix]) => path === prefix || path.startsWith(prefix + "/"));
     return match?.[1] ?? [];
 }

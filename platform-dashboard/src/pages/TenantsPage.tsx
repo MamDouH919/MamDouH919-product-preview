@@ -38,7 +38,7 @@ import PauseCircleOutlined from '@mui/icons-material/PauseCircleOutlined';
 import PlayCircleOutlined from '@mui/icons-material/PlayCircleOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import OpenInNew from '@mui/icons-material/OpenInNew';
-import { ApiError, PLAN_LABELS, type Tenant } from '../api';
+import { ApiError, PLAN_LABELS, LANGUAGE_LABELS, type Tenant } from '../api';
 import { useDeleteTenant, useTenants, useUpdateTenant } from '../hooks/useTenants';
 import { TenantFormDialog } from '../components/TenantFormDialog';
 import { CheckDialog } from '../components/CheckDialog';
@@ -251,6 +251,16 @@ export function TenantsPage() {
                           variant="outlined"
                           color={t.plan === 'full' ? 'primary' : t.plan === 'orders' ? 'secondary' : 'default'}
                           label={PLAN_LABELS[t.plan]}
+                        />
+                      )}
+                      {!t.aliasOf && (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          title={`Opens in ${LANGUAGE_LABELS[t.defaultLanguage]}`}
+                          label={t.languages
+                            .map((l) => (l === t.defaultLanguage ? `${l.toUpperCase()}*` : l.toUpperCase()))
+                            .join(' · ')}
                         />
                       )}
                     </Stack>

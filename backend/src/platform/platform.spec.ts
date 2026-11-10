@@ -141,6 +141,35 @@ describe('Tenant registry', () => {
     expect(tenants.hasModule('shop.test', StoreModule.ORDERS)).toBe(true);
   });
 
+  it('publishes a store in English and Arabic until told otherwise, and changes it for it and its aliases', async () => {
+    expect(tenants.getLanguages('legacy.test')).toEqual({ languages: ['en', 'ar'], defaultLanguage: 'ar' });
+
+    const view = await service.update('shop.test', { languages: ['en'], defaultLanguage: 'en' });
+    expect(view).toMatchObject({ languages: ['en'], defaultLanguage: 'en' });
+    expect(tenants.getLanguages('shop.test')).toEqual({ languages: ['en'], defaultLanguage: 'en' });
+    expect(tenants.getLanguages('www.shop.test')).toEqual({ languages: ['en'], defaultLanguage: 'en' });
+
+    // Other edits leave the languages alone.
+    await service.update('shop.test', { mongoUri: store('shop') });
+    expect(tenants.getLanguages('shop.test').languages).toEqual(['en']);
+
+    await service.update('shop.test', { languages: ['ar', 'en'], defaultLanguage: 'ar' });
+    expect(tenants.getLanguages('shop.test')).toEqual({ languages: ['ar', 'en'], defaultLanguage: 'ar' });
+  });
+
+  it('refuses a default language the store is not published in', async () => {
+    await expect(service.update('shop.test', { languages: ['en'] })).rejects.toThrow(/default language ar/);
+    await expect(
+      service.create({ host: 'us.test', mongoUri: store('us'), frontendUrl: 'http://us.test', languages: ['en'], defaultLanguage: 'ar' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(tenants.getLanguages('shop.test').languages).toEqual(['ar', 'en']);
+
+    // Left out, the default is the store's first language.
+    const us = await service.create({ host: 'us.test', mongoUri: store('us'), frontendUrl: 'http://us.test', languages: ['en'] });
+    expect(us.defaultLanguage).toBe('en');
+    await service.remove('us.test');
+  });
+
   it('never moves an orders-only store to the full shop', async () => {
     await service.update('shop.test', { plan: StorePlan.ORDERS });
     await expect(service.update('shop.test', { plan: StorePlan.FULL })).rejects.toThrow(/orders-only/);

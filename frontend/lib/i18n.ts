@@ -1,7 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import config from '@/config.json';
+import { FALLBACK_LOCALES, SUPPORTED_LOCALES } from './locales';
 
 import en from '../locales/en';
 import ar from '../locales/ar';
@@ -9,7 +9,7 @@ import ar from '../locales/ar';
 const locales: Record<string, any> = { en, ar };
 
 const resources = Object.fromEntries(
-    config.app.languages.map((lang) => [lang, { translation: locales[lang] || {} }])
+    SUPPORTED_LOCALES.map((lang) => [lang, { translation: locales[lang] || {} }])
 );
 
 i18n
@@ -17,8 +17,8 @@ i18n
     .use(initReactI18next)
     .init({
         resources,
-        fallbackLng: config.app.defaultLanguage,
-        supportedLngs: config.app.languages,
+        fallbackLng: FALLBACK_LOCALES.defaultLanguage,
+        supportedLngs: [...SUPPORTED_LOCALES],
         detection: {
             order: ['cookie', 'localStorage', 'navigator'],
             caches: ['localStorage', 'cookie'],
