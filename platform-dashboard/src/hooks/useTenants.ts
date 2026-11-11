@@ -31,3 +31,29 @@ export const useSeedTenant = () =>
     mutationFn: ({ host, admin, superAdmin }: { host: string; admin: SeedUser; superAdmin?: SeedUser }) =>
       api.seedTenant(host, { admin, superAdmin }),
   });
+
+const backupsKey = (host: string) => ['backups', host];
+
+export function useBackups(host: string) {
+  return useQuery({ queryKey: backupsKey(host), queryFn: () => api.listBackups(host) });
+}
+
+export function useCreateBackup(host: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.createBackup(host),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: backupsKey(host) }),
+  });
+}
+
+/** Dry runs and real restores; a real one adds a pre-restore backup, so the list is refreshed. */
+export function useRestoreBackup(host: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dryRun, confirm }: { id: string; dryRun: boolean; confirm?: string }) =>
+      api.restoreBackup(host, id, { dryRun, confirm }),
+    onSettled: (_data, _error, vars) => {
+      if (!vars.dryRun) void queryClient.invalidateQueries({ queryKey: backupsKey(host) });
+    },
+  });
+}

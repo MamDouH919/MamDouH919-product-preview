@@ -118,7 +118,6 @@ const TOPIC_BY_ROUTE: [string, HelpTopicId][] = [
   ["/admin/suppliers", "purchases"],
   ["/admin/inventory", "inventory"],
   ["/admin/products", "import"],
-  ["/admin/database", "import"],
   ["/admin/reports", "reports"],
   ["/admin/books", "reports"],
 ];

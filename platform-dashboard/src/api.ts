@@ -73,12 +73,37 @@ export interface SeedUser {
   password: string;
 }
 
+export type BackupKind = 'daily' | 'manual' | 'pre-restore';
+
+export interface Backup {
+  id: string;
+  kind: BackupKind;
+  createdAt: string;
+  /** Compressed size in bytes. */
+  size: number;
+}
+
+export interface RestoreReport {
+  dryRun: boolean;
+  host: string;
+  exportedAt?: string;
+  collections: { name: string; documents: number }[];
+  skipped: string[];
+  errors: string[];
+  restored: boolean;
+  /** Backup of the state just before a real restore, to undo it. */
+  safetyBackup?: string;
+}
+
 export class ApiError extends Error {
   readonly status: number;
+  /** Extra fields of the error body, e.g. a refused restore's `report`. */
+  readonly data: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -105,7 +130,7 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     method,
@@ -120,9 +145,25 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     const message = Array.isArray(data?.message) ? data.message.join('\n') : data?.message;
-    throw new ApiError(res.status, message || res.statusText || 'Request failed');
+    throw new ApiError(res.status, message || res.statusText || 'Request failed', data);
   }
+  return res;
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, body);
   return res.status === 204 ? (undefined as T) : res.json();
+}
+
+/** Saves a response body as a file in the browser. */
+async function download(path: string, filename: string): Promise<void> {
+  const blob = await (await send('GET', path)).blob();
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const host = (h: string) => `/platform/tenants/${encodeURIComponent(h)}`;
@@ -139,4 +180,11 @@ export const api = {
   checkTenant: (h: string) => request<TenantCheck>('POST', `${host(h)}/check`),
   seedTenant: (h: string, body: { admin: SeedUser; superAdmin?: SeedUser }) =>
     request<{ log: string[] }>('POST', `${host(h)}/seed`, body),
+
+  listBackups: (h: string) => request<Backup[]>('GET', `${host(h)}/backups`),
+  createBackup: (h: string) => request<Backup>('POST', `${host(h)}/backups`),
+  downloadBackup: (h: string, id: string) =>
+    download(`${host(h)}/backups/${encodeURIComponent(id)}`, `${h}_${id}`),
+  restoreBackup: (h: string, id: string, body: { dryRun: boolean; confirm?: string }) =>
+    request<RestoreReport>('POST', `${host(h)}/backups/${encodeURIComponent(id)}/restore`, body),
 };

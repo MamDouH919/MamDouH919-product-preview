@@ -105,6 +105,28 @@ export class TenantRegistry {
     }
   }
 
+  /**
+   * Claims a one-off job (e.g. "backup:shop.com:2026-11-12") for this
+   * instance. True for exactly one caller across every API instance sharing
+   * this registry; false when another already has it.
+   */
+  async claimJob(key: string): Promise<boolean> {
+    try {
+      await this.connection
+        .collection<{ _id: string; claimedAt: Date }>('job_claims')
+        .insertOne({ _id: key, claimedAt: new Date() });
+      return true;
+    } catch (error: any) {
+      if (error?.code === 11000) return false;
+      throw error;
+    }
+  }
+
+  /** Gives a claim back, so a job that failed can be retried. */
+  async releaseJob(key: string): Promise<void> {
+    await this.connection.collection<{ _id: string }>('job_claims').deleteOne({ _id: key });
+  }
+
   close(): Promise<void> {
     return this.connection.close();
   }

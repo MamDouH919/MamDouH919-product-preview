@@ -38,17 +38,19 @@ import PauseCircleOutlined from '@mui/icons-material/PauseCircleOutlined';
 import PlayCircleOutlined from '@mui/icons-material/PlayCircleOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import OpenInNew from '@mui/icons-material/OpenInNew';
+import BackupOutlined from '@mui/icons-material/BackupOutlined';
 import { ApiError, PLAN_LABELS, LANGUAGE_LABELS, type Tenant } from '../api';
 import { useDeleteTenant, useTenants, useUpdateTenant } from '../hooks/useTenants';
 import { TenantFormDialog } from '../components/TenantFormDialog';
 import { CheckDialog } from '../components/CheckDialog';
 import { SeedDialog } from '../components/SeedDialog';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { BackupsDialog } from '../components/BackupsDialog';
 
 type Filter = 'all' | 'active' | 'disabled';
 type DialogState =
   | { kind: 'create' }
-  | { kind: 'edit' | 'check' | 'seed' | 'toggle' | 'delete'; tenant: Tenant }
+  | { kind: 'edit' | 'check' | 'seed' | 'backups' | 'toggle' | 'delete'; tenant: Tenant }
   | null;
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
@@ -106,7 +108,7 @@ export function TenantsPage() {
     remove.reset();
     setDialog(null);
   };
-  const openFromMenu = (kind: 'edit' | 'check' | 'seed' | 'toggle' | 'delete') => {
+  const openFromMenu = (kind: 'edit' | 'check' | 'seed' | 'backups' | 'toggle' | 'delete') => {
     if (menu) setDialog({ kind, tenant: menu.tenant });
     setMenu(null);
   };
@@ -310,6 +312,14 @@ export function TenantsPage() {
             <ListItemText>Seed admin users</ListItemText>
           </MenuItem>
         )}
+        {!menu?.tenant.aliasOf && (
+          <MenuItem onClick={() => openFromMenu('backups')}>
+            <ListItemIcon>
+              <BackupOutlined fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Backups</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={() => openFromMenu('edit')}>
           <ListItemIcon>
             <EditOutlined fontSize="small" />
@@ -340,6 +350,7 @@ export function TenantsPage() {
       )}
       {dialog?.kind === 'check' && <CheckDialog host={dialog.tenant.host} onClose={closeDialog} />}
       {dialog?.kind === 'seed' && <SeedDialog host={dialog.tenant.host} onClose={closeDialog} />}
+      {dialog?.kind === 'backups' && <BackupsDialog host={dialog.tenant.host} onClose={closeDialog} />}
       {dialog?.kind === 'toggle' && (
         <ConfirmDialog
           title={`${dialog.tenant.disabled ? 'Enable' : 'Disable'} ${dialog.tenant.host}?`}

@@ -711,7 +711,7 @@ const en: HelpGuideSource = {
 
   import: {
     label: "Import",
-    summary: "Importing and updating products from a CSV file, and importing the database.",
+    summary: "Importing and updating products from a CSV file.",
     sections: [
       {
         title: "Importing products from CSV",
@@ -770,29 +770,6 @@ const en: HelpGuideSource = {
             type: "tip",
             requires: ["inventory", "finance"],
             text: "CSV is great for adding products, changing prices and stock takes. But stock arriving from a supplier should be recorded as a **Purchase**, so its cost and what you owe are recorded.",
-          },
-        ],
-      },
-      {
-        title: "Importing the database (super admin only)",
-        path: "/admin/database",
-        blocks: [
-          {
-            type: "p",
-            text: "On the **Database** page you can **export** all of the store's data to a file, or **import** a file exported earlier **from this same store**.",
-          },
-          {
-            type: "steps",
-            items: [
-              "Click **Choose File** and pick the export file.",
-              "Click **Check file** — it lists what will be imported and how many records in each part, or why it can't be.",
-              "Enter your password and type the site name as asked, to confirm.",
-              "Click **Import now**.",
-            ],
-          },
-          {
-            type: "warning",
-            text: "Importing is only allowed while the store has **no orders, returns or stock history** — i.e. a fresh store. And an export **isn't a full backup** (login sessions, for example, are left out).",
           },
         ],
       },

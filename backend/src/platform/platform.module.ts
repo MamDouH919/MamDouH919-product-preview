@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { PlatformAuthController, PlatformTenantsController } from './platform.controller';
+import { PlatformAuthController, PlatformBackupsController, PlatformTenantsController } from './platform.controller';
+import { BackupModule } from '../backup/backup.module';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformTenantsService } from './platform-tenants.service';
 
@@ -8,7 +9,8 @@ import { PlatformTenantsService } from './platform-tenants.service';
  * tenant registry (TenantConnectionService, from the global TenantModule).
  */
 @Module({
-  controllers: [PlatformAuthController, PlatformTenantsController],
+  imports: [BackupModule],
+  controllers: [PlatformAuthController, PlatformTenantsController, PlatformBackupsController],
   providers: [PlatformAuthService, PlatformTenantsService],
 })
 export class PlatformModule {}

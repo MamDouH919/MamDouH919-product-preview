@@ -12,7 +12,6 @@ import { SettingsModule } from './settings/settings.module';
 import { SectionsModule } from './sections/sections.module';
 import { SubscribeModule } from './subscribe/subscribe.module';
 import { ContactModule } from './contact/contact.module';
-import { DatabaseModule } from './database/database.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { ProductsModule } from './products/products.module';
@@ -80,7 +79,6 @@ import { StoreModuleGuard } from './guards/store-module.guard';
     SectionsModule,
     SubscribeModule,
     ContactModule,
-    DatabaseModule,
     CategoriesModule,
     SubCategoriesModule,
     ProductsModule,
