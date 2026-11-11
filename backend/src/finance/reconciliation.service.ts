@@ -261,7 +261,7 @@ export class ReconciliationService {
 
     // 15. Each expense account equals the expenses recorded in it (delivery costs also take courier fees),
     //     and cash over/short equals the settlement differences.
-    const [expenseRows, settlementRows] = await Promise.all([
+    const [expenseRows, settlementRows, manualRows] = await Promise.all([
       this.expenseModel
         .aggregate<{ _id: string; total: number }>([
           { $match: { status: ExpenseStatus.POSTED } },
@@ -271,16 +271,26 @@ export class ReconciliationService {
       this.settlementModel
         .aggregate<{ fees: number; difference: number }>([{ $group: { _id: null, fees: { $sum: '$feesMinor' }, difference: { $sum: '$differenceMinor' } } }])
         .exec(),
+      // A manual journal entry is its own document: what it posts to an expense account counts on the documents' side too.
+      this.entryModel
+        .aggregate<{ _id: string; net: number }>([
+          { $match: { 'source.type': 'manual' } },
+          { $unwind: '$lines' },
+          { $match: { 'lines.account': { $in: EXPENSE_ACCOUNTS } } },
+          { $group: { _id: '$lines.account', net: { $sum: { $subtract: ['$lines.debitMinor', '$lines.creditMinor'] } } } },
+        ])
+        .exec(),
     ]);
+    const manual = new Map(manualRows.map((r) => [r._id, r.net]));
     const expensed = new Map(expenseRows.map((r) => [r._id, r.total]));
     const fees = settlementRows[0]?.fees ?? 0;
     check(
       'Expense accounts equal recorded expenses and courier fees',
       EXPENSE_ACCOUNTS.flatMap((account) => {
-        const docs = (expensed.get(account) ?? 0) + (account === ACCOUNT.DELIVERY_COSTS ? fees : 0);
+        const docs = (expensed.get(account) ?? 0) + (account === ACCOUNT.DELIVERY_COSTS ? fees : 0) + (manual.get(account) ?? 0);
         return balances[account] === docs ? [] : [`account ${account}: journal ${balances[account]} ≠ expenses ${docs}`];
       }),
-      'each expense account = Σ posted expenses (+ settlement fees for delivery costs)',
+      'each expense account = Σ posted expenses (+ settlement fees for delivery costs, + manual journal entries)',
     );
     const shortages = -(settlementRows[0]?.difference ?? 0);
     check(

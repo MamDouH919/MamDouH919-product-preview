@@ -57,7 +57,7 @@ export interface AccountInfo {
 export const CHART: AccountInfo[] = [
   { code: ACCOUNT.CASH, name: { en: 'Cash on hand', ar: 'النقدية بالصندوق' }, type: AccountType.ASSET },
   { code: ACCOUNT.COURIER_CASH, name: { en: 'COD cash held by couriers', ar: 'نقدية التحصيل لدى المندوبين' }, type: AccountType.ASSET },
-  { code: ACCOUNT.RECEIVABLES, name: { en: 'Customer receivables', ar: 'مستحقات العملاء' }, type: AccountType.ASSET },
+  { code: ACCOUNT.RECEIVABLES, name: { en: 'Customer receivables', ar: 'مستحقات علي العملاء' }, type: AccountType.ASSET },
   { code: ACCOUNT.INVENTORY, name: { en: 'Inventory', ar: 'المخزون' }, type: AccountType.ASSET },
   { code: ACCOUNT.GOODS_AWAITING_DELIVERY, name: { en: 'Goods awaiting delivery', ar: 'بضاعة بانتظار التسليم' }, type: AccountType.ASSET },
   { code: ACCOUNT.PAYABLES, name: { en: 'Supplier payables', ar: 'مستحقات الموردين' }, type: AccountType.LIABILITY },
@@ -123,3 +123,100 @@ export const OPERATING_EXPENSE_ACCOUNTS: AccountCode[] = [
   ACCOUNT.UNCOLLECTIBLE,
   ACCOUNT.CASH_OVER_SHORT,
 ];
+
+/** The five headings a chart of accounts is read under. */
+export enum AccountCategory {
+  ASSETS = 'assets',
+  LIABILITIES = 'liabilities',
+  EQUITY = 'equity',
+  REVENUE = 'revenue',
+  EXPENSES = 'expenses',
+}
+
+export const CATEGORY_OF: Record<AccountType, AccountCategory> = {
+  [AccountType.ASSET]: AccountCategory.ASSETS,
+  [AccountType.LIABILITY]: AccountCategory.LIABILITIES,
+  [AccountType.EQUITY]: AccountCategory.EQUITY,
+  [AccountType.REVENUE]: AccountCategory.REVENUE,
+  [AccountType.CONTRA_REVENUE]: AccountCategory.REVENUE,
+  [AccountType.COST_OF_SALES]: AccountCategory.EXPENSES,
+  [AccountType.EXPENSE]: AccountCategory.EXPENSES,
+};
+
+/**
+ * The first digit an account's code starts with, by type — the usual
+ * numbering, so a code alone tells where an account sits.
+ */
+export const CODE_PREFIXES: Record<AccountType, string[]> = {
+  [AccountType.ASSET]: ['1'],
+  [AccountType.LIABILITY]: ['2'],
+  [AccountType.EQUITY]: ['3'],
+  [AccountType.REVENUE]: ['4'],
+  [AccountType.CONTRA_REVENUE]: ['4'],
+  [AccountType.COST_OF_SALES]: ['5'],
+  [AccountType.EXPENSE]: ['6', '7', '8', '9'],
+};
+
+/** Where cash moving against an account is shown on the cash-flow statement. */
+export enum CashFlowActivity {
+  OPERATING = 'operating',
+  INVESTING = 'investing',
+  FINANCING = 'financing',
+}
+
+/** Built-in accounts are operating, except owner equity (capital in, drawings out). */
+export const SYSTEM_ACTIVITY: Partial<Record<AccountCode, CashFlowActivity>> = {
+  [ACCOUNT.EQUITY]: CashFlowActivity.FINANCING,
+};
+
+/**
+ * Built-in accounts a manual entry may not touch: each is a sub-ledger that
+ * the reconciliation proves equal to its own documents (orders, stock,
+ * purchases, refunds, settlements), so only those documents move it. A
+ * manual line here would break that check with nothing to fix it.
+ */
+export const MANUAL_LOCKED_ACCOUNTS: AccountCode[] = [
+  ACCOUNT.COURIER_CASH,
+  ACCOUNT.RECEIVABLES,
+  ACCOUNT.INVENTORY,
+  ACCOUNT.GOODS_AWAITING_DELIVERY,
+  ACCOUNT.PAYABLES,
+  ACCOUNT.REFUNDS_PAYABLE,
+  ACCOUNT.PRODUCT_SALES,
+  ACCOUNT.SALES_DISCOUNTS,
+  ACCOUNT.SALES_RETURNS,
+  ACCOUNT.DELIVERY_INCOME,
+  ACCOUNT.DELIVERY_REFUNDS,
+  ACCOUNT.COGS,
+  ACCOUNT.INVENTORY_LOSSES,
+  ACCOUNT.UNCOLLECTIBLE,
+  ACCOUNT.CASH_OVER_SHORT,
+];
+
+/** One account as the chart lists it: built-in or added by the store. */
+export interface ChartAccount {
+  code: string;
+  name: { en: string; ar: string };
+  type: AccountType;
+  category: AccountCategory;
+  normalSide: BalanceSide;
+  cashFlowActivity: CashFlowActivity;
+  /** Built in: fixed code, name and type; the store can't change or remove it. */
+  isSystem: boolean;
+  isActive: boolean;
+  /** Whether a manual journal entry may post to it. */
+  allowsManual: boolean;
+  description?: string;
+}
+
+export const SYSTEM_CHART: ChartAccount[] = CHART.map((a) => ({
+  code: a.code,
+  name: a.name,
+  type: a.type,
+  category: CATEGORY_OF[a.type],
+  normalSide: normalSideOf(a.type),
+  cashFlowActivity: SYSTEM_ACTIVITY[a.code] ?? CashFlowActivity.OPERATING,
+  isSystem: true,
+  isActive: true,
+  allowsManual: !MANUAL_LOCKED_ACCOUNTS.includes(a.code),
+}));

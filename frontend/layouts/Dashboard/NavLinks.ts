@@ -87,7 +87,10 @@ export const useLinksList = () => {
             primary: t("navFinance"),
             icon: Wallet,
             children: [
-                { primary: t("reports"), pathname: "/admin/reports" },
+                { primary: t("accounting.chartOfAccounts"), pathname: "/admin/chart-of-accounts" },
+                { primary: t("accounting.journalEntries"), pathname: "/admin/journal" },
+                { primary: t("accounting.accountStatement"), pathname: "/admin/ledger" },
+                { primary: t("accounting.financialReports"), pathname: "/admin/reports" },
                 { primary: t("moneyAccounts"), pathname: "/admin/money-accounts" },
                 { primary: t("expenses"), pathname: "/admin/expenses" },
                 { primary: t("books"), pathname: "/admin/books" },

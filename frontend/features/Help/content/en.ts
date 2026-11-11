@@ -793,7 +793,7 @@ const en: HelpGuideSource = {
               "**Customer receivables**: what customers still owe on delivered orders, aged from delivery.",
               "**Supplier payables**: what you owe suppliers, aged from receipt of the goods.",
               "**Inventory valuation**: stock on hand now at its cost.",
-              "**Trial balance**: every ledger account's totals up to a chosen day — debits must equal credits.",
+              "**Trial balance**: every ledger account's opening balance, the debits and credits of the chosen period, and its closing balance — debits must equal credits in each pair.",
               "**Sales by product**: units sold, net sales, cost and margin per product.",
             ],
           },

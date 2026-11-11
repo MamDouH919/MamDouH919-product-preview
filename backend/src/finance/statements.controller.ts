@@ -52,7 +52,7 @@ class ReopenPeriodDto {
 type AdminRequest = Request & { userId?: string };
 const money = (minor: number) => formatMinor(minor);
 const named = (name: Record<string, string | undefined> | undefined, lang: 'en' | 'ar') => name?.[lang] ?? name?.en ?? name?.ar ?? '';
-const SIDE_LABEL = { en: { debit: 'Debit', credit: 'Credit' }, ar: { debit: 'مدين', credit: 'دائن' } } as const;
+const TOTAL_LABEL = { en: 'Total', ar: 'الإجمالي' } as const;
 
 /** The financial statements, as JSON for the dashboard or CSV for a spreadsheet. */
 @RequireModules(StoreModule.FINANCE)
@@ -81,7 +81,31 @@ export class StatementsController {
   async cashFlow(@Query() q: StatementQueryDto, @Res() res: Response) {
     const flow = await this.statements.cashFlow(q.from, q.to);
     const lang = q.lang ?? 'en';
-    return this.send(res, q, 'cash-flow', flow, ['source', 'amount'], () => flow.lines.map((l) => [l.name ? named(l.name, lang) : l.key, money(l.amountMinor)]));
+    return this.send(res, q, 'cash-flow', flow, ['activity', 'source', 'amount'], () =>
+      flow.sections.flatMap((s) => [
+        ...s.lines.map((l) => [s.activity, l.name ? named(l.name, lang) : l.key, money(l.amountMinor)]),
+        [s.activity, 'Net', money(s.netMinor)],
+      ]),
+    );
+  }
+
+  @Permissions([{ resource: Resource.FINANCE_REPORTS, actions: [Action.READ] }])
+  @Get('reports/balance-sheet')
+  async balanceSheet(@Query() q: StatementQueryDto, @Res() res: Response) {
+    const bs = await this.statements.balanceSheet(q.to);
+    const lang = q.lang ?? 'en';
+    const rows = (section: string, lines: { code: string; name: Record<string, string>; amountMinor: number }[]) =>
+      lines.map((l) => [section, l.code, named(l.name, lang), money(l.amountMinor)]);
+    return this.send(res, q, 'balance-sheet', bs, ['section', 'account', 'name', 'amount'], () => [
+      ...rows('assets', bs.assets.lines),
+      ['assets', '', 'Total assets', money(bs.totalAssetsMinor)],
+      ...rows('liabilities', bs.liabilities.lines),
+      ['liabilities', '', 'Total liabilities', money(bs.liabilities.totalMinor)],
+      ...rows('equity', bs.equity.lines),
+      ['equity', '', 'Current earnings', money(bs.equity.currentEarningsMinor)],
+      ['equity', '', 'Total equity', money(bs.equity.totalMinor)],
+      ['', '', 'Total liabilities and equity', money(bs.totalLiabilitiesAndEquityMinor)],
+    ]);
   }
 
   @Permissions([{ resource: Resource.FINANCE_REPORTS, actions: [Action.READ] }])
@@ -105,11 +129,12 @@ export class StatementsController {
   @Permissions([{ resource: Resource.FINANCE_REPORTS, actions: [Action.READ] }])
   @Get('reports/trial-balance')
   async trialBalance(@Query() q: StatementQueryDto, @Res() res: Response) {
-    const tb = await this.statements.trialBalance(q.to);
+    const tb = await this.statements.trialBalance(q.from, q.to);
     const lang = q.lang ?? 'en';
-    return this.send(res, q, 'trial-balance', tb, ['account', 'name', 'debit', 'credit', 'balance', 'side'], () => [
-      ...tb.accounts.map((a) => [a.code, named(a.name, lang), money(a.debitMinor), money(a.creditMinor), money(a.balanceMinor), a.balanceMinor ? SIDE_LABEL[lang][a.side] : '']),
-      ['', 'Total', money(tb.totalDebitMinor), money(tb.totalCreditMinor), '', ''],
+    const pair = (x: { debitMinor: number; creditMinor: number }) => [money(x.debitMinor), money(x.creditMinor)];
+    return this.send(res, q, 'trial-balance', tb, ['account', 'name', 'opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit'], () => [
+      ...tb.accounts.map((a) => [a.code, named(a.name, lang), ...pair(a.opening), ...pair(a.period), ...pair(a.closing)]),
+      ['', TOTAL_LABEL[lang], ...pair(tb.totals.opening), ...pair(tb.totals.period), ...pair(tb.totals.closing)],
     ]);
   }
 

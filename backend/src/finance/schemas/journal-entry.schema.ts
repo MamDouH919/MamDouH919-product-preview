@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes, Types } from 'mongoose';
-import { ACCOUNT_CODES } from '../accounts';
 
 // Ids here are `SchemaTypes.ObjectId`, not `Types.ObjectId`: @nestjs/mongoose
 // turns the latter into Mixed, which stores whatever it is given uncast — and
@@ -9,8 +8,13 @@ import { ACCOUNT_CODES } from '../accounts';
 /** One side of an entry. Exactly one of debit or credit is above zero. */
 @Schema({ _id: false })
 export class JournalLine {
-  @Prop({ type: String, enum: ACCOUNT_CODES, required: true })
+  /** A built-in or store-added account code. Checked against the chart by JournalService, not here, since the chart is per store. */
+  @Prop({ type: String, required: true })
   account!: string;
+
+  /** What this line is for, on manual entries. */
+  @Prop({ required: false })
+  note?: string;
 
   @Prop({ required: true, min: 0, default: 0 })
   debitMinor!: number;

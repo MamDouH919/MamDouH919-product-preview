@@ -87,47 +87,50 @@ describe('profit and loss CSV', () => {
 });
 
 describe('trial balance CSV', () => {
-  const account = (code: string, name: string, type: AccountType, debitMinor: number, creditMinor: number) => ({
+  const pair = (debitMinor: number, creditMinor: number) => ({ debitMinor, creditMinor });
+  const net = (d: number, c: number) => pair(Math.max(d - c, 0), Math.max(c - d, 0));
+  /** `od`/`oc`: totals before the period; `pd`/`pc`: posted within it. */
+  const account = (code: string, name: string, type: AccountType, od: number, oc: number, pd: number, pc: number) => ({
     code,
     name: { en: name, ar: name },
     type,
-    debitMinor,
-    creditMinor,
-    ...accountBalance(type, debitMinor, creditMinor),
+    opening: net(od, oc),
+    period: pair(pd, pc),
+    closing: net(od + pd, oc + pc),
+    debitMinor: od + pd,
+    creditMinor: oc + pc,
+    ...accountBalance(type, od + pd, oc + pc),
   });
 
   const csv = async (lang: 'en' | 'ar') => {
     const accounts = [
-      account('1000', 'Cash', ASSET, 200_000_000, 0),
-      account('1310', 'Goods', ASSET, 500, 500),
-      account('2000', 'Payables', LIABILITY, 700, 200),
-      account('3000', 'Equity', EQUITY, 0, 200_000_000),
-      account('4000', 'Sales', REVENUE, 0, 240_000),
+      account('1000', 'Cash', ASSET, 200_000_000, 0, 0, 0),
+      account('1310', 'Goods', ASSET, 500, 0, 0, 500),
+      account('2000', 'Payables', LIABILITY, 0, 200, 700, 0),
+      account('3000', 'Equity', EQUITY, 0, 200_000_000, 0, 0),
+      account('4000', 'Sales', REVENUE, 0, 300, 0, 240_000),
     ];
-    const totalDebitMinor = accounts.reduce((t, a) => t + a.debitMinor, 0);
-    const totalCreditMinor = accounts.reduce((t, a) => t + a.creditMinor, 0);
-    const statements = { trialBalance: async () => ({ accounts, totalDebitMinor, totalCreditMinor }) };
+    const sum = (k: 'opening' | 'period' | 'closing') => accounts.reduce((t, a) => pair(t.debitMinor + a[k].debitMinor, t.creditMinor + a[k].creditMinor), pair(0, 0));
+    const statements = { trialBalance: async () => ({ accounts, totals: { opening: sum('opening'), period: sum('period'), closing: sum('closing') } }) };
     const send = jest.fn();
     const res = { setHeader: jest.fn(), send } as unknown as Response;
     await new StatementsController(statements as never, {} as never).trialBalance({ format: 'csv', lang }, res);
-    return (send.mock.calls[0][0] as string).replace(/^﻿/, '').trim().split('\r\n');
+    return (send.mock.calls[0][0] as string).replace(/^\uFEFF/, '').trim().split('\r\n');
   };
 
-  it('writes each balance unsigned with the side it really falls on', async () => {
+  it('writes opening, period and closing debits and credits, each netted to one side', async () => {
     expect(await csv('en')).toEqual([
-      'account,name,debit,credit,balance,side',
-      '1000,Cash,2000000.00,0.00,2000000.00,Debit',
-      '1310,Goods,5.00,5.00,0.00,',
-      '2000,Payables,7.00,2.00,5.00,Debit',
-      '3000,Equity,0.00,2000000.00,2000000.00,Credit',
-      '4000,Sales,0.00,2400.00,2400.00,Credit',
-      ',Total,2000012.00,2002407.00,,',
+      'account,name,opening_debit,opening_credit,period_debit,period_credit,closing_debit,closing_credit',
+      '1000,Cash,2000000.00,0.00,0.00,0.00,2000000.00,0.00',
+      '1310,Goods,5.00,0.00,0.00,5.00,0.00,0.00',
+      '2000,Payables,0.00,2.00,7.00,0.00,5.00,0.00',
+      '3000,Equity,0.00,2000000.00,0.00,0.00,0.00,2000000.00',
+      '4000,Sales,0.00,3.00,0.00,2400.00,0.00,2403.00',
+      ',Total,2000005.00,2000005.00,7.00,2405.00,2000005.00,2002403.00',
     ]);
   });
 
-  it('names the side in Arabic for an Arabic file', async () => {
-    const rows = await csv('ar');
-    expect(rows.find((r) => r.startsWith('1000,'))?.endsWith(',مدين')).toBe(true);
-    expect(rows.find((r) => r.startsWith('3000,'))?.endsWith(',دائن')).toBe(true);
+  it('labels the total row in Arabic for an Arabic file', async () => {
+    expect((await csv('ar')).at(-1)?.startsWith(',الإجمالي,')).toBe(true);
   });
 });

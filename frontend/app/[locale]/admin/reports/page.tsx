@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Box, Button, Chip, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Link, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
+import { useRouter } from "next/navigation";
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import {
   AGE_BUCKETS,
   AgeBucket,
+  BalanceSheet,
   CashFlow,
   DayRange,
+  DebitCredit,
   downloadReportCsv,
   Payables,
   ProfitAndLoss,
@@ -27,13 +30,15 @@ import { formatDateTime, formatMinorMoney } from "@/features/Order/format";
 import { toastError } from "@/features/Purchasing/shared";
 
 type Tab = Report | "valuation";
-const TABS: Tab[] = ["profit-and-loss", "cash-flow", "receivables", "payables", "valuation", "trial-balance", "sales-by-product"];
-/** Reports of what is owed or held now take no date range; the trial balance takes only an end day. */
+/** In the order the books are read: trial balance, then the three statements, then the working reports. */
+const TABS: Tab[] = ["trial-balance", "profit-and-loss", "balance-sheet", "cash-flow", "receivables", "payables", "valuation", "sales-by-product"];
+/** Reports of what is owed or held now take no date range; the balance sheet takes only an end day. */
 const RANGE: Record<Tab, "range" | "asOf" | "none"> = {
   "profit-and-loss": "range",
   "cash-flow": "range",
   "sales-by-product": "range",
-  "trial-balance": "asOf",
+  "trial-balance": "range",
+  "balance-sheet": "asOf",
   receivables: "none",
   payables: "none",
   valuation: "none",
@@ -57,7 +62,7 @@ const useName = () => {
 const ReportsPage = () => {
   const { t, i18n } = useTranslation();
   const dispatch = useAppDispatch();
-  const [tab, setTab] = useState<Tab>("profit-and-loss");
+  const [tab, setTab] = useState<Tab>("trial-balance");
   const [range, setRange] = useState<DayRange>({ from: monthStart(), to: today() });
   const [downloading, setDownloading] = useState(false);
 
@@ -102,6 +107,7 @@ const ReportsPage = () => {
         )}
       </Stack>
       {tab === "profit-and-loss" && <ProfitAndLossReport range={params} />}
+      {tab === "balance-sheet" && <BalanceSheetReport range={params} />}
       {tab === "cash-flow" && <CashFlowReport range={params} />}
       {tab === "receivables" && <ReceivablesReport />}
       {tab === "payables" && <PayablesReport />}
@@ -187,17 +193,72 @@ const CashFlowReport = ({ range }: { range: DayRange }) => {
         <Chip variant="outlined" color="error" label={`${t("moneyOut")}: ${money(data.outflowMinor)}`} />
         <Chip variant="outlined" label={`${t("closingBalance")}: ${money(data.closingMinor)}`} />
       </Stack>
-      <Grid
-        head={[t("source"), t("amount")]}
-        rows={data.lines.map((l) => [l.name ? name(l.name) : t(`cashSource.${l.key}`, { defaultValue: l.key }), money(l.amountMinor)])}
-        total={[t("netCashFlow"), money(data.netMinor)]}
-      />
+      {data.sections.map((section) => (
+        <Stack key={section.activity} spacing={1}>
+          <Typography variant="subtitle2">{t(`accounting.activityHeading.${section.activity}`)}</Typography>
+          <Grid
+            head={[t("source"), t("amount")]}
+            rows={section.lines.map((l) => [
+              l.name ? `${l.code ? `${l.code} · ` : ""}${name(l.name)}` : t(`cashSource.${l.key}`, { defaultValue: t(`accounting.sourceTypes.${l.key}`, { defaultValue: l.key }) }),
+              money(l.amountMinor),
+            ])}
+            total={[t(`accounting.activityNet.${section.activity}`), money(section.netMinor)]}
+          />
+        </Stack>
+      ))}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Stack spacing={0.5}>
+          <Row label={t("openingBalance")} value={money(data.openingMinor)} />
+          <Row label={t("netCashFlow")} value={money(data.netMinor)} />
+          <Row label={t("closingBalance")} value={money(data.closingMinor)} bold />
+        </Stack>
+      </Paper>
       <Typography variant="subtitle2">{t("moneyAccounts")}</Typography>
       <Grid
         head={[t("moneyAccount"), t("openingBalance"), t("closingBalance")]}
         rows={data.accounts.map((a) => [a.name, money(a.openingMinor), money(a.closingMinor)])}
         total={[t("total"), money(data.openingMinor), money(data.closingMinor)]}
       />
+    </Stack>
+  );
+};
+
+/** One label and amount on a line, for statement subtotals. */
+const Row = ({ label, value, bold }: { label: string; value: string; bold?: boolean }) => (
+  <Stack direction="row" justifyContent="space-between" spacing={2}>
+    <Typography variant="body2" fontWeight={bold ? 700 : undefined}>{label}</Typography>
+    <Typography variant="body2" fontWeight={bold ? 700 : undefined}>{value}</Typography>
+  </Stack>
+);
+
+const BalanceSheetReport = ({ range }: { range: DayRange }) => {
+  const { t } = useTranslation();
+  const currency = useCurrency();
+  const name = useName();
+  const { data, isLoading } = useReportQuery<BalanceSheet>("balance-sheet", range);
+  if (isLoading || !data) return <TableLoading />;
+  const money = (minor: number) => formatMinorMoney(minor, currency);
+  const lines = (section: BalanceSheet["assets"]) => section.lines.map((l) => [`${l.code} · ${name(l.name)}`, money(l.amountMinor)]);
+  return (
+    <Stack spacing={2}>
+      {data.balanced ? <Alert severity="success">{t("accounting.balanceSheetBalanced")}</Alert> : <Alert severity="error">{t("accounting.balanceSheetNotBalanced")}</Alert>}
+      <Typography variant="subtitle2">{t("accounting.categories.assets")}</Typography>
+      <Grid head={[t("account"), t("amount")]} rows={lines(data.assets)} total={[t("accounting.totalAssets"), money(data.totalAssetsMinor)]} />
+      <Typography variant="subtitle2">{t("accounting.categories.liabilities")}</Typography>
+      <Grid head={[t("account"), t("amount")]} rows={lines(data.liabilities)} total={[t("accounting.totalLiabilities"), money(data.liabilities.totalMinor)]} />
+      <Typography variant="subtitle2">{t("accounting.categories.equity")}</Typography>
+      <Grid
+        head={[t("account"), t("amount")]}
+        rows={[...lines(data.equity), [t("accounting.currentEarnings"), money(data.equity.currentEarningsMinor)]]}
+        total={[t("accounting.totalEquity"), money(data.equity.totalMinor)]}
+      />
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Stack spacing={0.5}>
+          <Row label={t("accounting.totalAssets")} value={money(data.totalAssetsMinor)} bold />
+          <Row label={t("accounting.totalLiabilitiesAndEquity")} value={money(data.totalLiabilitiesAndEquityMinor)} bold />
+        </Stack>
+      </Paper>
+      <Typography variant="caption" color="text.secondary">{t("accounting.currentEarningsHint")}</Typography>
     </Stack>
   );
 };
@@ -286,7 +347,8 @@ const ValuationReport = () => {
 };
 
 const TrialBalanceReport = ({ range }: { range: DayRange }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const router = useRouter();
   const currency = useCurrency();
   const name = useName();
   const { data, isLoading } = useReportQuery<TrialBalance>("trial-balance", range);
@@ -315,18 +377,65 @@ const TrialBalanceReport = ({ range }: { range: DayRange }) => {
           </Box>
         </Alert>
       )}
-      <Grid
-        head={[t("account"), t("accountKind"), t("debit"), t("credit"), t("balance")]}
-        rows={data.accounts.map((a) => [
-          `${a.code} · ${name(a.name)}`,
-          <Chip key="k" size="small" variant="outlined" label={t(`accountTypes.${a.type}`, { defaultValue: a.type })} />,
-          money(a.debitMinor),
-          money(a.creditMinor),
-          <Typography key="b" variant="body2" color={a.isUnusual ? "warning.main" : undefined} fontWeight={a.isUnusual ? 600 : undefined}>{balance(a)}</Typography>,
-        ])}
-        total={[t("total"), "", money(data.totalDebitMinor), money(data.totalCreditMinor), ""]}
-      />
+      <Paper variant="outlined" sx={{ overflowX: "auto" }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell rowSpan={2} sx={{ fontWeight: 600 }}>{t("account")}</TableCell>
+              <TableCell rowSpan={2} sx={{ fontWeight: 600 }}>{t("accountKind")}</TableCell>
+              {(["openingBalance", "periodTransactions", "closingBalance"] as const).map((k) => (
+                <TableCell key={k} colSpan={2} align="center" sx={{ fontWeight: 600, borderInlineStart: 1, borderColor: "divider" }}>{t(k)}</TableCell>
+              ))}
+            </TableRow>
+            <TableRow>
+              {[0, 1, 2].flatMap((g) => [
+                <TableCell key={`${g}d`} align="right" sx={{ fontWeight: 600, borderInlineStart: 1, borderColor: "divider" }}>{t("debit")}</TableCell>,
+                <TableCell key={`${g}c`} align="right" sx={{ fontWeight: 600 }}>{t("credit")}</TableCell>,
+              ])}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.accounts.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ color: "text.secondary" }}>{t("nothingInPeriod")}</TableCell>
+              </TableRow>
+            )}
+            {data.accounts.map((a) => (
+              <TableRow key={a.code}>
+                <TableCell>
+                  <Link component="button" type="button" underline="hover" sx={{ textAlign: "start" }} onClick={() => router.push(`/${i18n.language}/admin/ledger?account=${a.code}`)}>
+                    {`${a.code} · ${name(a.name)}`}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <Chip size="small" variant="outlined" label={t(`accountTypes.${a.type}`, { defaultValue: a.type })} />
+                </TableCell>
+                <Pair value={a.opening} money={money} />
+                <Pair value={a.period} money={money} />
+                <Pair value={a.closing} money={money} warn={a.isUnusual} />
+              </TableRow>
+            ))}
+            <TableRow>
+              <TableCell colSpan={2} sx={{ fontWeight: 700 }}>{t("total")}</TableCell>
+              <Pair value={data.totals.opening} money={money} bold />
+              <Pair value={data.totals.period} money={money} bold />
+              <Pair value={data.totals.closing} money={money} bold />
+            </TableRow>
+          </TableBody>
+        </Table>
+      </Paper>
     </Stack>
+  );
+};
+
+/** A debit cell and a credit cell, with a divider before the pair. */
+const Pair = ({ value, money, bold, warn }: { value: DebitCredit; money: (minor: number) => string; bold?: boolean; warn?: boolean }) => {
+  const sx = { fontWeight: bold ? 700 : warn ? 600 : undefined, color: warn ? "warning.main" : undefined };
+  return (
+    <>
+      <TableCell align="right" sx={{ ...sx, borderInlineStart: 1, borderColor: "divider" }}>{money(value.debitMinor)}</TableCell>
+      <TableCell align="right" sx={sx}>{money(value.creditMinor)}</TableCell>
+    </>
   );
 };
 

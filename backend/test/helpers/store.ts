@@ -14,6 +14,8 @@ import { ExpensesService } from '../../src/expenses/expenses.service';
 import { StatementsService } from '../../src/finance/statements.service';
 import { PeriodsService } from '../../src/finance/periods.service';
 import { MoneyAccountsService } from '../../src/money-accounts/money-accounts.service';
+import { ChartService } from '../../src/finance/chart.service';
+import { LedgerService } from '../../src/finance/ledger.service';
 import { OrderStatus } from '../../src/orders/enums/order-status.enum';
 import { CouponType } from '../../src/coupons/schemas/coupon.schema';
 import { parseMoney } from '../../src/common/money/money';
@@ -48,7 +50,7 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
   };
   const notifications = { orderPlaced: () => undefined, statusChanged: () => undefined };
 
-  const journal = new JournalService(model('JournalEntry'), model('Counter'), model('Setting'), model('MoneyAccount'));
+  const journal = new JournalService(model('JournalEntry'), model('Counter'), model('Setting'), model('MoneyAccount'), model('LedgerAccount'));
   const inventory = new InventoryService(model('Product'), model('StockMovement'), db, journal);
   
   const coupons = new CouponsService(model('Coupon'), model('Order'), model('CouponUsage'));
@@ -107,6 +109,8 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
   const expenses = new ExpensesService(model('Expense'), model('Order'), model('Counter'), model('Setting'), db, journal);
   const statements = new StatementsService(model('JournalEntry'), model('Order'), model('Purchase'), model('Refund'), model('MoneyAccount'), finance, journal);
   const periods = new PeriodsService(model('Setting'), model('User'), reconciliation, finance);
+  const chart = new ChartService(model('LedgerAccount'), model('JournalEntry'), journal);
+  const ledger = new LedgerService(model('JournalEntry'), model('MoneyAccount'), db, journal, finance);
   const moneyAccounts = new MoneyAccountsService(model('MoneyAccount'), model('MoneyTransfer'), model('JournalEntry'), model('Counter'), db, journal);
   const refunds = new RefundsService(
     model('Refund'),
@@ -162,7 +166,7 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     },
   };
 
-  return { db, delivery, journal, inventory, coupons, orders, payments, finance, reconciliation, dashboard, refunds, purchasing, couriers, expenses, statements, periods, moneyAccounts, ...helpers };
+  return { db, delivery, journal, inventory, coupons, orders, payments, finance, reconciliation, dashboard, refunds, purchasing, couriers, expenses, statements, periods, moneyAccounts, chart, ledger, ...helpers };
 }
 
 export type Store = ReturnType<typeof buildStore>;

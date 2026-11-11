@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 import { JournalEntry, JournalEntrySchema } from './schemas/journal-entry.schema';
 import { Payment, PaymentSchema } from './schemas/payment.schema';
+import { LedgerAccount, LedgerAccountSchema } from './schemas/ledger-account.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { Counter, CounterSchema } from '../orders/schemas/counter.schema';
 import { Setting, SettingSchema } from '../settings/schemas/setting.schema';
@@ -23,11 +24,14 @@ import { FinanceController } from './finance.controller';
 import { StatementsService } from './statements.service';
 import { PeriodsService } from './periods.service';
 import { StatementsController } from './statements.controller';
+import { AccountingController } from './accounting.controller';
+import { ChartService } from './chart.service';
+import { LedgerService } from './ledger.service';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 
 @Module({
   imports: [AuthModule],
-  controllers: [FinanceController, StatementsController],
+  controllers: [FinanceController, StatementsController, AccountingController],
   providers: [
     JournalService,
     PaymentsService,
@@ -35,10 +39,13 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     ReconciliationService,
     StatementsService,
     PeriodsService,
+    ChartService,
+    LedgerService,
     // Read-only here: whether the caller is this store's super admin (closing periods).
     tenantModelProvider(User.name, UserSchema),
     tenantModelProvider(JournalEntry.name, JournalEntrySchema),
     tenantModelProvider(Payment.name, PaymentSchema),
+    tenantModelProvider(LedgerAccount.name, LedgerAccountSchema),
     tenantModelProvider(Order.name, OrderSchema),
     tenantModelProvider(Counter.name, CounterSchema),
     tenantModelProvider(Setting.name, SettingSchema),

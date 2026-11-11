@@ -34,6 +34,7 @@ import { Counter } from '../src/orders/schemas/counter.schema';
 import { Coupon } from '../src/coupons/schemas/coupon.schema';
 import { Setting } from '../src/settings/schemas/setting.schema';
 import { MoneyAccount } from '../src/money-accounts/schemas/money-account.schema';
+import { LedgerAccount } from '../src/finance/schemas/ledger-account.schema';
 import { Refund } from '../src/refunds/schemas/refund.schema';
 import { Product } from '../src/products/schemas/product.schema';
 import { StockMovement } from '../src/inventory/schemas/stock-movement.schema';
@@ -158,6 +159,7 @@ function journalFor(db: Connection) {
     db.model<Counter>(Counter.name),
     db.model<Setting>(Setting.name),
     db.model<MoneyAccount>(MoneyAccount.name),
+    db.model<LedgerAccount>(LedgerAccount.name),
   );
 }
 

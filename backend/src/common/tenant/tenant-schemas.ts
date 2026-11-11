@@ -19,6 +19,7 @@ import { Coupon, CouponSchema } from '../../coupons/schemas/coupon.schema';
 import { CouponUsage, CouponUsageSchema } from '../../coupons/schemas/coupon-usage.schema';
 import { JournalEntry, JournalEntrySchema } from '../../finance/schemas/journal-entry.schema';
 import { Payment, PaymentSchema } from '../../finance/schemas/payment.schema';
+import { LedgerAccount, LedgerAccountSchema } from '../../finance/schemas/ledger-account.schema';
 import { Refund, RefundSchema } from '../../refunds/schemas/refund.schema';
 import { Supplier, SupplierSchema } from '../../purchasing/schemas/supplier.schema';
 import { Purchase, PurchaseSchema } from '../../purchasing/schemas/purchase.schema';
@@ -71,6 +72,7 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: CouponUsage.name, schema: CouponUsageSchema },
   { name: JournalEntry.name, schema: JournalEntrySchema },
   { name: Payment.name, schema: PaymentSchema },
+  { name: LedgerAccount.name, schema: LedgerAccountSchema },
   { name: Refund.name, schema: RefundSchema },
   { name: Supplier.name, schema: SupplierSchema },
   { name: Purchase.name, schema: PurchaseSchema },

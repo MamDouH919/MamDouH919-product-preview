@@ -17,6 +17,8 @@ export type PeriodTotals = {
   productReturnsMinor: number;
   netProductSalesMinor: number;
   deliveryIncomeMinor: number;
+  /** Revenue in accounts the store added to its chart. */
+  otherRevenueMinor?: number;
   netRevenueMinor: number;
   costOfSalesMinor: number;
   grossProfitMinor: number;
@@ -37,8 +39,13 @@ export type ProfitAndLoss = {
   previousTotals?: PeriodTotals;
 };
 
+export type CashFlowActivity = "operating" | "investing" | "financing";
+export type CashFlowLine = { key: string; activity: CashFlowActivity; code?: string; name?: AccountName; amountMinor: number };
+
 export type CashFlow = {
-  lines: { key: string; name?: AccountName; amountMinor: number }[];
+  lines: CashFlowLine[];
+  /** Operating, investing and financing, in that order. */
+  sections: { activity: CashFlowActivity; lines: CashFlowLine[]; netMinor: number }[];
   inflowMinor: number;
   outflowMinor: number;
   netMinor: number;
@@ -64,12 +71,25 @@ export type Payables = {
 export type BalanceSide = "debit" | "credit";
 export type UnusualBalanceReason = "asset_credit" | "expense_credit" | "contra_revenue_credit" | "liability_debit" | "revenue_debit" | "equity_debit";
 
+export type DebitCredit = { debitMinor: number; creditMinor: number };
+
 export type TrialBalance = {
+  from?: string;
+  to?: string;
   asOf?: string;
   accounts: {
     code: string;
     name: AccountName;
     type: string;
+    category?: string;
+    isSystem?: boolean;
+    /** Net balance before the period, on one side. */
+    opening: DebitCredit;
+    /** Debits and credits posted within the period. */
+    period: DebitCredit;
+    /** Opening + period, netted to one side. */
+    closing: DebitCredit;
+    /** Everything up to the end of the period. */
     debitMinor: number;
     creditMinor: number;
     /** Unsigned; `side` says where it falls. */
@@ -79,8 +99,23 @@ export type TrialBalance = {
     isUnusual: boolean;
     unusualReason: UnusualBalanceReason | null;
   }[];
+  totals: { opening: DebitCredit; period: DebitCredit; closing: DebitCredit };
   totalDebitMinor: number;
   totalCreditMinor: number;
+  balanced: boolean;
+};
+
+export type BalanceSheetSection = { lines: { code: string; name: AccountName; type: string; amountMinor: number }[]; totalMinor: number };
+
+export type BalanceSheet = {
+  asOf?: string;
+  booksStartedAt?: string;
+  assets: BalanceSheetSection;
+  liabilities: BalanceSheetSection;
+  /** `totalMinor` includes current earnings: profit since the books began, not yet closed into equity. */
+  equity: BalanceSheetSection & { currentEarningsMinor: number };
+  totalAssetsMinor: number;
+  totalLiabilitiesAndEquityMinor: number;
   balanced: boolean;
 };
 
@@ -116,7 +151,7 @@ export type Periods = {
   history: { from: string | null; to: string | null | { day: string | null; reason: string }; by?: string; at: string }[];
 };
 
-export const REPORTS = ["profit-and-loss", "cash-flow", "receivables", "payables", "trial-balance", "sales-by-product"] as const;
+export const REPORTS = ["profit-and-loss", "balance-sheet", "cash-flow", "receivables", "payables", "trial-balance", "sales-by-product"] as const;
 export type Report = (typeof REPORTS)[number];
 
 export const STATEMENTS_QUERY_KEY = "statements";

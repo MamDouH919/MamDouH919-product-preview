@@ -99,7 +99,9 @@ describe('Statements, money accounts and periods', () => {
       expect((await store.moneyAccounts.list())[0].balanceMinor).toBe(200_000_000);
 
       const flow = await store.statements.cashFlow(today(), today());
-      expect(flow.lines).toEqual([{ key: 'money_account_opening', amountMinor: 200_000_000 }]);
+      // Owner money in against equity is financing, not trading.
+      expect(flow.lines.map((l) => [l.key, l.activity, l.amountMinor])).toEqual([['money_account_opening', 'financing', 200_000_000]]);
+      expect(flow.sections.map((s) => [s.activity, s.netMinor])).toEqual([['operating', 0], ['investing', 0], ['financing', 200_000_000]]);
       const pl = await store.statements.profitAndLoss(today(), today());
       expect(pl.totals.netProfitMinor).toBe(0);
 
@@ -136,7 +138,7 @@ describe('Statements, money accounts and periods', () => {
       expect(pl.totals).toMatchObject({ netRevenueMinor: 31500, grossProfitMinor: 13500, netProfitMinor: 13500 - 300000 });
       expect(pl.previousTotals).toMatchObject({ netRevenueMinor: 0 });
 
-      const tb = await store.statements.trialBalance(today());
+      const tb = await store.statements.trialBalance(undefined, today());
       expect(tb.balanced).toBe(true);
       expect(tb.totalDebitMinor).toBe(tb.totalCreditMinor);
       // More rent paid than cash came in: cash really is on the unusual side.
@@ -154,10 +156,32 @@ describe('Statements, money accounts and periods', () => {
       const [cash] = await store.moneyAccounts.list();
       await store.moneyAccounts.setOpeningBalance(String(cash._id), { amount: '2000000' }, owner);
 
-      const tb = await store.statements.trialBalance(today());
+      const tb = await store.statements.trialBalance(undefined, today());
       expect(tb.accounts.find((a) => a.code === ACCOUNT.EQUITY)).toMatchObject({ debitMinor: 0, creditMinor: 200_000_000, balanceMinor: 200_000_000, side: 'credit', isUnusual: false });
       expect(tb.accounts.find((a) => a.code === ACCOUNT.CASH)).toMatchObject({ balanceMinor: 200_000_000, side: 'debit', isUnusual: false });
       expect(tb.accounts.filter((a) => a.isUnusual)).toEqual([]);
+    });
+
+    it('trial balance for a period: what came before is the opening balance, the period adds its own movement', async () => {
+      const [cash] = await store.moneyAccounts.list();
+      await store.moneyAccounts.setOpeningBalance(String(cash._id), { amount: '2000000', date: new Date(Date.now() - 86_400_000 * 3).toISOString() }, owner);
+      await store.expenses.create({ account: ACCOUNT.RENT, amount: '3000', description: 'Rent' });
+
+      const tb = await store.statements.trialBalance(today(), today());
+      expect(tb.accounts.find((a) => a.code === ACCOUNT.CASH)).toMatchObject({
+        opening: { debitMinor: 200_000_000, creditMinor: 0 },
+        period: { debitMinor: 0, creditMinor: 300_000 },
+        closing: { debitMinor: 200_000_000 - 300_000, creditMinor: 0 },
+      });
+      expect(tb.accounts.find((a) => a.code === ACCOUNT.RENT)).toMatchObject({ opening: { debitMinor: 0, creditMinor: 0 }, period: { debitMinor: 300_000, creditMinor: 0 } });
+      expect(tb.totals.opening).toEqual({ debitMinor: 200_000_000, creditMinor: 200_000_000 });
+      expect(tb.totals.period).toEqual({ debitMinor: 300_000, creditMinor: 300_000 });
+      expect(tb.totals.closing).toEqual({ debitMinor: 200_000_000, creditMinor: 200_000_000 });
+      expect(tb.balanced).toBe(true);
+
+      // A period that ends before the opening balance shows nothing.
+      const earlier = dayKey(new Date(Date.now() - 86_400_000 * 5), 'Africa/Cairo');
+      expect((await store.statements.trialBalance(earlier, earlier)).accounts).toEqual([]);
     });
 
     it('what customers owe and what suppliers are owed, by age', async () => {

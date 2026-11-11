@@ -4,7 +4,7 @@ import { Model, PipelineStage } from 'mongoose';
 import { JournalEntry } from './schemas/journal-entry.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { Setting } from '../settings/schemas/setting.schema';
-import { ACCOUNT, OPERATING_EXPENSE_ACCOUNTS } from './accounts';
+import { ACCOUNT, AccountType, OPERATING_EXPENSE_ACCOUNTS } from './accounts';
 import { JournalService } from './journal.service';
 import { safeTimeZone, zonedDayRange } from '../common/helpers/time-zone';
 
@@ -21,7 +21,9 @@ export interface PeriodFigures {
   netProductSalesMinor: number;
   /** Delivery fees charged, less delivery-fee refunds. */
   deliveryIncomeMinor: number;
-  /** Net product sales + delivery income. Never an order total. */
+  /** Revenue in accounts the store added to its chart, less their contra accounts. */
+  otherRevenueMinor: number;
+  /** Net product sales + delivery income + other revenue. Never an order total. */
   netRevenueMinor: number;
   /** Cost of goods sold (net of restocked returns) plus inventory losses and stock-take differences. */
   costOfSalesMinor: number;
@@ -114,7 +116,7 @@ export class FinanceReportsService {
     if (end) date.$lt = end;
     const match = start || end ? { date } : {};
 
-    const [rows, delivered, uncosted] = await Promise.all([
+    const [rows, delivered, uncosted, chart] = await Promise.all([
       this.entryModel
         .aggregate<{ _id: { account: string; source: string }; debit: number; credit: number }>([
           { $match: match },
@@ -137,6 +139,7 @@ export class FinanceReportsService {
           { $count: 'n' },
         ])
         .exec(),
+      this.journal.chart(),
     ]);
 
     const net = (account: string, side: 'credit' | 'debit', source?: string) =>
@@ -150,10 +153,14 @@ export class FinanceReportsService {
     const delivery = net(ACCOUNT.DELIVERY_INCOME, 'credit') - net(ACCOUNT.DELIVERY_REFUNDS, 'debit');
     const netProduct = gross - discounts - returns;
     const deliveryCharged = net(ACCOUNT.DELIVERY_INCOME, 'credit');
-    const costOfSales = net(ACCOUNT.COGS, 'debit') + net(ACCOUNT.INVENTORY_LOSSES, 'debit');
+    // Accounts the store added report by their type.
+    const added = (type: AccountType, side: 'credit' | 'debit') =>
+      chart.filter((a) => !a.isSystem && a.type === type).reduce((t, a) => t + net(a.code, side), 0);
+    const otherRevenue = added(AccountType.REVENUE, 'credit') - added(AccountType.CONTRA_REVENUE, 'debit');
+    const costOfSales = net(ACCOUNT.COGS, 'debit') + net(ACCOUNT.INVENTORY_LOSSES, 'debit') + added(AccountType.COST_OF_SALES, 'debit');
     const deliveryCosts = net(ACCOUNT.DELIVERY_COSTS, 'debit');
-    const operatingExpenses = OPERATING_EXPENSE_ACCOUNTS.reduce((t, account) => t + net(account, 'debit'), 0);
-    const grossProfit = netProduct + delivery - costOfSales;
+    const operatingExpenses = OPERATING_EXPENSE_ACCOUNTS.reduce((t, account) => t + net(account, 'debit'), 0) + added(AccountType.EXPENSE, 'debit');
+    const grossProfit = netProduct + delivery + otherRevenue - costOfSales;
 
     return {
       grossProductSalesMinor: gross,
@@ -161,7 +168,8 @@ export class FinanceReportsService {
       productReturnsMinor: returns,
       netProductSalesMinor: netProduct,
       deliveryIncomeMinor: delivery,
-      netRevenueMinor: netProduct + delivery,
+      otherRevenueMinor: otherRevenue,
+      netRevenueMinor: netProduct + delivery + otherRevenue,
       costOfSalesMinor: costOfSales,
       grossProfitMinor: grossProfit,
       uncostedLines: uncosted[0]?.n ?? 0,

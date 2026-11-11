@@ -4,8 +4,9 @@ import { ClientSession, Model, Types } from 'mongoose';
 import { JournalEntry } from './schemas/journal-entry.schema';
 import { Counter } from '../orders/schemas/counter.schema';
 import { Setting } from '../settings/schemas/setting.schema';
-import { ACCOUNT, ACCOUNT_CODES, isCreditNormal } from './accounts';
+import { ACCOUNT, ACCOUNT_CODES, CATEGORY_OF, CashFlowActivity, ChartAccount, normalSideOf, SYSTEM_CHART } from './accounts';
 import { MoneyAccount, MoneyAccountType } from '../money-accounts/schemas/money-account.schema';
+import { LedgerAccount } from './schemas/ledger-account.schema';
 
 const JOURNAL_COUNTER = 'journal';
 
@@ -17,6 +18,7 @@ export interface PostingLine {
   customer?: Types.ObjectId;
   /** Cash lines: the cash box, bank or wallet. The store's default when left out. */
   moneyAccount?: Types.ObjectId;
+  note?: string;
 }
 
 export interface Posting {
@@ -40,7 +42,35 @@ export class JournalService {
     @InjectModel(Counter.name) private counterModel: Model<Counter>,
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
     @InjectModel(MoneyAccount.name) private moneyAccountModel: Model<MoneyAccount>,
+    @InjectModel(LedgerAccount.name) private ledgerAccountModel: Model<LedgerAccount>,
   ) {}
+
+  /**
+   * The store's whole chart: the built-in accounts, then the ones it added,
+   * in code order. Inactive added accounts are included — their history
+   * still reports — and flagged.
+   */
+  async chart(session?: ClientSession): Promise<ChartAccount[]> {
+    const custom = await this.ledgerAccountModel.find().session(session ?? null).lean().exec();
+    const added: ChartAccount[] = custom.map((a) => ({
+      code: a.code,
+      name: { en: a.name.en, ar: a.name.ar },
+      type: a.type,
+      category: CATEGORY_OF[a.type],
+      normalSide: normalSideOf(a.type),
+      cashFlowActivity: a.cashFlowActivity ?? CashFlowActivity.OPERATING,
+      isSystem: false,
+      isActive: a.isActive,
+      allowsManual: a.isActive,
+      description: a.description,
+    }));
+    return [...SYSTEM_CHART, ...added].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }));
+  }
+
+  /** The chart keyed by code. */
+  async chartByCode(session?: ClientSession): Promise<Map<string, ChartAccount>> {
+    return new Map((await this.chart(session)).map((a) => [a.code, a]));
+  }
 
   /**
    * Writes one entry. Zero lines are dropped; what remains must be at least
@@ -52,7 +82,11 @@ export class JournalService {
       .map((l) => ({ ...l, debitMinor: l.debitMinor ?? 0, creditMinor: l.creditMinor ?? 0 }))
       .filter((l) => l.debitMinor !== 0 || l.creditMinor !== 0);
     if (!lines.length) return null;
-    this.assertBalanced(lines);
+    const unknown = [...new Set(lines.map((l) => l.account).filter((code) => !ACCOUNT_CODES.includes(code as never)))];
+    const added = unknown.length
+      ? (await this.ledgerAccountModel.find({ code: { $in: unknown } }).select('code').session(session).lean().exec()).map((a) => a.code)
+      : [];
+    this.assertBalanced(lines, new Set<string>([...ACCOUNT_CODES, ...added]));
 
     // Every cash line says where the money is; nobody picking means the main cash box.
     if (lines.some((l) => l.account === ACCOUNT.CASH && !l.moneyAccount)) {
@@ -99,6 +133,7 @@ export class JournalService {
     date: Date,
     session: ClientSession,
     createdBy?: string,
+    memo?: string,
   ): Promise<JournalEntry | null> {
     return this.post(
       {
@@ -111,8 +146,9 @@ export class JournalService {
           order: l.order,
           customer: l.customer,
           moneyAccount: l.moneyAccount,
+          note: l.note,
         })),
-        memo: `Reverses entry #${original.entryNumber}`,
+        memo: memo ?? `Reverses entry #${original.entryNumber}`,
         createdBy,
         reversalOf: original._id as Types.ObjectId,
       },
@@ -184,29 +220,33 @@ export class JournalService {
         ...(range.to ? { $lt: range.to } : {}),
       };
     }
-    const rows: { _id: string; debit: number; credit: number }[] = await this.entryModel
-      .aggregate([
-        { $match: match },
-        { $unwind: '$lines' },
-        ...(accounts ? [{ $match: { 'lines.account': { $in: accounts } } }] : []),
-        { $group: { _id: '$lines.account', debit: { $sum: '$lines.debitMinor' }, credit: { $sum: '$lines.creditMinor' } } },
-      ])
-      .exec();
+    const [rows, chart] = await Promise.all([
+      this.entryModel
+        .aggregate<{ _id: string; debit: number; credit: number }>([
+          { $match: match },
+          { $unwind: '$lines' },
+          ...(accounts ? [{ $match: { 'lines.account': { $in: accounts } } }] : []),
+          { $group: { _id: '$lines.account', debit: { $sum: '$lines.debitMinor' }, credit: { $sum: '$lines.creditMinor' } } },
+        ])
+        .exec(),
+      this.chartByCode(),
+    ]);
 
     const result: Record<string, number> = {};
-    for (const code of accounts ?? ACCOUNT_CODES) result[code] = 0;
+    for (const code of accounts ?? chart.keys()) result[code] = 0;
     for (const row of rows) {
-      result[row._id] = isCreditNormal(row._id) ? row.credit - row.debit : row.debit - row.credit;
+      const creditNormal = chart.get(row._id)?.normalSide === 'credit';
+      result[row._id] = creditNormal ? row.credit - row.debit : row.debit - row.credit;
     }
     return result;
   }
 
-  private assertBalanced(lines: Required<Pick<PostingLine, 'account' | 'debitMinor' | 'creditMinor'>>[]): void {
+  private assertBalanced(lines: Required<Pick<PostingLine, 'account' | 'debitMinor' | 'creditMinor'>>[], known: Set<string>): void {
     let debit = 0;
     let credit = 0;
     for (const l of lines) {
       const sides = [l.debitMinor, l.creditMinor];
-      if (!ACCOUNT_CODES.includes(l.account as never)) throw this.bug(`unknown account ${l.account}`);
+      if (!known.has(l.account)) throw this.bug(`unknown account ${l.account}`);
       if (!sides.every((v) => Number.isSafeInteger(v) && v >= 0)) throw this.bug('amounts must be whole minor units');
       if ((l.debitMinor > 0) === (l.creditMinor > 0)) throw this.bug('each line is a debit or a credit');
       debit += l.debitMinor;
