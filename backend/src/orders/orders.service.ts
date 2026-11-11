@@ -50,6 +50,7 @@ import {
   OrderItemInputDto,
   QueryOrdersDto,
 } from './dto/order.dto';
+import { memo } from '../finance/journal-memo';
 
 /** Why a basket line cannot be bought as it stands. */
 export type QuoteIssue = 'unavailable' | 'no_price' | 'insufficient_stock';
@@ -752,7 +753,7 @@ export class OrdersService {
           { account: ACCOUNT.COGS, debitMinor: costMinor, ...ref },
           { account: ACCOUNT.GOODS_AWAITING_DELIVERY, creditMinor: costMinor, ...ref },
         ],
-        memo: `${this.reference(order.orderNumber)} delivered`,
+        memo: memo('order_delivered', { order: order.orderNumber }),
         createdBy: userId,
       },
       session,
@@ -839,7 +840,7 @@ export class OrdersService {
           date: order.cancelledAt ?? new Date(),
           source: { type: 'order', id: order._id as Types.ObjectId, number: order.orderNumber, event: 'cancelled' },
           lines,
-          memo: `${this.reference(order.orderNumber)} cancelled — stock back on the shelf`,
+          memo: memo('order_cancelled', { order: order.orderNumber }),
           createdBy: userId,
         },
         session,
@@ -879,7 +880,7 @@ export class OrdersService {
           { account: ACCOUNT.GOODS_AWAITING_DELIVERY, debitMinor: total, order: order._id as Types.ObjectId },
           { account: ACCOUNT.INVENTORY, creditMinor: total, order: order._id as Types.ObjectId },
         ],
-        memo: `${this.reference(order.orderNumber)} placed — goods set aside at cost`,
+        memo: memo('order_placed', { order: order.orderNumber }),
       },
       session,
     );

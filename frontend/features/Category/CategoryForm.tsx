@@ -23,6 +23,7 @@ import { LocalizedField } from "@/backend-api/globalTypes";
 import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 import SlugField from "@/components/MUI/SlugField";
 import { cleanSlug } from "@/lib/slug";
+import { useContentLanguages, useSeedSingleLanguage } from "@/lib/useContentLanguages";
 
 type CategoryFormValues = {
   image: File | string | null;
@@ -45,7 +46,9 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
 
   const isEditing = !!defaultData;
 
-  const { control, handleSubmit, register, watch, setValue, formState: { errors } } =
+  const content = useContentLanguages();
+
+  const { control, handleSubmit, register, watch, setValue, getValues, formState: { errors } } =
     useForm<CategoryFormValues>({
       defaultValues: {
         image: defaultData?.image ? getBackendUri(defaultData.image) : "",
@@ -58,6 +61,8 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
       },
     });
 
+  useSeedSingleLanguage(content.single, ["name", "description"], getValues, setValue);
+
   const isActiveValue = watch("isActive");
 
   const mutation = useMutation({
@@ -69,10 +74,12 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
         if (compressed) formData.append("image", compressed);
       }
 
-      if (data.name.ar) formData.append("name[ar]", data.name.ar);
-      if (data.name.en) formData.append("name[en]", data.name.en);
-      if (data.description.ar) formData.append("description[ar]", data.description.ar);
-      if (data.description.en) formData.append("description[en]", data.description.en);
+      const name = content.fill(data.name);
+      const description = content.fill(data.description);
+      if (name.ar) formData.append("name[ar]", name.ar);
+      if (name.en) formData.append("name[en]", name.en);
+      if (description.ar) formData.append("description[ar]", description.ar);
+      if (description.en) formData.append("description[en]", description.en);
       if (cleanSlug(data.slug)) formData.append("slug", cleanSlug(data.slug));
       formData.append("isActive", String(data.isActive));
       formData.append("order", String(data.order));
@@ -119,7 +126,7 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
           label={t("active")}
         />
 
-        <LanguageTabs hasError={tabHasError}>
+        <LanguageTabs hasError={tabHasError} languages={content.languages}>
           {(lang) => (
             <>
               <TextInputComponent name={`name.${lang}`} label={t("name")} control={control} required />

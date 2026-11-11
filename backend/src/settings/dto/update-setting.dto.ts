@@ -3,7 +3,7 @@ import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, Valida
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 import { CURRENCIES } from '../../common/money/money';
 import { SUPPORTED_COUNTRIES } from '../../price-list/data';
-import { BannerStyle } from '../schemas/setting.schema';
+import { BannerStyle, ContentLanguages } from '../schemas/setting.schema';
 
 export class SocialMediaItemDto {
   @IsString()
@@ -96,4 +96,17 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsIn([true, false, 'true', 'false'])
   showPrices?: boolean | 'true' | 'false';
+
+  @IsOptional()
+  @IsIn(Object.values(ContentLanguages))
+  contentLanguages?: ContentLanguages;
+
+  // Form-data strings "true" / "false"; super admin only.
+  @IsOptional()
+  @IsIn([true, false, 'true', 'false'])
+  costPlus5Percent?: boolean | 'true' | 'false';
+
+  @IsOptional()
+  @IsIn([true, false, 'true', 'false'])
+  costPlus15Percent?: boolean | 'true' | 'false';
 }

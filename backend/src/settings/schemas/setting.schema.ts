@@ -29,6 +29,17 @@ export enum BannerStyle {
   FADE = 'fade',
 }
 
+/**
+ * Which languages staff type a product's or category's texts in. With one
+ * language the dashboard shows a single input and saves its text under every
+ * language, so a store with texts in one language can still publish in both.
+ */
+export enum ContentLanguages {
+  BOTH = 'both',
+  AR = 'ar',
+  EN = 'en',
+}
+
 /** One change to the store's finance rules, with what it was and what it became. */
 @Schema({ _id: false })
 export class FinanceSettingChange {
@@ -172,6 +183,19 @@ export class Setting extends Document {
   /** Whether the storefront shows prices. Off suits a showcase store that quotes on WhatsApp. */
   @Prop({ default: true })
   showPrices!: boolean;
+
+  @Prop({ type: String, enum: ContentLanguages, default: ContentLanguages.BOTH })
+  contentLanguages!: ContentLanguages;
+
+  /**
+   * Where a unit cost is typed, also show it with 5% / 15% added. Display
+   * only: nothing stored or posted changes. Only a super admin sets them.
+   */
+  @Prop({ default: false })
+  costPlus5Percent!: boolean;
+
+  @Prop({ default: false })
+  costPlus15Percent!: boolean;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

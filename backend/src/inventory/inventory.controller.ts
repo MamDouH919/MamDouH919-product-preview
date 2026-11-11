@@ -85,6 +85,19 @@ export class InventoryController {
     return this.inventoryService.setOpeningCost(dto.productId, dto.variantId, unitCostMinor, req.userId);
   }
 
+  /** Fixes an opening cost typed wrong, while nothing else has touched that stock. */
+  @Permissions([{ resource: Resource.INVENTORY, actions: [Action.UPDATE] }])
+  @Post('opening-cost/correct')
+  correctOpeningCost(@Body() dto: SetOpeningCostDto, @Req() req: { userId?: string }) {
+    let unitCostMinor: number;
+    try {
+      unitCostMinor = parseMoney(dto.unitCost);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+    return this.inventoryService.correctOpeningCost(dto.productId, dto.variantId, unitCostMinor, req.userId);
+  }
+
   @Permissions([{ resource: Resource.INVENTORY, actions: [Action.UPDATE] }])
   @Post('stock-take')
   stockTake(@Body() dto: StockTakeDto, @Req() req: Request & { userId?: string }) {

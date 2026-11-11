@@ -7,6 +7,7 @@ import { Setting } from '../settings/schemas/setting.schema';
 import { ACCOUNT, ACCOUNT_CODES, CATEGORY_OF, CashFlowActivity, ChartAccount, normalSideOf, SYSTEM_CHART } from './accounts';
 import { MoneyAccount, MoneyAccountType } from '../money-accounts/schemas/money-account.schema';
 import { LedgerAccount } from './schemas/ledger-account.schema';
+import { JournalMemo, memo as systemMemo, memoText } from './journal-memo';
 
 const JOURNAL_COUNTER = 'journal';
 
@@ -25,7 +26,8 @@ export interface Posting {
   date: Date;
   source: { type: string; id: Types.ObjectId; number?: number; event: string };
   lines: PostingLine[];
-  memo?: string;
+  /** Text staff typed, or a system memo that reads in either language. */
+  memo?: string | JournalMemo;
   createdBy?: string;
   reversalOf?: Types.ObjectId;
 }
@@ -113,7 +115,7 @@ export class JournalService {
           date: posting.date,
           source: posting.source,
           lines,
-          memo: posting.memo,
+          ...this.memoFields(posting.memo),
           createdBy: posting.createdBy ? new Types.ObjectId(posting.createdBy) : undefined,
           reversalOf: posting.reversalOf,
         },
@@ -133,7 +135,7 @@ export class JournalService {
     date: Date,
     session: ClientSession,
     createdBy?: string,
-    memo?: string,
+    reason?: string,
   ): Promise<JournalEntry | null> {
     return this.post(
       {
@@ -148,12 +150,18 @@ export class JournalService {
           moneyAccount: l.moneyAccount,
           note: l.note,
         })),
-        memo: memo ?? `Reverses entry #${original.entryNumber}`,
+        memo: systemMemo('reversal', reason ? { entry: original.entryNumber, reason } : { entry: original.entryNumber }),
         createdBy,
         reversalOf: original._id as Types.ObjectId,
       },
       session,
     );
+  }
+
+  /** What an entry stores for its memo: the English text, plus the key and values of a system memo. */
+  private memoFields(memo: Posting['memo']) {
+    if (memo === undefined || typeof memo === 'string') return { memo };
+    return { memo: memoText({ memoKey: memo.key, memoParams: memo.params })?.en, memoKey: memo.key, memoParams: memo.params };
   }
 
   /**

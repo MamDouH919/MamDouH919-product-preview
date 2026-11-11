@@ -110,7 +110,7 @@ describe('Chart of accounts, manual journal and statements', () => {
 
       const journal = await store.ledger.list({});
       expect(journal.total).toBe(3);
-      expect(journal.rows.map((e) => e.memo)).toEqual(['Rent', 'Loan', 'Capital']);
+      expect(journal.rows.map((e) => e.memo?.en)).toEqual(['Rent', 'Loan', 'Capital']);
       expect(journal.rows[0]).toMatchObject({ isManual: true, totalMinor: 120_000, createdBy: { name: 'Owner' } });
       expect(journal.rows[0].lines[0]).toMatchObject({ account: ACCOUNT.RENT, name: { en: 'Rent' }, debitMinor: 120_000 });
       expect((await store.ledger.list({ account: '2500' })).total).toBe(1);

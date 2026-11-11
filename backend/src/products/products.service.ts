@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
 import { Product } from './schemas/product.schema';
@@ -13,8 +13,25 @@ import { InventoryService } from '../inventory/inventory.service';
 import { MovementType } from '../inventory/enums/movement-type.enum';
 import { withTransaction } from '../common/tenant/with-transaction';
 import { buildSlug } from '../common/helpers/slug';
+import { parseMoney } from '../common/money/money';
 
 export const productImageStorage = tenantImageStorage('products');
+
+/** Units a new product or variant starts with, and what one of them cost. */
+interface OpeningLine {
+  stock: number;
+  unitCost?: number;
+}
+
+/** Total cost of the opening units in minor units; undefined leaves them uncosted. */
+function openingValue(line: OpeningLine): number | undefined {
+  if (line.unitCost === undefined || line.unitCost === null) return undefined;
+  try {
+    return line.stock * parseMoney(String(line.unitCost));
+  } catch (error) {
+    throw new BadRequestException((error as Error).message);
+  }
+}
 
 
 @Injectable()
@@ -53,14 +70,16 @@ export class ProductsService {
     // count is always the sum of its movements — never a number that appeared
     // from nowhere.
     const opening = {
-      product: createProductDto.stock ?? 0,
+      product: { stock: createProductDto.stock ?? 0, unitCost: createProductDto.unitCost },
       variants: (createProductDto.variants ?? []).map((v) => ({
         label: v.label,
         stock: v.stock ?? 0,
+        unitCost: v.unitCost,
       })),
     };
     createProductDto.stock = 0;
-    createProductDto.variants = (createProductDto.variants ?? []).map((v) => ({
+    delete createProductDto.unitCost;
+    createProductDto.variants = (createProductDto.variants ?? []).map(({ unitCost: _cost, ...v }) => ({
       ...v,
       stock: 0,
     }));
@@ -384,6 +403,7 @@ export class ProductsService {
     // the incoming variants array replaces the stored one wholesale, and
     // whatever the form sent back is stale by definition.
     delete (updateProductDto as { stock?: number }).stock;
+    delete (updateProductDto as { unitCost?: number }).unitCost;
     // Likewise the rating, which ReviewsService derives from approved reviews.
     delete (updateProductDto as { ratingAverage?: number }).ratingAverage;
     delete (updateProductDto as { ratingCount?: number }).ratingCount;
@@ -391,7 +411,7 @@ export class ProductsService {
     let addedVariants: ProductVariantDto[] = [];
     if (updateProductDto.variants) {
       const { merged, added } = this.mergeVariantStock(existing, updateProductDto.variants);
-      updateProductDto.variants = merged;
+      updateProductDto.variants = merged.map(({ unitCost: _cost, ...v }) => v);
       addedVariants = added;
     }
 
@@ -448,8 +468,8 @@ export class ProductsService {
     if (addedVariants.length > 0) {
       await this.recordOpeningStock(
         updated,
-        0,
-        addedVariants.map((v) => ({ label: v.label, stock: v.stock ?? 0 })),
+        { stock: 0 },
+        addedVariants.map((v) => ({ label: v.label, stock: v.stock ?? 0, unitCost: v.unitCost })),
         userId,
       );
       return this.findOne(id);
@@ -524,11 +544,15 @@ export class ProductsService {
     return { merged, added };
   }
 
-  /** Writes the OPENING movements that fill a freshly created product or variant. */
+  /**
+   * Writes the OPENING movements that fill a freshly created product or
+   * variant — valued, when the admin gave the unit cost, so the stock never
+   * sits uncosted.
+   */
   private async recordOpeningStock(
     product: Product,
-    productStock: number,
-    variants: { label: string; stock: number }[],
+    productOpening: OpeningLine,
+    variants: (OpeningLine & { label: string })[],
     userId?: string,
     session?: ClientSession,
   ): Promise<void> {
@@ -537,16 +561,17 @@ export class ProductsService {
     const productId = product._id!.toString();
     const hasVariants = (product.variants?.length ?? 0) > 0;
 
-    if (!hasVariants && productStock > 0) {
+    if (!hasVariants && productOpening.stock > 0) {
       await this.inventoryService.adjust(
         {
           productId,
           type: MovementType.OPENING,
-          quantity: productStock,
+          quantity: productOpening.stock,
           reason: 'Opening stock',
         },
         userId,
         session,
+        openingValue(productOpening),
       );
       return;
     }
@@ -569,6 +594,7 @@ export class ProductsService {
         },
         userId,
         session,
+        openingValue(opening),
       );
     }
   }

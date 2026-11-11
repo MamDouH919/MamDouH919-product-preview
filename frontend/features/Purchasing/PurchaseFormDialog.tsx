@@ -26,10 +26,12 @@ import { createPurchase, updatePurchase } from "@/backend-api/purchasing/mutatio
 import { Purchase, PurchaseInput } from "@/backend-api/purchasing/types";
 import { formatMinorMoney, minorToInput } from "@/features/Order/format";
 import { useCurrency } from "@/Hooks/useCurrency";
+import CostPercentages, { addCostPercentages } from "@/components/CostPercentages";
 import { AMOUNT, inputToMinor, toastError, todayInput } from "./shared";
 
 type Option = { productId: string; variantId?: string; label: string; tracked?: boolean };
-type Line = { key: number; option: Option | null; quantity: string; unitCost: string };
+/** `rates`: the cost percentages switched on for the line, added to its unit cost when sent. */
+type Line = { key: number; option: Option | null; quantity: string; unitCost: string; rates: number[] };
 
 /**
  * Enters a purchase as a draft — nothing moves until it is posted. With
@@ -72,14 +74,16 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
           option: { productId: l.product, variantId: l.variantId, label: `${l.name[lang] ?? l.name.en ?? ""}${l.variantLabel ? ` — ${l.variantLabel}` : ""}` },
           quantity: String(l.quantity),
           unitCost: minorToInput(l.unitCostMinor),
+          rates: [],
         }))
-      : [{ key: nextKey++, option: null, quantity: "1", unitCost: "" }],
+      : [{ key: nextKey++, option: null, quantity: "1", unitCost: "", rates: [] }],
   );
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   const linesOk = lines.length > 0 && lines.every((l) => l.option && /^\d+$/.test(l.quantity) && Number(l.quantity) > 0 && AMOUNT.test(l.unitCost));
   const landedOk = !landed || AMOUNT.test(landed);
-  const subtotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * inputToMinor(l.unitCost), 0);
+  const lineCost = (l: Line) => (AMOUNT.test(l.unitCost) ? addCostPercentages(l.unitCost, l.rates) : l.unitCost);
+  const subtotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * inputToMinor(lineCost(l)), 0);
   const total = subtotal + (landedOk ? inputToMinor(landed) : 0);
 
   const mutation = useMutation({
@@ -90,7 +94,7 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
         date: new Date(date).toISOString(),
         landedCost: landed || undefined,
         notes: notes.trim() || undefined,
-        lines: lines.map((l) => ({ productId: l.option!.productId, variantId: l.option!.variantId, quantity: Number(l.quantity), unitCost: l.unitCost })),
+        lines: lines.map((l) => ({ productId: l.option!.productId, variantId: l.option!.variantId, quantity: Number(l.quantity), unitCost: lineCost(l) })),
       };
       return purchase ? updatePurchase({ id: purchase._id, ...body }) : createPurchase(body);
     },
@@ -128,7 +132,7 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
 
           <Divider />
           {lines.map((line) => (
-            <Stack key={line.key} direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+            <Stack key={line.key} direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "flex-start" }}>
               <Autocomplete
                 sx={{ flex: 3 }}
                 options={options}
@@ -141,21 +145,23 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
                 renderInput={(params) => <TextField {...params} size="small" label={t("product")} />}
               />
               <TextField size="small" label={t("quantity")} value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value.trim() })} sx={{ flex: 1 }} slotProps={{ htmlInput: { inputMode: "numeric", dir: "ltr" } }} />
-              <TextField
-                size="small"
-                label={t("unitCost")}
-                value={line.unitCost}
-                onChange={(e) => update(line.key, { unitCost: e.target.value.trim() })}
-                error={!!line.unitCost && !AMOUNT.test(line.unitCost)}
-                sx={{ flex: 1 }}
-                slotProps={{ htmlInput: { inputMode: "decimal", dir: "ltr" } }}
-              />
+              <Stack sx={{ flex: 1 }}>
+                <TextField
+                  size="small"
+                  label={t("unitCost")}
+                  value={line.unitCost}
+                  onChange={(e) => update(line.key, { unitCost: e.target.value.trim() })}
+                  error={!!line.unitCost && !AMOUNT.test(line.unitCost)}
+                  slotProps={{ htmlInput: { inputMode: "decimal", dir: "ltr" } }}
+                />
+                <CostPercentages cost={AMOUNT.test(line.unitCost) ? line.unitCost : ""} value={line.rates} onChange={(rates) => update(line.key, { rates })} />
+              </Stack>
               <IconButton onClick={() => setLines((ls) => ls.filter((l) => l.key !== line.key))} disabled={lines.length === 1}>
                 <Delete />
               </IconButton>
             </Stack>
           ))}
-          <Button startIcon={<Add />} onClick={() => setLines((ls) => [...ls, { key: Date.now(), option: null, quantity: "1", unitCost: "" }])} sx={{ alignSelf: "flex-start" }}>
+          <Button startIcon={<Add />} onClick={() => setLines((ls) => [...ls, { key: Date.now(), option: null, quantity: "1", unitCost: "", rates: [] }])} sx={{ alignSelf: "flex-start" }}>
             {t("addLine")}
           </Button>
 

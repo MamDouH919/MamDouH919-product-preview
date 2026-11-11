@@ -41,7 +41,8 @@ export type JournalEntry = {
   date: string;
   postedAt: string;
   source: JournalSource;
-  memo?: string;
+  /** In both languages: system memos are written in each, staff-typed ones hold the same text twice. */
+  memo?: AccountName;
   isManual: boolean;
   isReversal: boolean;
   isReversed: boolean;
@@ -80,7 +81,7 @@ export type AccountStatement = {
     entryNumber: number;
     date: string;
     source: JournalSource;
-    memo?: string;
+    memo?: AccountName;
     note?: string;
     moneyAccount?: string;
     counterparts: { code: string; name: AccountName }[];

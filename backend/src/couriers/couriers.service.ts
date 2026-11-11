@@ -13,6 +13,7 @@ import { signedLine } from '../inventory/inventory.service';
 import { Courier } from './schemas/courier.schema';
 import { CourierSettlement } from './schemas/courier-settlement.schema';
 import { CreateCourierDto, SettleCourierDto, UpdateCourierDto } from './dto/courier.dto';
+import { memo } from '../finance/journal-memo';
 
 const SETTLEMENT_COUNTER = 'courier_settlement';
 const SETTLEMENT_NUMBER_BASE = 7000;
@@ -171,7 +172,7 @@ export class CouriersService {
             signedLine(ACCOUNT.CASH_OVER_SHORT, -differenceMinor),
             { account: ACCOUNT.COURIER_CASH, creditMinor: held.heldMinor },
           ],
-          memo: `${courier.name} settled`,
+          memo: memo('courier_settled', { courier: courier.name }),
           createdBy: userId,
         },
         session,

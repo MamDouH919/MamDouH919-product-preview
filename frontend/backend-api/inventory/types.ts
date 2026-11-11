@@ -46,6 +46,8 @@ export type StockLevel = {
   valueMinor: number | null;
   /** Average cost of one unit, minor units. */
   unitCostMinor: number | null;
+  /** Has a cost and nothing but the opening has touched it, so that cost can still be corrected. */
+  costCorrectable: boolean;
 };
 
 export type StockMovement = {

@@ -41,6 +41,7 @@ import {
   RefundRules,
   suggestedLineMinor,
 } from './refund-rules';
+import { memo } from '../finance/journal-memo';
 
 const REFUND_COUNTER = 'refund';
 /** Refund numbers start here — after orders (1001…) and returns (2001…), so the three never read alike. */
@@ -330,7 +331,7 @@ export class RefundsService {
             },
             ...costLines,
           ],
-          memo: `Refund #${claimed.refundNumber} for order #${order.orderNumber}`,
+          memo: memo('refund', { refund: claimed.refundNumber, order: order.orderNumber }),
           createdBy: userId,
         },
         session,

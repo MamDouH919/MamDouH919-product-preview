@@ -29,6 +29,7 @@ import {
   UpdatePurchaseDto,
   UpdateSupplierDto,
 } from './dto/purchasing.dto';
+import { memo } from '../finance/journal-memo';
 
 /** Human-facing numbers, so a purchase, a supplier return and a payment never read alike. */
 const NUMBERS = {
@@ -207,7 +208,7 @@ export class PurchasingService {
             { account: ACCOUNT.PAYABLES, creditMinor: purchase.totalMinor },
             ...varianceLines(variance),
           ],
-          memo: `Purchase #${purchase.purchaseNumber}`,
+          memo: memo('purchase', { number: purchase.purchaseNumber }),
           createdBy: userId,
         },
         session,
@@ -340,7 +341,7 @@ export class PurchasingService {
             { account: ACCOUNT.INVENTORY, creditMinor: outOfStock },
             ...varianceLines(variance),
           ],
-          memo: `Goods back to supplier, purchase #${purchase.purchaseNumber}`,
+          memo: memo('purchase_return', { number: purchase.purchaseNumber }),
           createdBy: userId,
         },
         session,
@@ -405,7 +406,7 @@ export class PurchasingService {
             { account: ACCOUNT.PAYABLES, debitMinor: amountMinor },
             { account: ACCOUNT.CASH, creditMinor: amountMinor, moneyAccount: await this.journal.moneyAccount(dto.moneyAccountId, session) },
           ],
-          memo: `Payment to ${supplier.name}`,
+          memo: memo('supplier_payment', { supplier: supplier.name }),
           createdBy: userId,
         },
         session,

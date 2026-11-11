@@ -71,6 +71,13 @@ export class ProductVariantDto {
   @IsNumber()
   @Min(0)
   stock?: number;
+
+  // Cost of one opening unit. Same rule as `stock`: new variants only.
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  unitCost?: number;
 }
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 
@@ -182,6 +189,14 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   stock?: number;
+
+  // Cost of one opening unit, booked with the opening stock. Create only;
+  // after that, costs come from purchases.
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  unitCost?: number;
 
   @ApiProperty({ required: false })
   @IsOptional()

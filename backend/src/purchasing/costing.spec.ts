@@ -176,6 +176,36 @@ describe('Costing and buying', () => {
     await reconciled();
   });
 
+  it('opening stock with a cost is booked against equity as it comes in', async () => {
+    const item = await store.product(150, 0);
+    await store.inventory.adjust({ productId: item, type: MovementType.OPENING, quantity: 10 }, undefined, undefined, 90000);
+
+    expect(await product(item)).toMatchObject({ stock: 10, inventoryValueMinor: 90000, lastUnitCostMinor: 9000 });
+    expect((await balances())).toMatchObject({ [ACCOUNT.INVENTORY]: 90000, [ACCOUNT.EQUITY]: 90000 });
+    expect((await store.inventory.getLevels({})).find((r) => r.productId === item)).toMatchObject({ valued: true, costCorrectable: true });
+    await reconciled();
+  });
+
+  it('a mistyped opening cost can be corrected until anything else touches the stock', async () => {
+    const item = await store.product(150, 10, 150); // the selling price typed as the cost
+    await expect(store.inventory.correctOpeningCost(item, undefined, 15000)).rejects.toBeInstanceOf(BadRequestException);
+
+    await store.inventory.correctOpeningCost(item, undefined, 9000);
+    expect(await product(item)).toMatchObject({ stock: 10, inventoryValueMinor: 90000, lastUnitCostMinor: 9000 });
+    expect((await balances())).toMatchObject({ [ACCOUNT.INVENTORY]: 90000, [ACCOUNT.EQUITY]: 90000 });
+    await reconciled();
+
+    await sell(item, 1);
+    expect((await store.inventory.getLevels({})).find((r) => r.productId === item)).toMatchObject({ costCorrectable: false });
+    await expect(store.inventory.correctOpeningCost(item, undefined, 8000)).rejects.toBeInstanceOf(ConflictException);
+    expect((await store.finance.summary())).toMatchObject({ costOfSalesMinor: 9000 });
+  });
+
+  it('stock with no cost has nothing to correct', async () => {
+    const item = await store.product(50, 4);
+    await expect(store.inventory.correctOpeningCost(item, undefined, 1000)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('goods back to the supplier leave at what they were bought for, and only what is on the shelf', async () => {
     const [b, c] = [await store.product(80, 0), await store.product(50, 0)];
     const s = await supplier();

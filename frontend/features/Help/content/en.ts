@@ -657,7 +657,7 @@ const en: HelpGuideSource = {
         blocks: [
           {
             type: "p",
-            text: "Stock that was on the shelf before the books started has no cost. Such products show a **Set cost** button — enter what one unit really cost you. It's set **once**; after that, costs come from purchases.",
+            text: "Stock that was on the shelf before the books started has no cost. Such products show a **Set cost** button — enter what one unit really cost you. It's set **once**; after that, costs come from purchases. Easier still: enter the **Cost per unit** next to the opening stock when you add the product. If a cost was typed wrong, a pencil icon beside it lets you correct it — while nothing has been sold, bought or adjusted for that item yet.",
           },
           { type: "warning", text: "Selling a product before its cost is set leaves its margin incomplete in Sales by product." },
         ],

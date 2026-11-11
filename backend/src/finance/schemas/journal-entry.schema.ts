@@ -75,8 +75,17 @@ export class JournalEntry extends Document {
   @Prop({ type: [JournalLineSchema], required: true })
   lines!: JournalLine[];
 
+  /** The memo's English text — what the journal search matches. */
   @Prop({ required: false })
   memo?: string;
+
+  /** On entries the system posts: which memo sentence, so it reads in either language. See journal-memo.ts. */
+  @Prop({ required: false })
+  memoKey?: string;
+
+  /** The values that go in that sentence: numbers, names, a reason. */
+  @Prop({ type: SchemaTypes.Mixed, required: false })
+  memoParams?: Record<string, string | number>;
 
   /** The admin whose action posted it. Absent for customer and system events. */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'User', required: false })

@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { BannerStyle, Setting } from './schemas/setting.schema';
+import { BannerStyle, ContentLanguages, Setting } from './schemas/setting.schema';
 import { User } from '../auth/schemas/user.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { CURRENCIES, DEFAULT_CURRENCY } from '../common/money/money';
@@ -72,11 +72,22 @@ export class SettingsService {
     if (dto.bannerStyle !== undefined && !Object.values(BannerStyle).includes(dto.bannerStyle)) {
       throw new BadRequestException(`Unknown banner style "${dto.bannerStyle}"`);
     }
+    if (dto.contentLanguages !== undefined && !Object.values(ContentLanguages).includes(dto.contentLanguages)) {
+      throw new BadRequestException(`Unknown content languages "${dto.contentLanguages}"`);
+    }
     if (dto.showPrices !== undefined) {
       if (!['true', 'false'].includes(String(dto.showPrices))) {
         throw new BadRequestException('showPrices must be true or false');
       }
       dto.showPrices = String(dto.showPrices) === 'true';
+    }
+    for (const key of ['costPlus5Percent', 'costPlus15Percent'] as const) {
+      if (dto[key] === undefined) continue;
+      if (!(await isSuper())) throw new ForbiddenException('Only a super admin can change the cost percentages');
+      if (!['true', 'false'].includes(String(dto[key]))) {
+        throw new BadRequestException(`${key} must be true or false`);
+      }
+      dto[key] = String(dto[key]) === 'true';
     }
 
     let seedCountry: string | undefined;

@@ -71,7 +71,7 @@ const JournalPage = () => {
         header: t("accounting.accounts"),
         render: (e: JournalEntry) => (
           <Stack spacing={0.25}>
-            {e.memo && <Typography variant="body2">{e.memo}</Typography>}
+            {e.memo && <Typography variant="body2">{name(e.memo)}</Typography>}
             {e.lines.map((l, i) => (
               <Typography key={i} variant="caption" color="text.secondary" sx={{ ps: l.creditMinor ? 2 : 0 }}>
                 {`${l.debitMinor ? t("debitSide") : t("creditSide")} ${l.account} ${name(l.name)} — ${formatMinorMoney(l.debitMinor || l.creditMinor, currency)}`}

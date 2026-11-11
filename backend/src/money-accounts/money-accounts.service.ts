@@ -11,6 +11,7 @@ import { ACCOUNT } from '../finance/accounts';
 import { MoneyAccount } from './schemas/money-account.schema';
 import { MoneyTransfer } from './schemas/money-transfer.schema';
 import { CreateMoneyAccountDto, SetOpeningBalanceDto, TransferMoneyDto, UpdateMoneyAccountDto } from './dto/money-account.dto';
+import { memo } from '../finance/journal-memo';
 
 const TRANSFER_COUNTER = 'money_transfer';
 const TRANSFER_NUMBER_BASE = 9000;
@@ -92,7 +93,7 @@ export class MoneyAccountsService {
             { account: ACCOUNT.CASH, debitMinor: amountMinor, moneyAccount: to },
             { account: ACCOUNT.CASH, creditMinor: amountMinor, moneyAccount: from },
           ],
-          memo: dto.note ?? 'Transfer between accounts',
+          memo: dto.note ?? memo('transfer'),
           createdBy: userId,
         },
         session,
@@ -123,7 +124,7 @@ export class MoneyAccountsService {
             { account: ACCOUNT.CASH, debitMinor: amountMinor, moneyAccount: account },
             { account: ACCOUNT.EQUITY, creditMinor: amountMinor },
           ],
-          memo: 'Opening balance',
+          memo: memo('opening_balance'),
           createdBy: userId,
         },
         session,

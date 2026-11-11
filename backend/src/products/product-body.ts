@@ -2,11 +2,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { parseNestedBody } from '../common/helpers/parse-nested-body';
 import { deleteFile, toPublicPath } from '../common/helpers/compress-image';
 
-const NUMBER_FIELDS = ['price', 'stock', 'lowStockThreshold', 'order'] as const;
+const NUMBER_FIELDS = ['price', 'stock', 'unitCost', 'lowStockThreshold', 'order'] as const;
 // Fields a form clears by sending them empty: "" becomes null, which unsets them.
 const NULLABLE_NUMBER_FIELDS = ['compareAtPrice'] as const;
 const BOOLEAN_FIELDS = ['isActive', 'trackStock', 'allowBackorder'] as const;
-const VARIANT_NUMBER_FIELDS = ['price', 'stock', 'compareAtPrice'] as const;
+const VARIANT_NUMBER_FIELDS = ['price', 'stock', 'unitCost', 'compareAtPrice'] as const;
 
 // Same rules as the global pipe in main.ts, so a product is held to the same
 // standard as every JSON endpoint.

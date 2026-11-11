@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import HistoryIcon from "@mui/icons-material/History";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import Image from "next/image";
 import {
   useInventorySummaryQuery,
@@ -66,6 +67,7 @@ const InventoryPage = () => {
   const [selected, setSelected] = useState<StockLevel | null>(null);
   const [historyRow, setHistoryRow] = useState<StockLevel | null>(null);
   const [costRow, setCostRow] = useState<StockLevel | null>(null);
+  const [correctRow, setCorrectRow] = useState<StockLevel | null>(null);
   const currency = useCurrency();
 
   // Keeps the table from refetching on every keystroke.
@@ -164,7 +166,17 @@ const InventoryPage = () => {
           !row.trackStock ? (
             "—"
           ) : row.valued ? (
-            formatMinorMoney(row.unitCostMinor ?? 0, currency)
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <span>{formatMinorMoney(row.unitCostMinor ?? 0, currency)}</span>
+              {/* Nothing but the opening has touched it yet, so a mistyped cost can still be fixed. */}
+              {row.costCorrectable && (
+                <Tooltip title={t("correctOpeningCost")}>
+                  <IconButton size="small" onClick={() => setCorrectRow(row)}>
+                    <EditOutlinedIcon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
           ) : (
             // Stock from before the books: no cost until someone says what it was.
             <Button size="small" color="warning" onClick={() => setCostRow(row)}>
@@ -302,6 +314,7 @@ const InventoryPage = () => {
       <AdjustStockDialog row={selected} onClose={() => setSelected(null)} />
       <ProductMovementsDialog row={historyRow} onClose={() => setHistoryRow(null)} />
       <OpeningCostDialog row={costRow} onClose={() => setCostRow(null)} />
+      <OpeningCostDialog row={correctRow} correct onClose={() => setCorrectRow(null)} />
     </Stack>
   );
 };

@@ -28,3 +28,9 @@ export const setOpeningCost = async (data: { productId: string; variantId?: stri
   const response = await api.post("/inventory/opening-cost", data);
   return response.data;
 };
+
+/** Fixes an opening cost typed wrong — only while nothing else has touched that stock. */
+export const correctOpeningCost = async (data: { productId: string; variantId?: string; unitCost: string }) => {
+  const response = await api.post("/inventory/opening-cost/correct", data);
+  return response.data;
+};

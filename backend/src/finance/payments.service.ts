@@ -14,6 +14,7 @@ import { Courier } from '../couriers/schemas/courier.schema';
 import { JournalService } from './journal.service';
 import { ACCOUNT } from './accounts';
 import { moneyOf, orderAmounts, outstandingOf, paymentStatusFor } from './order-money';
+import { memo } from './journal-memo';
 
 const PAYMENT_COUNTER = 'payment';
 
@@ -139,7 +140,7 @@ export class PaymentsService {
               customer: order.customer,
             },
           ],
-          memo: `Collection #${payment.paymentNumber} for order #${order.orderNumber}`,
+          memo: memo('collection', { payment: payment.paymentNumber, order: order.orderNumber }),
           createdBy: userId,
         },
         session,
@@ -230,7 +231,7 @@ export class PaymentsService {
             { account: ACCOUNT.UNCOLLECTIBLE, debitMinor: amountMinor, order: order._id as Types.ObjectId },
             { account: ACCOUNT.RECEIVABLES, creditMinor: amountMinor, order: order._id as Types.ObjectId, customer: order.customer },
           ],
-          memo: `Order #${order.orderNumber} written off: ${reason.trim()}`,
+          memo: memo('write_off', { order: order.orderNumber, reason: reason.trim() }),
           createdBy: userId,
         },
         session,

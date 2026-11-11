@@ -142,7 +142,7 @@ const LedgerPage = () => {
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{sourceLabel(r.source)}</TableCell>
                     <TableCell>
-                      {[r.memo, r.note].filter(Boolean).join(" · ")}
+                      {[r.memo && name(r.memo), r.note].filter(Boolean).join(" · ")}
                       {r.moneyAccount && !moneyAccount && <Typography variant="caption" color="text.secondary" display="block">{r.moneyAccount}</Typography>}
                     </TableCell>
                     <TableCell>

@@ -81,7 +81,7 @@ export class AccountingController {
         r.date.toISOString().slice(0, 10),
         r.entryNumber,
         `${r.source.type}${r.source.number ? ` #${r.source.number}` : ''}`,
-        [r.memo, r.note].filter(Boolean).join(' · '),
+        [r.memo?.[lang], r.note].filter(Boolean).join(' · '),
         r.counterparts.map((c) => `${c.code} ${name(c.name)}`).join(', '),
         formatMinor(r.debitMinor),
         formatMinor(r.creditMinor),

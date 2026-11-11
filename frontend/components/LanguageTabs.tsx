@@ -14,6 +14,8 @@ type Props = {
   /** Marks a tab whose fields have errors. */
   hasError?: (lang: Locale) => boolean;
   spacing?: number;
+  /** The languages to ask for, default the store's; see useContentLanguages. */
+  languages?: Locale[];
   sx?: SxProps<Theme>;
 };
 
@@ -22,9 +24,11 @@ type Props = {
  * platform), default language first. A one-language store gets its fields
  * without tabs.
  */
-export default function LanguageTabs({ children, hasError, spacing = 2, sx }: Props) {
+export default function LanguageTabs({ children, hasError, spacing = 2, languages: only, sx }: Props) {
   const { t } = useTranslation();
-  const { languages, multilingual } = useStoreLocales();
+  const store = useStoreLocales();
+  const languages = only?.length ? only : store.languages;
+  const multilingual = languages.length > 1;
   const [active, setActive] = useState(0);
   const current = Math.min(active, languages.length - 1);
 

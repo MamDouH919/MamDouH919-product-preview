@@ -34,6 +34,7 @@ import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { setSettings, updateColor } from "@/Store/slices/settings";
 import { LocalizedField } from "@/backend-api/globalTypes";
+import { CONTENT_LANGUAGES, type ContentLanguages } from "@/backend-api/settings/types";
 import { SUPPORTED_COUNTRIES } from "@/backend-api/price-list/types";
 import { PRICE_LIST_QUERY_KEY, ZONES_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
@@ -61,6 +62,9 @@ type SettingsFormValues = {
   country: string;
   returnWindowDays: string;
   showPrices: boolean;
+  contentLanguages: ContentLanguages;
+  costPlus5Percent: boolean;
+  costPlus15Percent: boolean;
 };
 
 /**
@@ -98,6 +102,9 @@ const SettingsPage = () => {
       country: "",
       returnWindowDays: "14",
       showPrices: true,
+      contentLanguages: "both",
+      costPlus5Percent: false,
+      costPlus15Percent: false,
     },
   });
 
@@ -135,6 +142,9 @@ const SettingsPage = () => {
         country: settings.country ?? "",
         returnWindowDays: String(settings.returnWindowDays ?? 14),
         showPrices: settings.showPrices ?? true,
+        contentLanguages: settings.contentLanguages ?? "both",
+        costPlus5Percent: settings.costPlus5Percent ?? false,
+        costPlus15Percent: settings.costPlus15Percent ?? false,
       });
     }
   }, [settings, reset]);
@@ -165,6 +175,12 @@ const SettingsPage = () => {
       if (isSuper && sells && data.country) formData.append("country", data.country);
       if (sells && data.returnWindowDays !== "") formData.append("returnWindowDays", data.returnWindowDays);
       if (!sells) formData.append("showPrices", String(data.showPrices));
+      // Only a store published in more than one language has a choice to make.
+      if (multilingual) formData.append("contentLanguages", data.contentLanguages);
+      if (isSuper) {
+        formData.append("costPlus5Percent", String(data.costPlus5Percent));
+        formData.append("costPlus15Percent", String(data.costPlus15Percent));
+      }
       (data.socialMedia ?? []).forEach((item, i) => {
         formData.append(`socialMedia[${i}][key]`, item.key);
         formData.append(`socialMedia[${i}][value]`, item.value);
@@ -430,6 +446,66 @@ const SettingsPage = () => {
                       </Stack>
                     }
                   />
+                )}
+              />
+            </Paper>
+          )}
+
+          {/* Cost percentages — shown beside every unit cost typed; display only */}
+          {isSuper && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={0.5}>
+                {t("costPercentages")}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" component="p" mb={2}>
+                {t("costPercentagesHint")}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Stack>
+                {(["costPlus5Percent", "costPlus15Percent"] as const).map((name) => (
+                  <Controller
+                    key={name}
+                    name={name}
+                    control={control}
+                    render={({ field }) => (
+                      <FormControlLabel
+                        control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                        label={t("costPlusRate", { rate: name === "costPlus5Percent" ? 5 : 15 })}
+                      />
+                    )}
+                  />
+                ))}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* Content languages — which languages products and categories are typed in */}
+          {multilingual && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                {t("contentLanguages")}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Controller
+                name="contentLanguages"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    select
+                    size="small"
+                    label={t("contentLanguagesLabel")}
+                    value={field.value}
+                    onChange={field.onChange}
+                    helperText={t("contentLanguagesHint")}
+                    sx={{ maxWidth: 360 }}
+                    fullWidth
+                  >
+                    {CONTENT_LANGUAGES.map((mode) => (
+                      <MenuItem key={mode} value={mode}>
+                        {t(`contentLanguagesOptions.${mode}`)}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 )}
               />
             </Paper>

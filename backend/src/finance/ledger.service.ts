@@ -11,6 +11,7 @@ import { ACCOUNT, ChartAccount } from './accounts';
 import { JournalService, PostingLine } from './journal.service';
 import { FinanceReportsService } from './finance-reports.service';
 import { AccountStatementQueryDto, CreateManualJournalDto, JournalQueryDto, ReverseJournalDto } from './dto/accounting.dto';
+import { LocalText, memoText } from './journal-memo';
 
 /** Entries typed in by staff, as opposed to those business events post. */
 export const MANUAL_SOURCE = 'manual';
@@ -20,7 +21,7 @@ const REVERSED = 'reversed';
 const STATEMENT_MAX_LINES = 5000;
 const HOUR_MS = 60 * 60 * 1000;
 
-type LeanEntry = Pick<JournalEntry, 'entryNumber' | 'date' | 'source' | 'lines' | 'memo' | 'reversalOf' | 'postedAt' | 'createdBy'> & {
+type LeanEntry = Pick<JournalEntry, 'entryNumber' | 'date' | 'source' | 'lines' | 'memo' | 'memoKey' | 'memoParams' | 'reversalOf' | 'postedAt' | 'createdBy'> & {
   _id: Types.ObjectId;
 };
 
@@ -108,7 +109,7 @@ export class LedgerService {
       if (await this.journal.findBySource(MANUAL_SOURCE, original.source.id, REVERSED, session)) {
         throw new ConflictException(`Entry #${original.entryNumber} is already reversed`);
       }
-      return this.journal.reverse(original, REVERSED, date, session, userId, `Reverses entry #${original.entryNumber}: ${dto.reason.trim()}`);
+      return this.journal.reverse(original, REVERSED, date, session, userId, dto.reason.trim());
     });
   }
 
@@ -219,7 +220,7 @@ export class LedgerService {
       entryNumber: number;
       date: Date;
       source: LeanEntry['source'];
-      memo?: string;
+      memo?: LocalText;
       note?: string;
       moneyAccount?: string;
       counterparts: { code: string; name: ChartAccount['name'] }[];
@@ -243,7 +244,7 @@ export class LedgerService {
           entryNumber: e.entryNumber,
           date: e.date,
           source: e.source,
-          memo: e.memo,
+          memo: memoText(e),
           note: l.note,
           moneyAccount: l.moneyAccount ? moneyNames.get(String(l.moneyAccount)) : undefined,
           counterparts,
@@ -275,7 +276,7 @@ export class LedgerService {
       date: e.date,
       postedAt: e.postedAt,
       source: e.source,
-      memo: e.memo,
+      memo: memoText(e),
       isManual: e.source.type === MANUAL_SOURCE,
       isReversal: !!e.reversalOf,
       reversalOf: e.reversalOf,

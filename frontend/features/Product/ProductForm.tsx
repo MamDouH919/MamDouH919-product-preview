@@ -32,6 +32,7 @@ import Delete from "@mui/icons-material/Delete";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
 import LanguageTabs from "@/components/LanguageTabs";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
+import { useContentLanguages, useSeedSingleLanguage } from "@/lib/useContentLanguages";
 import { ImageInput } from "@/components/MUI/ImageInput";
 import { createProduct, updateProduct } from "@/backend-api/products/mutations";
 import { PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks";
@@ -43,6 +44,7 @@ import { getBackendUri, handleCompression } from "@/utils/helperFunctions";
 import { getBackendUrl } from "@/lib/getBackendUrl";
 import { useStoreModules } from "@/Hooks/useStoreModules";
 import SlugField from "@/components/MUI/SlugField";
+import CostPercentages, { addCostPercentages } from "@/components/CostPercentages";
 import { cleanSlug } from "@/lib/slug";
 
 type ImageItem = { file: File | string | null };
@@ -59,6 +61,9 @@ type VariantItem = {
   color: string;
   size: string;
   stock: string;
+  unitCost: string;
+  /** Cost percentages switched on for the opening cost; added to it when sent. */
+  costRates: number[];
 };
 
 type ProductFormValues = {
@@ -80,6 +85,8 @@ type ProductFormValues = {
   order: number;
   trackStock: boolean;
   stock: string;
+  unitCost: string;
+  costRates: number[];
   lowStockThreshold: string;
   allowBackorder: boolean;
 };
@@ -112,7 +119,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
   const { data: categories = [] } = useCategoriesQuery();
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } =
+  const content = useContentLanguages();
+
+  const { control, handleSubmit, watch, setValue, getValues, formState: { errors } } =
     useForm<ProductFormValues>({
       defaultValues: {
         name: { ar: defaultData?.name?.ar ?? "", en: defaultData?.name?.en ?? "" },
@@ -129,6 +138,8 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
           color: v.color ?? "",
           size: v.size ?? "",
           stock: String(v.stock ?? 0),
+          unitCost: "",
+          costRates: [],
         })),
         price: defaultData?.price !== undefined ? String(defaultData.price) : "",
         compareAtPrice: numberText(defaultData?.compareAtPrice),
@@ -143,10 +154,14 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         order: defaultData?.order ?? 0,
         trackStock: defaultData?.trackStock ?? true,
         stock: String(defaultData?.stock ?? 0),
+        unitCost: "",
+        costRates: [],
         lowStockThreshold: String(defaultData?.lowStockThreshold ?? 0),
         allowBackorder: defaultData?.allowBackorder ?? false,
       },
     });
+
+  useSeedSingleLanguage(content.single, ["name", "description", "shortDescription"], getValues, setValue);
 
   const selectedCategory = watch("category");
 
@@ -162,11 +177,14 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
     mutationFn: async (data: ProductFormValues) => {
       const formData = new FormData();
 
-      // Localized fields
+      // Localized fields; typed in one language, they go under every language.
+      const name = content.fill(data.name);
+      const description = content.fill(data.description);
+      const shortDescription = content.fill(data.shortDescription);
       LANGS.forEach((l) => {
-        if (data.name?.[l]) formData.append(`name[${l}]`, data.name[l]!);
-        if (data.description?.[l]) formData.append(`description[${l}]`, data.description[l]!);
-        if (data.shortDescription?.[l]) formData.append(`shortDescription[${l}]`, data.shortDescription[l]!);
+        if (name[l]) formData.append(`name[${l}]`, name[l]!);
+        if (description[l]) formData.append(`description[${l}]`, description[l]!);
+        if (shortDescription[l]) formData.append(`shortDescription[${l}]`, shortDescription[l]!);
       });
 
       // Images: existing paths are sent as one JSON list (so an empty list can
@@ -201,6 +219,8 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               // Only meaningful for a new variant. The server ignores it for an
               // existing one and keeps whatever the ledger says.
               stock: Number(v.stock) || 0,
+              // Cost of the opening units, booked with them. New variants only.
+              ...(!v._id && data.trackStock && v.unitCost.trim() !== "" ? { unitCost: Number(addCostPercentages(v.unitCost, v.costRates ?? [])) } : {}),
             })),
           ),
         );
@@ -214,6 +234,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         // the inventory ledger, never through this form.
         if (!isEditing && !data.variants?.length) {
           formData.append("stock", String(Number(data.stock) || 0));
+          if (data.trackStock && data.unitCost.trim() !== "") formData.append("unitCost", addCostPercentages(data.unitCost.trim(), data.costRates));
         }
       } else if (!isEditing) {
         // Untracked, so the storefront never shows it sold out; an edit leaves
@@ -263,6 +284,15 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
   const trackStock = watch("trackStock");
   const hasVariants = variantFields.length > 0;
   const variantColumn = tracksInventory ? 3 : 4;
+  // A cost at or above the selling price is almost always the price typed in
+  // the wrong box; warn, don't block.
+  const productPrice = watch("price");
+  const costHint = (cost: string, price: string, fallback?: string) => {
+    const c = Number(cost);
+    const p = Number(price.trim() !== "" ? price : productPrice);
+    if (cost.trim() !== "" && p > 0 && c >= p) return t("costAtOrAbovePrice");
+    return fallback;
+  };
 
   return (
     <Box component="form" onSubmit={handleSubmit((data) => mutation.mutate(data))}>
@@ -270,7 +300,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
         {/* ── 1. Basic info: what the customer reads ── */}
         <FormSection step={1} title={t("productBasicInfo")} hint={t("productBasicInfoHint")}>
-          <LanguageTabs hasError={tabHasError}>
+          <LanguageTabs hasError={tabHasError} languages={content.languages}>
             {(l) => (
             <>
               <TextInputComponent name={`name.${l}`} label={t("name")} control={control} required />
@@ -452,7 +482,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
               variant="outlined"
               startIcon={<Add />}
               onClick={() =>
-                appendVariant({ label: "", price: "", compareAtPrice: "", sku: "", gtin: "", color: "", size: "", stock: "0" })
+                appendVariant({ label: "", price: "", compareAtPrice: "", sku: "", gtin: "", color: "", size: "", stock: "0", unitCost: "", costRates: [] })
               }
             >
               {t("addVariant")}
@@ -527,6 +557,25 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                           />
                         </Grid>
                       )}
+                      {tracksInventory && trackStock && !field._id && (
+                        <Grid size={{ xs: 12, sm: 6, md: variantColumn }}>
+                          <TextInputComponent
+                            name={`variants.${index}.unitCost`}
+                            label={t("openingUnitCost")}
+                            control={control}
+                            type="number"
+                            helperText={costHint(
+                              watch(`variants.${index}.unitCost`) ?? "",
+                              watch(`variants.${index}.price`) ?? "",
+                            )}
+                          />
+                          <CostPercentages
+                            cost={watch(`variants.${index}.unitCost`) ?? ""}
+                            value={watch(`variants.${index}.costRates`) ?? []}
+                            onChange={(rates) => setValue(`variants.${index}.costRates`, rates)}
+                          />
+                        </Grid>
+                      )}
                     </Grid>
                     <Tooltip title={t("delete")}>
                       <IconButton color="error" onClick={() => removeVariant(index)}>
@@ -566,6 +615,20 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                           readOnly={isEditing}
                           helperText={isEditing ? t("stockEditedInInventory") : t("openingStockHint")}
                         />
+                      </Grid>
+                    )}
+                    {/* The opening units' cost goes in with them, so they never sit
+                        uncosted. Afterwards costs come from purchases. */}
+                    {!hasVariants && !isEditing && (
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextInputComponent
+                          name="unitCost"
+                          label={t("openingUnitCost")}
+                          control={control}
+                          type="number"
+                          helperText={costHint(watch("unitCost") ?? "", "", t("openingUnitCostHint"))}
+                        />
+                        <CostPercentages cost={watch("unitCost") ?? ""} value={watch("costRates")} onChange={(rates) => setValue("costRates", rates)} />
                       </Grid>
                     )}
                     <Grid size={{ xs: 12, sm: 6 }}>

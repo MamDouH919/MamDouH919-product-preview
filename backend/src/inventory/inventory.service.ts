@@ -22,6 +22,7 @@ import {
   QueryMovementsDto,
   StockFilter,
 } from './dto/query-inventory.dto';
+import { memo } from '../finance/journal-memo';
 
 /**
  * The cost-of-goods-sold side of a costing variance. Positive: the units sold
@@ -59,6 +60,8 @@ export interface StockLevel {
   valueMinor: number | null;
   /** Average cost of one unit; null until the stock has a cost. */
   unitCostMinor: number | null;
+  /** Has a cost, and nothing but the opening has touched it — so the opening cost can still be corrected. */
+  costCorrectable: boolean;
 }
 
 @Injectable()
@@ -176,7 +179,27 @@ export class InventoryService {
     );
 
     if (MANUAL_MOVEMENT_TYPES.includes(dto.type)) await this.postCorrection(movement, session, userId);
+    if (dto.type === MovementType.OPENING) await this.postOpening(movement, session, userId);
     return movement;
+  }
+
+  /**
+   * Opening stock that came in with a cost: owned before the books began, so
+   * it is booked against owner equity, the same as a cost set afterwards.
+   */
+  private async postOpening(movement: StockMovement, session: ClientSession, userId?: string) {
+    const value = movement.valueMinor ?? 0;
+    if (!value) return;
+    await this.journal.post(
+      {
+        date: new Date(),
+        source: { type: 'stock_movement', id: movement._id as Types.ObjectId, event: 'opening_cost' },
+        lines: [signedLine(ACCOUNT.INVENTORY, value), signedLine(ACCOUNT.EQUITY, -value)],
+        memo: memo('opening_stock', { qty: movement.quantity }),
+        createdBy: userId,
+      },
+      session,
+    );
   }
 
   /**
@@ -236,7 +259,88 @@ export class InventoryService {
             { account: ACCOUNT.INVENTORY, debitMinor: valueMinor },
             { account: ACCOUNT.EQUITY, creditMinor: valueMinor },
           ],
-          memo: `Opening stock value, ${pool.qty} unit(s)`,
+          memo: memo('opening_stock', { qty: pool.qty }),
+          createdBy: userId,
+        },
+        session,
+      );
+      return movement;
+    });
+  }
+
+  /**
+   * Fixes an opening cost typed wrong. Allowed only while nothing but the
+   * opening itself has touched this stock — once units were sold, bought or
+   * adjusted, those movements were valued at the old cost and changing it
+   * would leave them wrong. The difference is booked against owner equity,
+   * where the opening value went, and the history keeps both figures.
+   */
+  async correctOpeningCost(
+    productId: string,
+    variantId: string | undefined,
+    unitCostMinor: number,
+    userId?: string,
+  ): Promise<StockMovement> {
+    if (!Number.isSafeInteger(unitCostMinor) || unitCostMinor < 0) throw new BadRequestException('The unit cost must be 0 or more');
+    return withTransaction(this.connection, async (session) => {
+      const product = await this.productModel.findById(productId).session(session).exec();
+      if (!product) throw new NotFoundException(`Product ${productId} not found`);
+      const variant = variantId ? product.variants.find((v) => v._id.toString() === variantId) : undefined;
+      if (variantId && !variant) throw new NotFoundException(`Variant ${variantId} not found on this product`);
+      if (!variantId && product.variants?.length) throw new BadRequestException('This product has variants — correct the cost of each');
+
+      const pool = this.poolOf(product, variant);
+      if (!isValued(pool)) throw new BadRequestException('This stock has no cost yet — set it rather than correct it');
+
+      const later = await this.movementModel
+        .exists({
+          product: product._id,
+          variantId: variant?._id ?? null,
+          type: { $nin: [MovementType.OPENING, MovementType.COST_SET] },
+        })
+        .session(session)
+        .exec();
+      if (later) {
+        throw new ConflictException(
+          'This stock has been sold, bought or adjusted since its opening cost was set, so that cost can no longer be corrected',
+        );
+      }
+
+      const oldUnitMinor = unitCost(pool) ?? 0;
+      const valueMinor = Math.max(pool.qty, 0) * unitCostMinor;
+      const deltaMinor = valueMinor - (pool.valueMinor ?? 0);
+      if (deltaMinor === 0 && oldUnitMinor === unitCostMinor) throw new BadRequestException('That is already the cost of this stock');
+
+      const set = variant
+        ? { 'variants.$[v].inventoryValueMinor': valueMinor, 'variants.$[v].lastUnitCostMinor': unitCostMinor }
+        : { inventoryValueMinor: valueMinor, lastUnitCostMinor: unitCostMinor };
+      await this.productModel
+        .updateOne({ _id: product._id }, { $set: set }, { session, ...(variant ? { arrayFilters: [{ 'v._id': variant._id }] } : {}) })
+        .exec();
+
+      const [movement] = await this.movementModel.create(
+        [
+          {
+            product: product._id,
+            variantId: variant?._id,
+            variantLabel: variant?.label,
+            type: MovementType.COST_SET,
+            quantity: 0,
+            balanceAfter: pool.qty,
+            valueMinor: deltaMinor,
+            valueAfterMinor: valueMinor,
+            reason: `Opening cost corrected from ${formatMinor(oldUnitMinor)} to ${formatMinor(unitCostMinor)} per unit`,
+            user: userId ? new Types.ObjectId(userId) : undefined,
+          },
+        ],
+        { session },
+      );
+      await this.journal.post(
+        {
+          date: new Date(),
+          source: { type: 'stock_movement', id: movement._id as Types.ObjectId, event: 'opening_cost_corrected' },
+          lines: [signedLine(ACCOUNT.INVENTORY, deltaMinor), signedLine(ACCOUNT.EQUITY, -deltaMinor)],
+          memo: memo('opening_cost_corrected', { qty: pool.qty }),
           createdBy: userId,
         },
         session,
@@ -261,7 +365,7 @@ export class InventoryService {
           signedLine(ACCOUNT.INVENTORY_LOSSES, -(value + variance)),
           ...varianceLines(variance),
         ],
-        memo: `Stock ${movement.type.replace('_', ' ')}${movement.reason ? `: ${movement.reason}` : ''}`,
+        memo: memo('stock_movement', movement.reason ? { type: movement.type, reason: movement.reason } : { type: movement.type }),
         createdBy: userId,
       },
       session,
@@ -473,10 +577,11 @@ export class InventoryService {
       .sort({ order: 1, createdAt: -1 })
       .exec();
 
+    const touched = await this.touchedSinceOpening(products.map((p) => p._id as Types.ObjectId));
     const rows = products.flatMap((product) =>
       product.variants?.length
-        ? product.variants.map((variant) => this.toLevel(product, variant))
-        : [this.toLevel(product)],
+        ? product.variants.map((variant) => this.toLevel(product, variant, touched))
+        : [this.toLevel(product, undefined, touched)],
     );
 
     return this.filterByStatus(rows, query.status);
@@ -569,7 +674,19 @@ export class InventoryService {
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  private toLevel(product: Product, variant?: ProductVariant): StockLevel {
+  /** Items (`product:variant`) with any movement besides their opening — their opening cost is settled. */
+  private async touchedSinceOpening(productIds: Types.ObjectId[]): Promise<Set<string>> {
+    if (!productIds.length) return new Set();
+    const groups = await this.movementModel
+      .aggregate<{ _id: { product: Types.ObjectId; variantId?: Types.ObjectId } }>([
+        { $match: { product: { $in: productIds }, type: { $nin: [MovementType.OPENING, MovementType.COST_SET] } } },
+        { $group: { _id: { product: '$product', variantId: '$variantId' } } },
+      ])
+      .exec();
+    return new Set(groups.map((g) => `${g._id.product.toString()}:${g._id.variantId?.toString() ?? ''}`));
+  }
+
+  private toLevel(product: Product, variant: ProductVariant | undefined, touched: Set<string>): StockLevel {
     const stock = variant ? (variant.stock ?? 0) : (product.stock ?? 0);
     const pool = this.poolOf(product, variant);
     const threshold = product.lowStockThreshold ?? 0;
@@ -596,6 +713,8 @@ export class InventoryService {
       valued: isValued(pool),
       valueMinor: pool.valueMinor,
       unitCostMinor: unitCost(pool),
+      costCorrectable:
+        product.trackStock && isValued(pool) && !touched.has(`${product._id!.toString()}:${variant?._id?.toString() ?? ''}`),
     };
   }
 

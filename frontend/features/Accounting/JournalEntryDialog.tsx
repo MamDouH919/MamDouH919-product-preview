@@ -53,7 +53,7 @@ const JournalEntryDialog = ({ id, onClose, onOpenEntry, onOpenAccount }: { id: s
               {entry.isReversal && <Chip size="small" color="warning" label={t("accounting.reversal")} />}
               {entry.isReversed && <Chip size="small" color="warning" variant="outlined" label={t("accounting.reversed")} />}
             </Stack>
-            {entry.memo && <Typography variant="body2">{entry.memo}</Typography>}
+            {entry.memo && <Typography variant="body2">{name(entry.memo)}</Typography>}
             <Paper variant="outlined" sx={{ overflowX: "auto" }}>
               <Table size="small">
                 <TableHead>
