@@ -133,6 +133,9 @@ export async function proxy(req: NextRequest) {
   // a storefront customer. They are never interchangeable — an admin session
   // must not open /account, and a customer session must not open /admin.
   const token = req.cookies.get('token')?.value;
+  // The access cookie may be gone while the refresh token still holds the
+  // session; the dashboard trades it for a new access token on load.
+  const adminRefreshToken = req.cookies.get('refresh_token')?.value;
   const customerToken = req.cookies.get('customer_token')?.value;
 
   const isAccountRoute = pathname.includes('/account');
@@ -161,7 +164,7 @@ export async function proxy(req: NextRequest) {
   }
 
   // ── Dashboard admin ──
-  if (isAdminRoute && !token) {
+  if (isAdminRoute && !token && !adminRefreshToken) {
     const loginUrl = new URL(`/${locale}/login`, req.url);
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);

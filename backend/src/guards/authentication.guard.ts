@@ -35,10 +35,11 @@ export class AuthenticationGuard implements CanActivate {
       }
       // An access token outlives logout unless it is tied to a live session:
       // logout deletes the user's refresh-token row, and that ends every token.
-      if (!(await this.hasLiveSession(request, payload.userId))) {
+      if (!(await this.hasLiveSession(request, payload.userId, payload.sid))) {
         throw new UnauthorizedException("Invalid token");
       }
       request.userId = payload.userId;
+      request.sessionId = payload.sid;
     } catch (error) {
       Logger.error(error);
       throw new UnauthorizedException("Invalid token");
@@ -46,10 +47,15 @@ export class AuthenticationGuard implements CanActivate {
     return true;
   }
 
-  private async hasLiveSession(request: Request, userId: string): Promise<boolean> {
+  private async hasLiveSession(request: Request, userId: string, sid?: string): Promise<boolean> {
     if (!Types.ObjectId.isValid(userId)) return false;
+    if (sid !== undefined && !Types.ObjectId.isValid(sid)) return false;
     const connection = await this.tenantConnection.getConnection(request['tenant'] ?? request.hostname);
+    // Tokens carry the session they belong to, so logging out on one device
+    // ends that device only. Tokens minted before sessions existed have no
+    // `sid` and fall back to "any live session for this user".
     const session = await connection.model(RefreshToken.name).exists({
+      ...(sid ? { _id: new Types.ObjectId(sid) } : {}),
       userId: new Types.ObjectId(userId),
       expiryDate: { $gte: new Date() },
     });

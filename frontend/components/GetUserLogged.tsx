@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useAppDispatch } from "@/Store/store";
 import { changeAuthData } from "@/Store/slices/auth";
 import { fetchMe } from "@/backend-api/auth/queries";
-import { setAuthToken } from "@/lib/api";
+import { refreshAdminSession, setAuthToken } from "@/lib/api";
 import { getTokenFromCookie, handleLogout } from "@/actions/cookies";
 
 const GetUserLogged = ({ children }: { children: React.ReactNode }) => {
@@ -15,7 +15,13 @@ const GetUserLogged = ({ children }: { children: React.ReactNode }) => {
         initialized.current = true;
 
         (async () => {
-            const token = await getTokenFromCookie();
+            let token = await getTokenFromCookie();
+
+            // The access cookie can be gone while the session is still alive
+            // (e.g. a cookie set before it had a max-age) — try the refresh token.
+            if (!token) {
+                token = await refreshAdminSession().catch(() => null) ?? undefined;
+            }
 
             if (!token) {
                 dispatch(changeAuthData({ isInitialized: true }));

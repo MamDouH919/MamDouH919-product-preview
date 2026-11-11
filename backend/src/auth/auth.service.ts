@@ -19,6 +19,11 @@ import { ResetToken } from './schemas/reset-token.schema';
 import { RolesService } from '../roles/roles.service';
 import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 
+const ACCESS_TOKEN_TTL = '12h';
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** How long a just-rotated refresh token is still accepted (concurrent tabs). */
+const REFRESH_GRACE_MS = 60 * 1000;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -144,22 +149,61 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string, tenant: string) {
-    const token = await this.RefreshTokenModel.findOne({
-      token: refreshToken,
-      expiryDate: { $gte: new Date() },
+    const now = new Date();
+    const session = await this.RefreshTokenModel.findOne({
+      expiryDate: { $gte: now },
+      $or: [
+        { token: refreshToken },
+        { previousToken: refreshToken, previousValidUntil: { $gte: now } },
+      ],
     });
 
-    if (!token) {
+    if (!session) {
       throw new UnauthorizedException('Refresh token is invalid or has expired');
     }
 
     // The token row's own `_id` is not the user — signing with it gave an
     // access token whose every permission lookup failed.
-    if (!(await this.UserModel.exists({ _id: token.userId }))) {
+    if (!(await this.UserModel.exists({ _id: session.userId }))) {
       throw new UnauthorizedException('Refresh token is invalid or has expired');
     }
 
-    return this.generateUserTokens(token.userId, tenant);
+    if (session.token === refreshToken) {
+      // Rotate atomically: only succeeds if nobody rotated it in the meantime.
+      const next = uuidv4();
+      const rotated = await this.RefreshTokenModel.updateOne(
+        { _id: session._id, token: refreshToken },
+        {
+          $set: {
+            token: next,
+            expiryDate: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+            previousToken: refreshToken,
+            previousValidUntil: new Date(Date.now() + REFRESH_GRACE_MS),
+          },
+        },
+      );
+      if (rotated.modifiedCount === 1) {
+        return {
+          accessToken: this.signAccessToken(session.userId, tenant, session._id),
+          refreshToken: next,
+        };
+      }
+    }
+
+    // A concurrent refresh rotated this token first: hand back the current one
+    // instead of rotating again, which would strand the other caller.
+    const current = await this.RefreshTokenModel.findOne({
+      _id: session._id,
+      previousToken: refreshToken,
+      previousValidUntil: { $gte: new Date() },
+    });
+    if (!current) {
+      throw new UnauthorizedException('Refresh token is invalid or has expired');
+    }
+    return {
+      accessToken: this.signAccessToken(current.userId, tenant, current._id),
+      refreshToken: current.token,
+    };
   }
 
   async changePassword(userId, newPassword: string, oldPassword: string) {
@@ -224,26 +268,30 @@ export class AuthService {
     );
 
     await this.ResetTokenModel.deleteMany({ userId: resetToken.userId });
+    // A password reset signs the user out everywhere.
+    await this.RefreshTokenModel.deleteMany({ userId: resetToken.userId });
 
     return { message: 'Password reset successfully' };
   }
 
+  /** A fresh login: opens a new session (one per device) and issues its tokens. */
   async generateUserTokens(userId, tenant: string) {
     const refreshToken = uuidv4();
-    await this.storeRefreshToken(refreshToken, userId);
+    const session = await this.RefreshTokenModel.create({
+      token: refreshToken,
+      userId,
+      expiryDate: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    });
     return {
-      accessToken: this.JwtService.sign({ userId, tenant }, { expiresIn: "12h" }),
+      accessToken: this.signAccessToken(userId, tenant, session._id),
       refreshToken,
     };
   }
 
-  async storeRefreshToken(token: string, userId: string) {
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 7);
-    await this.RefreshTokenModel.updateOne(
-      { userId },
-      { $set: { expiryDate, token } },
-      { upsert: true },
+  private signAccessToken(userId, tenant: string, sid) {
+    return this.JwtService.sign(
+      { userId: String(userId), tenant, sid: String(sid) },
+      { expiresIn: ACCESS_TOKEN_TTL },
     );
   }
 
@@ -251,8 +299,13 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async logout(userId: string) {
-    await this.RefreshTokenModel.deleteOne({ userId });
+  /** Ends the caller's session only; tokens issued before sessions existed end every session. */
+  async logout(userId: string, sessionId?: string) {
+    if (sessionId) {
+      await this.RefreshTokenModel.deleteOne({ _id: sessionId, userId });
+    } else {
+      await this.RefreshTokenModel.deleteMany({ userId });
+    }
     return { message: 'Logged out successfully' };
   }
 

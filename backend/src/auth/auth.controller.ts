@@ -63,7 +63,7 @@ export class AuthController {
 
   @UseGuards(AuthenticationGuard)
   @Delete('logout')
-  async logout(@Req() req: { userId: string }) {
-    return this.authService.logout(req.userId);
+  async logout(@Req() req: { userId: string; sessionId?: string }) {
+    return this.authService.logout(req.userId, req.sessionId);
   }
 }

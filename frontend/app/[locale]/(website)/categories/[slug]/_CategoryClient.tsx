@@ -206,7 +206,7 @@ export default function CategoryPage({ params }: PageProps) {
           </Box>
 
           {/* Right: sub-categories + products */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0, width: { xs: "100%", md: "auto" } }}>
             {/* Sub-category chips */}
             {(loadingSubs || hasSubs) && (
               <>

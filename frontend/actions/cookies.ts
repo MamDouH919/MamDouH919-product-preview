@@ -16,9 +16,26 @@ const cookieOptions = {
     path: "/",
 };
 
-export async function setTokenInCookie(token: string) {
+// ── Dashboard admin ───────────────────────────────────────────────────────────
+// Both cookies outlive a browser restart for as long as the refresh token is
+// valid (7 days, sliding). The access token itself expires sooner (12h); the
+// api client trades the refresh token for a new pair when that happens.
+const ADMIN_SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+
+export async function setAdminSession(accessToken: string, refreshToken: string) {
     const cookieStore = await cookies()
-    cookieStore.set('token', token, cookieOptions)
+    cookieStore.set('token', accessToken, { ...cookieOptions, maxAge: ADMIN_SESSION_MAX_AGE })
+    // Never read by page scripts directly — only through getRefreshTokenFromCookie.
+    cookieStore.set('refresh_token', refreshToken, {
+        ...cookieOptions,
+        maxAge: ADMIN_SESSION_MAX_AGE,
+        httpOnly: true,
+    })
+}
+
+export async function getRefreshTokenFromCookie() {
+    const cookieStore = await cookies()
+    return cookieStore.get('refresh_token')?.value
 }
 
 export async function getTokenFromCookie() {
@@ -31,6 +48,7 @@ export async function removeTokenFromCookie() {
     const cookieStore = await cookies()
 
     cookieStore.delete('token')
+    cookieStore.delete('refresh_token')
 }
 
 export async function getSidebarStateFromCookie() {
@@ -43,6 +61,7 @@ export async function handleLogout() {
     const cookieStore = await cookies()
 
     cookieStore.delete('token')
+    cookieStore.delete('refresh_token')
     cookieStore.delete('me')
 
 }
