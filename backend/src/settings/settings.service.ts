@@ -81,6 +81,12 @@ export class SettingsService {
       }
       dto.showPrices = String(dto.showPrices) === 'true';
     }
+    if (dto.preorderEnabled !== undefined) {
+      if (!['true', 'false'].includes(String(dto.preorderEnabled))) {
+        throw new BadRequestException('preorderEnabled must be true or false');
+      }
+      dto.preorderEnabled = String(dto.preorderEnabled) === 'true';
+    }
     for (const key of ['costPlus5Percent', 'costPlus15Percent'] as const) {
       if (dto[key] === undefined) continue;
       if (!(await isSuper())) throw new ForbiddenException('Only a super admin can change the cost percentages');

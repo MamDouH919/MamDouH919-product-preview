@@ -149,7 +149,7 @@ export class ProductsController {
   @UseGuards(AuthenticationGuard, AuthorizationGuard)
   @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.DELETE] }])
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(id);
+  remove(@Param('id') id: string, @Req() req: Request & { userId?: string }) {
+    return this.productsService.remove(id, req.userId);
   }
 }

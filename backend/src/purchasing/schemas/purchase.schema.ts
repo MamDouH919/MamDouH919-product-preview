@@ -72,6 +72,10 @@ export class Purchase extends Document {
   @Prop({ type: Date, required: false })
   dueDate?: Date;
 
+  /** Where the goods are received. Absent on purchases from before warehouses: the main one. */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Warehouse', required: false })
+  warehouse?: Types.ObjectId;
+
   @Prop({ type: [PurchaseLineSchema], default: [] })
   lines!: PurchaseLine[];
 

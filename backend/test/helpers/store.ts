@@ -1,6 +1,7 @@
 import { Connection, Types } from 'mongoose';
 import { OrdersService } from '../../src/orders/orders.service';
 import { InventoryService } from '../../src/inventory/inventory.service';
+import { WarehousesService } from '../../src/inventory/warehouses.service';
 import { CouponsService } from '../../src/coupons/coupons.service';
 import { JournalService } from '../../src/finance/journal.service';
 import { PaymentsService } from '../../src/finance/payments.service';
@@ -28,7 +29,7 @@ import { PLAN_MODULES, StoreModule, StorePlan } from '../../src/common/tenant/st
  * stubbed, with fixed answers. `modules` is what the store's plan has —
  * everything unless a test says otherwise.
  */
-export function buildStore(db: Connection, modules: readonly StoreModule[] = PLAN_MODULES[StorePlan.FULL]) {
+export function buildStore(db: Connection, modules: readonly StoreModule[] = PLAN_MODULES[StorePlan.FULL], maxWarehouses = 5) {
   const model = (name: string) => db.model(name) as never;
   const zone = new Types.ObjectId();
   const subZone = new Types.ObjectId();
@@ -51,7 +52,8 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
   const notifications = { orderPlaced: () => undefined, statusChanged: () => undefined };
 
   const journal = new JournalService(model('JournalEntry'), model('Counter'), model('Setting'), model('MoneyAccount'), model('LedgerAccount'));
-  const inventory = new InventoryService(model('Product'), model('StockMovement'), db, journal);
+  const warehouses = new WarehousesService(model('Warehouse'), model('Product'), model('StockMovement'), db, maxWarehouses);
+  const inventory = new InventoryService(model('Product'), model('StockMovement'), model('StockTransfer'), model('Counter'), db, journal, warehouses);
   
   const coupons = new CouponsService(model('Coupon'), model('Order'), model('CouponUsage'));
   const orders = new OrdersService(
@@ -166,7 +168,7 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     },
   };
 
-  return { db, delivery, journal, inventory, coupons, orders, payments, finance, reconciliation, dashboard, refunds, purchasing, couriers, expenses, statements, periods, moneyAccounts, chart, ledger, ...helpers };
+  return { db, delivery, journal, inventory, warehouses, coupons, orders, payments, finance, reconciliation, dashboard, refunds, purchasing, couriers, expenses, statements, periods, moneyAccounts, chart, ledger, ...helpers };
 }
 
 export type Store = ReturnType<typeof buildStore>;

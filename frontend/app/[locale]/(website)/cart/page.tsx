@@ -184,7 +184,9 @@ const CartRow = ({
 
   // Prefer the live price; the snapshot only fills in while the quote loads.
   const unitPrice = line?.unitPrice ?? item.price;
-  const max = line?.available ?? 999;
+  // Pre-orderable units (held in another warehouse) can be bought too.
+  const sellable = line?.available != null ? line.available + (line.preorderAvailable ?? 0) : null;
+  const max = sellable ?? 999;
 
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
@@ -228,6 +230,11 @@ const CartRow = ({
               {formatMoney(unitPrice, currency)}
             </Typography>
           )}
+          {!line?.issue && !!line?.preorderQuantity && (
+            <Typography variant="caption" color="warning.main" display="block">
+              {t("preorderUnitsHint", { count: line.preorderQuantity })}
+            </Typography>
+          )}
 
           <Stack direction="row" alignItems="center" spacing={1} mt={1}>
             <Stack direction="row" alignItems="center" sx={{ border: 1, borderColor: "divider", borderRadius: 2 }}>
@@ -262,9 +269,9 @@ const CartRow = ({
           severity={line.issue === "insufficient_stock" ? "warning" : "error"}
           sx={{ mt: 1.5 }}
           action={
-            line.issue === "insufficient_stock" && (line.available ?? 0) > 0 ? (
-              <Button color="inherit" size="small" onClick={() => onQuantity(line.available!)}>
-                {t("useAvailable", { count: line.available! })}
+            line.issue === "insufficient_stock" && (sellable ?? 0) > 0 ? (
+              <Button color="inherit" size="small" onClick={() => onQuantity(sellable!)}>
+                {t("useAvailable", { count: sellable! })}
               </Button>
             ) : (
               <Button color="inherit" size="small" onClick={onRemove}>
@@ -274,8 +281,8 @@ const CartRow = ({
           }
         >
           {line.issue === "insufficient_stock"
-            ? (line.available ?? 0) > 0
-              ? t("onlyNAvailable", { count: line.available! })
+            ? (sellable ?? 0) > 0
+              ? t("onlyNAvailable", { count: sellable! })
               : t("outOfStock")
             : t("noLongerAvailable")}
         </Alert>

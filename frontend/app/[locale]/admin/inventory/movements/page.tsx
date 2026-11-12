@@ -26,6 +26,7 @@ import {
 } from "@/backend-api/inventory/types";
 import { useProductsQuery } from "@/backend-api/products/hooks";
 import SimpleTable from "@/components/Table/SimpleTable";
+import { warehouseName } from "@/features/Inventory/warehouseName";
 
 const StockMovementsPage = () => {
   const { t, i18n } = useTranslation();
@@ -85,6 +86,11 @@ const StockMovementsPage = () => {
         id: "type",
         header: t("movementType"),
         render: (row: StockMovement) => t(`movement_${row.type}`),
+      },
+      {
+        id: "warehouse",
+        header: t("warehouse"),
+        render: (row: StockMovement) => (row.warehouse ? warehouseName(row.warehouse, lang) : t("mainWarehouse")),
       },
       {
         id: "quantity",

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import mongoose, { Connection } from 'mongoose';
 import {
+  DEFAULT_MAX_WAREHOUSES,
   databaseKey,
   liveTenantMap,
   TenantConnectionService,
@@ -24,6 +25,8 @@ export interface TenantView {
   /** The storefront's languages, defaults filled in. An alias's own are ignored: it serves its primary host's. */
   languages: StoreLanguage[];
   defaultLanguage: StoreLanguage;
+  /** How many warehouses the store may keep. */
+  maxWarehouses: number;
   /** The connection string with any user:password replaced by `***`. */
   database: string;
   /** Whether this API instance holds an open connection to it right now. */
@@ -72,6 +75,7 @@ export class PlatformTenantsService {
       plan: dto.plan ?? DEFAULT_PLAN,
       ...(dto.languages ? { languages: dto.languages } : {}),
       ...(dto.defaultLanguage ? { defaultLanguage: dto.defaultLanguage } : {}),
+      ...(dto.maxWarehouses ? { maxWarehouses: dto.maxWarehouses } : {}),
     };
     this.assertValid([...records, record], registry.uri);
 
@@ -93,7 +97,9 @@ export class PlatformTenantsService {
       plan: dto.plan ?? current.plan,
       languages: dto.languages ?? current.languages,
       defaultLanguage: dto.defaultLanguage ?? current.defaultLanguage,
+      maxWarehouses: dto.maxWarehouses ?? current.maxWarehouses,
     };
+    if (!next.maxWarehouses) delete next.maxWarehouses;
     if (!next.languages) delete next.languages;
     if (!next.defaultLanguage) delete next.defaultLanguage;
     // An orders-only store keeps its stock and money outside the system from
@@ -202,6 +208,7 @@ export class PlatformTenantsService {
       disabled: record.disabled,
       plan: record.plan,
       ...resolveStoreLanguages(record.host, record.languages, record.defaultLanguage),
+      maxWarehouses: record.maxWarehouses ?? DEFAULT_MAX_WAREHOUSES,
       database: redactMongoUri(record.mongoUri),
       connected: this.tenants.isConnected(record.host),
       createdAt: record.createdAt,

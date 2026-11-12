@@ -1,9 +1,9 @@
-import { AppBar, Box, Container, IconButton, Toolbar, Tooltip, Typography, useColorScheme } from '@mui/material';
+import { AppBar, Box, Button, Container, IconButton, Toolbar, Tooltip, Typography, useColorScheme } from '@mui/material';
 import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlined from '@mui/icons-material/LightModeOutlined';
 import Logout from '@mui/icons-material/Logout';
 import Hub from '@mui/icons-material/Hub';
-import { Navigate, Outlet } from 'react-router';
+import { Navigate, NavLink, Outlet } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { useMe } from '../hooks/useTenants';
 
@@ -36,9 +36,15 @@ export function AppLayout() {
       >
         <Toolbar sx={{ gap: 1.5 }}>
           <Hub color="primary" />
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" sx={{ mr: 2 }}>
             Platform
           </Typography>
+          <Button component={NavLink} to="/tenants" color="inherit">
+            Stores
+          </Button>
+          <Button component={NavLink} to="/errors" color="inherit" sx={{ flexGrow: 1, justifyContent: 'flex-start' }}>
+            Errors
+          </Button>
           {me.data && (
             <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {me.data.email}

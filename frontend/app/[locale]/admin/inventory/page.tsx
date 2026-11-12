@@ -26,7 +26,10 @@ import Image from "next/image";
 import {
   useInventorySummaryQuery,
   useStockLevelsQuery,
+  useWarehousesQuery,
 } from "@/backend-api/inventory/hooks";
+import TransferDialog from "@/features/Inventory/TransferDialog";
+import { warehouseName } from "@/features/Inventory/warehouseName";
 import { InventoryFilters, StockLevel } from "@/backend-api/inventory/types";
 import { useCategoriesQuery } from "@/backend-api/categories/hooks";
 import { getBackendUri } from "@/utils/helperFunctions";
@@ -82,6 +85,11 @@ const InventoryPage = () => {
   const { data: levels, isLoading } = useStockLevelsQuery(filters);
   const { data: summary } = useInventorySummaryQuery();
   const { data: categories } = useCategoriesQuery();
+  const { data: warehousesData } = useWarehousesQuery();
+  const warehouses = useMemo(() => warehousesData?.data ?? [], [warehousesData]);
+  // One warehouse is how every store starts; columns per warehouse only once there are more.
+  const multi = warehouses.length > 1;
+  const [transferring, setTransferring] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(
@@ -92,6 +100,16 @@ const InventoryPage = () => {
             title: t("stockMovements"),
             icon: "add",
             link: `/${i18n.language}/admin/inventory/movements`,
+          },
+          {
+            title: t("warehouses"),
+            icon: "add",
+            link: `/${i18n.language}/admin/inventory/warehouses`,
+          },
+          {
+            title: t("stockTransfers"),
+            icon: "add",
+            link: `/${i18n.language}/admin/inventory/transfers`,
           },
         ],
       })
@@ -146,17 +164,43 @@ const InventoryPage = () => {
         header: t("sku"),
         render: (row: StockLevel) => row.sku ?? "—",
       },
+      ...(multi
+        ? warehouses.map((w) => ({
+            id: `wh-${w._id}`,
+            header: w.isMain ? `${warehouseName(w, lang)} ★` : warehouseName(w, lang),
+            render: (row: StockLevel) => {
+              if (!row.trackStock) return "∞";
+              const qty = row.stocks.find((e) => e.warehouseId === w._id)?.qty ?? 0;
+              return (
+                <Typography
+                  variant="body2"
+                  fontWeight={w.isMain ? 700 : 400}
+                  color={qty < 0 || (w.isMain && qty === 0) ? "error.main" : qty === 0 ? "text.disabled" : "text.primary"}
+                >
+                  {qty}
+                </Typography>
+              );
+            },
+          }))
+        : []),
       {
         id: "stock",
-        header: t("stock"),
+        header: multi ? t("totalStock") : t("stock"),
         render: (row: StockLevel) => (
-          <Typography
-            variant="body2"
-            fontWeight={700}
-            color={row.stock <= 0 ? "error.main" : "text.primary"}
-          >
-            {row.trackStock ? row.stock : "∞"}
-          </Typography>
+          <Stack>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              color={(multi ? row.totalStock : row.stock) <= 0 ? "error.main" : "text.primary"}
+            >
+              {row.trackStock ? (multi ? row.totalStock : row.stock) : "∞"}
+            </Typography>
+            {row.trackStock && row.stock < 0 && (
+              <Typography variant="caption" color="warning.main">
+                {t("preorderOwed", { count: -row.stock })}
+              </Typography>
+            )}
+          </Stack>
         ),
       },
       {
@@ -225,7 +269,7 @@ const InventoryPage = () => {
         ),
       },
     ],
-    [t, lang, currency]
+    [t, lang, currency, multi, warehouses]
   );
 
   return (
@@ -299,6 +343,28 @@ const InventoryPage = () => {
             </MenuItem>
           ))}
         </TextField>
+        {multi && (
+          <TextField
+            select
+            size="small"
+            label={t("warehouse")}
+            value={filters.warehouseId ?? ""}
+            onChange={(e) => setFilters((prev) => ({ ...prev, warehouseId: e.target.value || undefined }))}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">{t("all")}</MenuItem>
+            {warehouses.map((w) => (
+              <MenuItem key={w._id} value={w._id}>
+                {warehouseName(w, lang)}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+        {multi && (
+          <Button variant="outlined" onClick={() => setTransferring(Date.now())}>
+            {t("newTransfer")}
+          </Button>
+        )}
       </Stack>
 
       <Box flex={1} minHeight={0}>
@@ -315,6 +381,7 @@ const InventoryPage = () => {
       <ProductMovementsDialog row={historyRow} onClose={() => setHistoryRow(null)} />
       <OpeningCostDialog row={costRow} onClose={() => setCostRow(null)} />
       <OpeningCostDialog row={correctRow} correct onClose={() => setCorrectRow(null)} />
+      {transferring && <TransferDialog key={transferring} onClose={() => setTransferring(null)} />}
     </Stack>
   );
 };

@@ -31,6 +31,8 @@ export interface Tenant {
   /** The storefront's languages; an alias's own are ignored, it serves its primary host's. */
   languages: StoreLanguage[];
   defaultLanguage: StoreLanguage;
+  /** How many open warehouses the store may keep. */
+  maxWarehouses: number;
   /** Connection string with credentials replaced by `***`. */
   database: string;
   connected: boolean;
@@ -46,6 +48,7 @@ export interface TenantInput {
   plan?: StorePlan;
   languages?: StoreLanguage[];
   defaultLanguage?: StoreLanguage;
+  maxWarehouses?: number;
 }
 
 export interface TenantPatch {
@@ -56,6 +59,7 @@ export interface TenantPatch {
   plan?: StorePlan;
   languages?: StoreLanguage[];
   defaultLanguage?: StoreLanguage;
+  maxWarehouses?: number;
 }
 
 export interface TenantCheck {
@@ -93,6 +97,41 @@ export interface RestoreReport {
   restored: boolean;
   /** Backup of the state just before a real restore, to undo it. */
   safetyBackup?: string;
+}
+
+export type ErrorStatus = 'new' | 'resolved' | 'ignored';
+
+export interface ErrorGroup {
+  id: string;
+  /** The store's host, or `platform`. */
+  host: string;
+  method: string;
+  route: string;
+  statusCode: number;
+  name: string;
+  message: string;
+  stack: string | null;
+  count: number;
+  status: ErrorStatus;
+  note: string | null;
+  firstSeen: string;
+  lastSeen: string;
+  resolvedAt: string | null;
+}
+
+export interface ErrorQuery {
+  host?: string;
+  status?: ErrorStatus;
+  statusCode?: number;
+  q?: string;
+  page: number;
+  limit: number;
+}
+
+export interface ErrorStats {
+  totals: { groups: number; new: number; resolved: number; ignored: number; events: number };
+  perDay: { date: string; count: number }[];
+  byHost: { host: string; count: number }[];
 }
 
 export class ApiError extends Error {
@@ -166,6 +205,13 @@ async function download(path: string, filename: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const qs = (params: Record<string, string | number | undefined>) => {
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') search.set(k, String(v));
+  const text = search.toString();
+  return text ? `?${text}` : '';
+};
+
 const host = (h: string) => `/platform/tenants/${encodeURIComponent(h)}`;
 
 export const api = {
@@ -180,6 +226,13 @@ export const api = {
   checkTenant: (h: string) => request<TenantCheck>('POST', `${host(h)}/check`),
   seedTenant: (h: string, body: { admin: SeedUser; superAdmin?: SeedUser }) =>
     request<{ log: string[] }>('POST', `${host(h)}/seed`, body),
+
+  listErrors: (query: ErrorQuery) =>
+    request<{ items: ErrorGroup[]; total: number }>('GET', `/platform/errors${qs({ ...query })}`),
+  errorStats: (days: number) => request<ErrorStats>('GET', `/platform/errors/stats${qs({ days })}`),
+  updateError: (id: string, patch: { status?: ErrorStatus; note?: string }) =>
+    request<ErrorGroup>('PATCH', `/platform/errors/${encodeURIComponent(id)}`, patch),
+  deleteError: (id: string) => request<void>('DELETE', `/platform/errors/${encodeURIComponent(id)}`),
 
   listBackups: (h: string) => request<Backup[]>('GET', `${host(h)}/backups`),
   createBackup: (h: string) => request<Backup>('POST', `${host(h)}/backups`),

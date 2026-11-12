@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
@@ -9,6 +9,8 @@ import { PlatformLoginDto } from './dto/platform-login.dto';
 import { CreateTenantDto, SeedTenantDto, UpdateTenantDto } from './dto/tenant.dto';
 import { RestoreBackupDto } from './dto/backup.dto';
 import { BackupService } from '../backup/backup.service';
+import { TenantConnectionService } from '../common/helpers/dynamic-connection';
+import { ErrorStatsQueryDto, QueryErrorsDto, UpdateErrorDto } from './dto/errors.dto';
 
 /** Login for the platform dashboard. Not tied to any store's host. */
 @Controller('platform/auth')
@@ -99,5 +101,36 @@ export class PlatformBackupsController {
   @HttpCode(200)
   restore(@Param('host') host: string, @Param('id') id: string, @Body() dto: RestoreBackupDto) {
     return this.backups.restore(host, id, { dryRun: dto.dryRun !== false, confirm: dto.confirm });
+  }
+}
+
+
+/** Server errors from every store and the platform API, grouped by cause. */
+@Controller('platform/errors')
+@UseGuards(PlatformAuthGuard)
+export class PlatformErrorsController {
+  constructor(private readonly tenants: TenantConnectionService) {}
+
+  @Get()
+  list(@Query() query: QueryErrorsDto) {
+    return this.tenants.getRegistry().errors.list({ ...query, page: query.page ?? 1, limit: query.limit ?? 20 });
+  }
+
+  @Get('stats')
+  stats(@Query() query: ErrorStatsQueryDto) {
+    return this.tenants.getRegistry().errors.stats(query.days ?? 14);
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() dto: UpdateErrorDto) {
+    const updated = await this.tenants.getRegistry().errors.update(id, dto);
+    if (!updated) throw new NotFoundException('Error not found');
+    return updated;
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(@Param('id') id: string) {
+    if (!(await this.tenants.getRegistry().errors.remove(id))) throw new NotFoundException('Error not found');
   }
 }

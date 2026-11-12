@@ -196,6 +196,14 @@ export class Setting extends Document {
 
   @Prop({ default: false })
   costPlus15Percent!: boolean;
+
+  /**
+   * Lets a customer order what the main warehouse has run out of while
+   * another warehouse still holds it. The order waits, and cannot ship,
+   * until the units are transferred in.
+   */
+  @Prop({ default: false })
+  preorderEnabled!: boolean;
 }
 
 export const SettingSchema = SchemaFactory.createForClass(Setting);

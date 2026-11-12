@@ -43,7 +43,12 @@ export interface TenantConfig {
      */
     languages?: string[];
     defaultLanguage?: string;
+    /** How many warehouses the store may keep. Left out means DEFAULT_MAX_WAREHOUSES. */
+    maxWarehouses?: number;
 }
+
+/** Stores the platform hasn't given a warehouse allowance keep the one main warehouse. */
+export const DEFAULT_MAX_WAREHOUSES = 1;
 
 /**
  * Which database a URI points at, for spotting two hosts that share one:
@@ -94,11 +99,12 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
  */
 export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
     const all: Record<string, TenantConfig> = {};
-    for (const { host, mongoUri, frontendUrl, aliasOf, plan, languages, defaultLanguage } of records) {
+    for (const { host, mongoUri, frontendUrl, aliasOf, plan, languages, defaultLanguage, maxWarehouses } of records) {
         all[host] = {
             mongoUri,
             frontendUrl,
             plan,
+            ...(maxWarehouses ? { maxWarehouses } : {}),
             ...(languages?.length ? { languages } : {}),
             ...(defaultLanguage ? { defaultLanguage } : {}),
             ...(aliasOf ? { aliasOf } : {}),
@@ -145,6 +151,11 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
     async onModuleDestroy(): Promise<void> {
         clearInterval(this.refreshTimer);
         await this.registry?.close();
+    }
+
+    /** The platform registry when configured, else null; for callers that must never fail (error logging). */
+    findRegistry(): TenantRegistry | null {
+        return this.registry;
     }
 
     /** The platform registry, or 503 when this deployment still uses TENANT_MAP / config.json. */
@@ -245,6 +256,14 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
         const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
         const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
         return resolveStoreLanguages(host, primary?.languages, primary?.defaultLanguage);
+    }
+
+    /** How many warehouses the store may keep; an alias answers with its primary host's. */
+    getMaxWarehouses(host: string): number {
+        const tenantMap = this.loadTenantMap();
+        const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
+        const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
+        return primary?.maxWarehouses ?? DEFAULT_MAX_WAREHOUSES;
     }
 
     getModules(host: string): readonly StoreModule[] {

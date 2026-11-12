@@ -37,6 +37,13 @@ export async function toProductDto<T extends object>(body: Record<string, any>, 
       data.variants = 'invalid';
     }
   }
+  if (typeof data.openingStocks === 'string') {
+    try {
+      data.openingStocks = JSON.parse(data.openingStocks);
+    } catch {
+      data.openingStocks = 'invalid';
+    }
+  }
   if (typeof data.tags === 'string') {
     data.tags = data.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
   }

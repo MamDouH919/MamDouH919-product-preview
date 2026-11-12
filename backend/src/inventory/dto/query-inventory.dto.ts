@@ -21,6 +21,11 @@ export class QueryInventoryDto {
   @IsMongoId()
   categoryId?: string;
 
+  @ApiProperty({ required: false, description: 'Only items with stock in this warehouse' })
+  @IsOptional()
+  @IsMongoId()
+  warehouseId?: string;
+
   @ApiProperty({ required: false, description: 'Matches product name or SKU' })
   @IsOptional()
   @IsString()
@@ -40,6 +45,11 @@ export class QueryMovementsDto {
   @IsOptional()
   @IsMongoId()
   variantId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsMongoId()
+  warehouseId?: string;
 
   @ApiProperty({ required: false, enum: MovementType })
   @IsOptional()

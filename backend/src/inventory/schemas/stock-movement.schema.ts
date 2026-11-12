@@ -23,6 +23,18 @@ export class StockMovement extends Document {
   @Prop({ required: false })
   variantLabel?: string;
 
+  /** Where the units moved. Absent on rows written before warehouses existed: the main one. */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Warehouse', required: false, index: true })
+  warehouse?: Types.ObjectId;
+
+  /** The transfer this row is one side of. */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'StockTransfer', required: false })
+  transfer?: Types.ObjectId;
+
+  /** Of a sale's units, how many were sold ahead of stock — owed until a transfer arrives. */
+  @Prop({ type: Number, required: false })
+  preorderQuantity?: number;
+
   @Prop({ type: String, enum: MovementType, required: true })
   type!: MovementType;
 
@@ -30,7 +42,7 @@ export class StockMovement extends Document {
   @Prop({ required: true })
   quantity!: number;
 
-  /** Stock level after this movement was applied — the audit anchor. */
+  /** Stock in this movement's warehouse after it was applied — the audit anchor. */
   @Prop({ required: true })
   balanceAfter!: number;
 

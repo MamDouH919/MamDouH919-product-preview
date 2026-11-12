@@ -128,6 +128,7 @@ export class PurchasingService {
       date: dto.date ?? purchase.date.toISOString(),
       dueDate: dto.dueDate ?? purchase.dueDate?.toISOString(),
       notes: dto.notes ?? purchase.notes,
+      warehouseId: dto.warehouseId ?? (purchase.warehouse ? String(purchase.warehouse) : undefined),
       landedCost: dto.landedCost ?? formatMinor(purchase.landedCostMinor),
       lines:
         dto.lines ??
@@ -181,6 +182,7 @@ export class PurchasingService {
               variantId: line.variantId ? String(line.variantId) : undefined,
               type: MovementType.PURCHASE,
               quantity: line.quantity,
+              warehouseId: purchase.warehouse ? String(purchase.warehouse) : undefined,
               reference: `Purchase #${purchase.purchaseNumber}${purchase.supplierInvoiceNo ? ` (invoice ${purchase.supplierInvoiceNo})` : ''}`,
             },
             userId,
@@ -224,14 +226,14 @@ export class PurchasingService {
     if (query.supplierId) filter.supplier = this.oid(query.supplierId, 'Supplier');
     if (query.status) filter.status = query.status as PurchaseStatus;
     const [data, total] = await Promise.all([
-      this.purchaseModel.find(filter).sort({ date: -1, purchaseNumber: -1 }).skip((page - 1) * limit).limit(limit).populate('supplier', 'name').exec(),
+      this.purchaseModel.find(filter).sort({ date: -1, purchaseNumber: -1 }).skip((page - 1) * limit).limit(limit).populate('supplier', 'name').populate('warehouse', 'name code').exec(),
       this.purchaseModel.countDocuments(filter).exec(),
     ]);
     return { data, total, page, limit };
   }
 
   async purchase(id: string) {
-    const purchase = await this.purchaseModel.findById(this.oid(id, 'Purchase')).populate('supplier', 'name phone').exec();
+    const purchase = await this.purchaseModel.findById(this.oid(id, 'Purchase')).populate('supplier', 'name phone').populate('warehouse', 'name code').exec();
     if (!purchase) throw new NotFoundException('Purchase not found');
     const [returns, payments] = await Promise.all([
       this.returnModel.find({ purchase: purchase._id }).sort({ date: 1 }).lean().exec(),
@@ -288,11 +290,15 @@ export class PurchasingService {
 
       let variance = 0;
       let outOfStock = 0;
+      // Goods go back from the warehouse they were received into.
+      const warehouseId = purchase.warehouse ? String(purchase.warehouse) : undefined;
       for (const { line, quantity, valueMinor } of lines) {
-        const product = await this.productModel.findById(line.product).session(session).lean().exec();
-        const onHand = line.variantId
-          ? product?.variants.find((v) => v._id.equals(line.variantId))?.stock ?? 0
-          : product?.stock ?? 0;
+        const onHand = await this.inventory.currentStock(
+          String(line.product),
+          line.variantId ? String(line.variantId) : undefined,
+          warehouseId ?? String((await this.inventory.resolveWarehouse(undefined, session))._id),
+          session,
+        );
         if (onHand < quantity) {
           throw new BadRequestException(`Only ${Math.max(onHand, 0)} unit(s) of line ${purchaseLineLabel(line)} are on the shelf to send back`);
         }
@@ -302,6 +308,7 @@ export class PurchasingService {
             variantId: line.variantId ? String(line.variantId) : undefined,
             type: MovementType.PURCHASE_RETURN,
             quantity,
+            warehouseId,
             reference: `Supplier return #${ret.returnNumber} (Purchase #${purchase.purchaseNumber})`,
           },
           userId,
@@ -451,8 +458,11 @@ export class PurchasingService {
     // Freight goes to the lines by value, largest remainder, so the shares add up exactly (example E8).
     const shares = landedCostMinor > 0 ? allocate(landedCostMinor, totals) : lines.map(() => 0);
 
+    const warehouse = await this.inventory.resolveWarehouse(dto.warehouseId);
+
     return {
       supplier: supplier._id,
+      warehouse: warehouse._id,
       supplierInvoiceNo: dto.supplierInvoiceNo || undefined,
       date: this.date(dto.date),
       dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,

@@ -6,6 +6,7 @@ import { ALL_MODULES, requiredModules, StoreModule } from "@/lib/storeModules";
 export const useStoreModules = () => {
     const modules = useAppSelector((state) => state.settings.modules) ?? ALL_MODULES;
     const showPricesSetting = useAppSelector((state) => state.settings.showPrices);
+    const preorderSetting = useAppSelector((state) => state.settings.preorderEnabled);
 
     return useMemo(() => {
         const has = (module: StoreModule) => modules.includes(module);
@@ -15,6 +16,8 @@ export const useStoreModules = () => {
             allows: (pathname: string) => requiredModules(pathname).every(has),
             // A store that takes orders always shows what they cost.
             showPrices: has("orders") || showPricesSetting !== false,
+            /** Whether shoppers may order what the main warehouse is out of while another holds it. */
+            preorders: has("orders") && has("inventory") && preorderSetting === true,
         };
-    }, [modules, showPricesSetting]);
+    }, [modules, showPricesSetting, preorderSetting]);
 };

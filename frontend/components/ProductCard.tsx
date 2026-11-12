@@ -11,6 +11,7 @@ import CustomLink from "@/components/CustomLink"
 import WhatsAppButton from "@/components/WhatsAppButton"
 import WishlistButton from "@/features/Wishlist/WishlistButton"
 import QuickAddDialog from "@/features/Cart/QuickAddDialog"
+import { preorderUnits } from "@/lib/preorder"
 import { useStoreModules } from "@/Hooks/useStoreModules"
 import { saleFrom } from "@/lib/productOffer"
 import Image from "next/image"
@@ -26,7 +27,7 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
   const currency = useCurrency()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   // A catalog store takes no orders, so it has no cart, wishlist or stock to show.
-  const { has, showPrices } = useStoreModules()
+  const { has, showPrices, preorders } = useStoreModules()
   const sells = has("orders")
 
   const name = localizedField(product.name, lang)
@@ -46,7 +47,10 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
 
   const limited = has("inventory") && product.trackStock && !product.allowBackorder
   const stock = product.totalStock ?? (variants.length ? variants.reduce((s, v) => s + (v.stock ?? 0), 0) : product.stock)
-  const soldOut = limited && (stock ?? 0) <= 0
+  // Out here but held in another warehouse: still for sale, as a pre-order.
+  const preorderable = limited && preorders ? (variants.length ? variants.reduce((s, v) => s + preorderUnits(v), 0) : preorderUnits(product)) : 0
+  const soldOut = limited && (stock ?? 0) <= 0 && preorderable <= 0
+  const preorderOnly = limited && (stock ?? 0) <= 0 && preorderable > 0
   const canQuickAdd = !soldOut && displayPrice != null
 
   const cssVars = {
@@ -110,6 +114,11 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
           {soldOut && (
             <span className="pointer-events-none rounded-full bg-neutral-900 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-md">
               {t("outOfStock")}
+            </span>
+          )}
+          {preorderOnly && (
+            <span className="pointer-events-none rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-md">
+              {t("preorder")}
             </span>
           )}
         </div>

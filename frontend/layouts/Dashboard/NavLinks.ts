@@ -61,6 +61,8 @@ export const useLinksList = () => {
             icon: Warehouse,
             children: [
                 { primary: t("inventory"), pathname: "/admin/inventory" },
+                { primary: t("warehouses"), pathname: "/admin/inventory/warehouses" },
+                { primary: t("stockTransfers"), pathname: "/admin/inventory/transfers" },
                 { primary: t("purchases"), pathname: "/admin/purchases" },
                 { primary: t("suppliers"), pathname: "/admin/suppliers" },
             ],

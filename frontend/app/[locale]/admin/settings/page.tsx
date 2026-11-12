@@ -62,6 +62,7 @@ type SettingsFormValues = {
   country: string;
   returnWindowDays: string;
   showPrices: boolean;
+  preorderEnabled: boolean;
   contentLanguages: ContentLanguages;
   costPlus5Percent: boolean;
   costPlus15Percent: boolean;
@@ -102,6 +103,7 @@ const SettingsPage = () => {
       country: "",
       returnWindowDays: "14",
       showPrices: true,
+      preorderEnabled: false,
       contentLanguages: "both",
       costPlus5Percent: false,
       costPlus15Percent: false,
@@ -142,6 +144,7 @@ const SettingsPage = () => {
         country: settings.country ?? "",
         returnWindowDays: String(settings.returnWindowDays ?? 14),
         showPrices: settings.showPrices ?? true,
+        preorderEnabled: settings.preorderEnabled ?? false,
         contentLanguages: settings.contentLanguages ?? "both",
         costPlus5Percent: settings.costPlus5Percent ?? false,
         costPlus15Percent: settings.costPlus15Percent ?? false,
@@ -175,6 +178,7 @@ const SettingsPage = () => {
       if (isSuper && sells && data.country) formData.append("country", data.country);
       if (sells && data.returnWindowDays !== "") formData.append("returnWindowDays", data.returnWindowDays);
       if (!sells) formData.append("showPrices", String(data.showPrices));
+      if (sells && has("inventory")) formData.append("preorderEnabled", String(data.preorderEnabled));
       // Only a store published in more than one language has a choice to make.
       if (multilingual) formData.append("contentLanguages", data.contentLanguages);
       if (isSuper) {
@@ -359,6 +363,31 @@ const SettingsPage = () => {
                         slotProps={{ htmlInput: { min: 0, max: 365 } }}
                         sx={{ maxWidth: 360 }}
                         fullWidth
+                      />
+                    )}
+                  />
+                </Paper>
+              )}
+
+              {/* Pre-orders — sell what another warehouse still holds */}
+              {sells && has("inventory") && (
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
+                    {t("preorders")}
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Controller
+                    name="preorderEnabled"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControlLabel
+                        control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                        label={
+                          <Stack>
+                            <Typography variant="body2" fontWeight={600}>{t("preorderEnabled")}</Typography>
+                            <Typography variant="caption" color="text.secondary">{t("preorderEnabledHint")}</Typography>
+                          </Stack>
+                        }
                       />
                     )}
                   />

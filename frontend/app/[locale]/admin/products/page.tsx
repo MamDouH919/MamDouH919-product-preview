@@ -21,12 +21,34 @@ import { Product } from "@/backend-api/products/types";
 import { getBackendUri } from "@/utils/helperFunctions";
 import SimpleTable from "@/components/Table/SimpleTable";
 import CustomLink from "@/components/CustomLink";
+import { useCurrency } from "@/Hooks/useCurrency";
+import { formatMinorMoney } from "@/features/Order/format";
+
+type Unit = { price: number; costMinor: number };
+
+/** Sellable units with both a price and a known cost: the variants, or the product itself. */
+const costedUnits = (p: Product): Unit[] => {
+  const src = p.variants?.length
+    ? p.variants.map((v) => ({ price: v.price ?? p.price, cost: v.lastUnitCostMinor }))
+    : [{ price: p.price, cost: p.lastUnitCostMinor }];
+  return src.flatMap((u) =>
+    u.price != null && u.price > 0 && u.cost != null ? [{ price: u.price, costMinor: u.cost }] : []
+  );
+};
+
+/** "12" or "12 – 18" when the units differ. */
+const range = (values: number[], fmt: (n: number) => string) => {
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  return lo === hi ? fmt(lo) : `${fmt(lo)} – ${fmt(hi)}`;
+};
 
 const ProductsPage = () => {
   const { t, i18n } = useTranslation();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const lang = i18n.language;
+  const currency = useCurrency();
 
   const { data: products, isLoading } = useProductsQuery();
 
@@ -123,9 +145,45 @@ const ProductsPage = () => {
       },
       {
         id: "price",
-        header: t("price"),
+        header: t("sellingPrice"),
         render: (row: Product) =>
           row.price !== undefined ? row.price : "—",
+      },
+      {
+        id: "cost",
+        header: t("unitCost"),
+        render: (row: Product) => {
+          const u = costedUnits(row);
+          return u.length ? range(u.map((x) => x.costMinor), (n) => formatMinorMoney(n, currency)) : "—";
+        },
+      },
+      {
+        id: "profit",
+        header: t("profitPerUnit"),
+        render: (row: Product) => {
+          const u = costedUnits(row);
+          if (!u.length) return "—";
+          const profits = u.map((x) => Math.round(x.price * 100) - x.costMinor);
+          return (
+            <Box component="span" color={Math.min(...profits) < 0 ? "error.main" : "success.main"}>
+              {range(profits, (n) => formatMinorMoney(n, currency))}
+            </Box>
+          );
+        },
+      },
+      {
+        id: "margin",
+        header: t("profitMargin"),
+        render: (row: Product) => {
+          const u = costedUnits(row);
+          if (!u.length) return "—";
+          const margins = u.map((x) => ((x.price * 100 - x.costMinor) / (x.price * 100)) * 100);
+          return (
+            <Box component="span" color={Math.min(...margins) < 0 ? "error.main" : "success.main"}>
+              {range(margins, (n) => `${n.toFixed(1)}%`)}
+            </Box>
+          );
+        },
       },
       {
         id: "images",
@@ -183,7 +241,7 @@ const ProductsPage = () => {
         ),
       },
     ],
-    [t, lang, toggleActiveMutation, deleteMutation]
+    [t, lang, currency, toggleActiveMutation, deleteMutation]
   );
 
   return (

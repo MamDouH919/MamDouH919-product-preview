@@ -22,6 +22,8 @@ import Delete from "@mui/icons-material/Delete";
 import Add from "@mui/icons-material/Add";
 import { useProductsQuery } from "@/backend-api/products/hooks";
 import { useSuppliersQuery, PURCHASES_QUERY_KEY } from "@/backend-api/purchasing/hooks";
+import { useWarehousesQuery } from "@/backend-api/inventory/hooks";
+import { warehouseName } from "@/features/Inventory/warehouseName";
 import { createPurchase, updatePurchase } from "@/backend-api/purchasing/mutations";
 import { Purchase, PurchaseInput } from "@/backend-api/purchasing/types";
 import { formatMinorMoney, minorToInput } from "@/features/Order/format";
@@ -29,9 +31,31 @@ import { useCurrency } from "@/Hooks/useCurrency";
 import CostPercentages, { addCostPercentages } from "@/components/CostPercentages";
 import { AMOUNT, inputToMinor, toastError, todayInput } from "./shared";
 
-type Option = { productId: string; variantId?: string; label: string; tracked?: boolean };
+type Option = { productId: string; variantId?: string; label: string; tracked?: boolean; price?: number };
 /** `rates`: the cost percentages switched on for the line, added to its unit cost when sent. */
 type Line = { key: number; option: Option | null; quantity: string; unitCost: string; rates: number[] };
+
+/** Under a line: the product's selling price and the margin its unit cost leaves. */
+const Margin = ({ price, cost }: { price?: number; cost: string }) => {
+  const { t } = useTranslation();
+  const currency = useCurrency();
+  if (price == null) return null;
+  const priceMinor = Math.round(price * 100);
+  const costMinor = inputToMinor(cost);
+  const hasCost = AMOUNT.test(cost) && costMinor > 0 && priceMinor > 0;
+  const profit = priceMinor - costMinor;
+  const pct = hasCost ? (profit / priceMinor) * 100 : 0;
+  return (
+    <Typography variant="caption" color="text.secondary" component="div" mt={0.5}>
+      {t("sellingPrice")}: {formatMinorMoney(priceMinor, currency)}
+      {hasCost && (
+        <Typography component="span" variant="caption" fontWeight={700} color={profit < 0 ? "error.main" : "success.main"} sx={{ display: "block" }}>
+          {t("profitMargin")}: {pct.toFixed(1)}% ({formatMinorMoney(profit, currency)})
+        </Typography>
+      )}
+    </Typography>
+  );
+};
 
 /**
  * Enters a purchase as a draft — nothing moves until it is posted. With
@@ -54,8 +78,8 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
         .flatMap((p) => {
           const name = p.name[lang] ?? p.name.en ?? p.name.ar ?? "";
           return p.variants?.length
-            ? p.variants.map((v) => ({ productId: p._id, variantId: v._id, label: `${name} — ${v.label}`, tracked: p.trackStock }))
-            : [{ productId: p._id, label: name, tracked: p.trackStock }];
+            ? p.variants.map((v) => ({ productId: p._id, variantId: v._id, label: `${name} — ${v.label}`, tracked: p.trackStock, price: v.price ?? p.price }))
+            : [{ productId: p._id, label: name, tracked: p.trackStock, price: p.price }];
         })
         .sort((a, b) => Number(b.tracked) - Number(a.tracked)),
     [products, lang],
@@ -64,6 +88,11 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
   let nextKey = 0;
   const [supplierId, setSupplierId] = useState(typeof purchase?.supplier === "object" ? purchase.supplier._id : (purchase?.supplier ?? ""));
   const [invoiceNo, setInvoiceNo] = useState(purchase?.supplierInvoiceNo ?? "");
+  const [warehouseId, setWarehouseId] = useState(
+    typeof purchase?.warehouse === "object" ? purchase.warehouse._id : (purchase?.warehouse ?? ""),
+  );
+  const { data: warehousesData } = useWarehousesQuery(open);
+  const warehouses = (warehousesData?.data ?? []).filter((w) => w.isActive || w._id === warehouseId);
   const [date, setDate] = useState(purchase ? purchase.date.slice(0, 10) : todayInput());
   const [landed, setLanded] = useState(purchase ? minorToInput(purchase.landedCostMinor) : "");
   const [notes, setNotes] = useState(purchase?.notes ?? "");
@@ -90,6 +119,7 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
     mutationFn: () => {
       const body: PurchaseInput = {
         supplierId,
+        warehouseId: warehouseId || undefined,
         supplierInvoiceNo: invoiceNo.trim() || undefined,
         date: new Date(date).toISOString(),
         landedCost: landed || undefined,
@@ -119,6 +149,21 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
                 </MenuItem>
               ))}
             </TextField>
+            {warehouses.length > 1 && (
+              <TextField
+                select
+                label={t("receiveInto")}
+                value={warehouseId || warehouses.find((w) => w.isMain)?._id || ""}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                sx={{ flex: 1.5 }}
+              >
+                {warehouses.map((w) => (
+                  <MenuItem key={w._id} value={w._id}>
+                    {warehouseName(w, i18n.language)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField label={t("supplierInvoiceNo")} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} sx={{ flex: 1 }} />
             <TextField
               label={t("receivedOn")}
@@ -155,6 +200,7 @@ const PurchaseFormDialog = ({ open, purchase, onClose, onSaved }: { open: boolea
                   slotProps={{ htmlInput: { inputMode: "decimal", dir: "ltr" } }}
                 />
                 <CostPercentages cost={AMOUNT.test(line.unitCost) ? line.unitCost : ""} value={line.rates} onChange={(rates) => update(line.key, { rates })} />
+                <Margin price={line.option?.price} cost={lineCost(line)} />
               </Stack>
               <IconButton onClick={() => setLines((ls) => ls.filter((l) => l.key !== line.key))} disabled={lines.length === 1}>
                 <Delete />

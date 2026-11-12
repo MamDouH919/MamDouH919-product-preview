@@ -23,8 +23,11 @@ import { adjustStock, stockTake } from "@/backend-api/inventory/mutations";
 import {
   INVENTORY_QUERY_KEY,
   MOVEMENTS_QUERY_KEY,
+  WAREHOUSES_QUERY_KEY,
   useMovementTypesQuery,
+  useWarehousesQuery,
 } from "@/backend-api/inventory/hooks";
+import { warehouseName } from "./warehouseName";
 import { PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks";
 import { MovementType, StockLevel } from "@/backend-api/inventory/types";
 
@@ -59,13 +62,21 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
   const [counted, setCounted] = useState("");
   const [reason, setReason] = useState("");
   const [reference, setReference] = useState("");
+  const { data: warehousesData } = useWarehousesQuery(!!row);
+  const warehouses = (warehousesData?.data ?? []).filter((w) => w.isActive);
+  const mainId = warehouses.find((w) => w.isMain)?._id ?? "";
+  const [warehouseId, setWarehouseId] = useState("");
+  const selectedWarehouse = warehouseId || mainId;
+  // Units in the warehouse being changed: what a stock take compares with.
+  const here = row ? (row.stocks?.find((e) => e.warehouseId === selectedWarehouse)?.qty ?? (selectedWarehouse === mainId ? row.stock : 0)) : 0;
 
   useEffect(() => {
     if (!row) return;
+    setWarehouseId("");
     setMode("movement");
     setType("");
     setQuantity("");
-    setCounted(String(row.stock));
+    setCounted(String(Math.max(row.stock, 0)));
     setReason("");
     setReference("");
   }, [row]);
@@ -77,6 +88,7 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
     queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
     queryClient.invalidateQueries({ queryKey: [MOVEMENTS_QUERY_KEY] });
     queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
+    queryClient.invalidateQueries({ queryKey: [WAREHOUSES_QUERY_KEY] });
   };
 
   const mutation = useMutation({
@@ -87,6 +99,7 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
         return stockTake({
           productId: row.productId,
           variantId: row.variantId,
+          warehouseId: selectedWarehouse || undefined,
           countedQuantity: Number(counted),
           reason: reason || undefined,
         });
@@ -97,6 +110,7 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
       return adjustStock({
         productId: row.productId,
         variantId: row.variantId,
+        warehouseId: selectedWarehouse || undefined,
         type: selectedType,
         quantity: Number(quantity),
         reason: reason || undefined,
@@ -126,7 +140,7 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
   const parsedCounted = Number(counted);
 
   const delta =
-    mode === "count" && counted !== "" ? parsedCounted - row.stock : null;
+    mode === "count" && counted !== "" ? parsedCounted - here : null;
 
   const canSubmit =
     mode === "count"
@@ -145,7 +159,7 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
             {row.variantLabel ? ` — ${row.variantLabel}` : ""}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {t("currentStock")}: {row.stock}
+            {t("currentStock")}: {here}
           </Typography>
         </Stack>
       </DialogTitle>
@@ -162,6 +176,27 @@ const AdjustStockDialog = ({ row, onClose }: AdjustStockDialogProps) => {
             <ToggleButton value="movement">{t("recordMovement")}</ToggleButton>
             <ToggleButton value="count">{t("stockTake")}</ToggleButton>
           </ToggleButtonGroup>
+
+          {warehouses.length > 1 && (
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label={t("warehouse")}
+              value={selectedWarehouse}
+              onChange={(e) => {
+                setWarehouseId(e.target.value);
+                const qty = row.stocks?.find((s) => s.warehouseId === e.target.value)?.qty ?? 0;
+                setCounted(String(Math.max(qty, 0)));
+              }}
+            >
+              {warehouses.map((w) => (
+                <MenuItem key={w._id} value={w._id}>
+                  {warehouseName(w, lang)}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
 
           {mode === "movement" ? (
             <>

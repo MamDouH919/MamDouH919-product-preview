@@ -12,6 +12,8 @@ export enum MovementType {
   ADJUSTMENT_OUT = "adjustment_out",
   PURCHASE_RETURN = "purchase_return",
   COST_SET = "cost_set",
+  TRANSFER_OUT = "transfer_out",
+  TRANSFER_IN = "transfer_in",
 }
 
 /**
@@ -36,7 +38,14 @@ export type StockLevel = {
   image?: string;
   category?: Category;
   trackStock: boolean;
+  /** Units in the main warehouse — what can be sold now. Negative: pre-orders owed. */
   stock: number;
+  /** Units in every warehouse together. */
+  totalStock: number;
+  /** Units per warehouse. */
+  stocks: { warehouseId: string; qty: number }[];
+  /** Units that can still be pre-ordered from the other warehouses. */
+  preorderStock: number;
   lowStockThreshold: number;
   status: StockStatus;
   price?: number;
@@ -61,6 +70,7 @@ export type StockMovement = {
   };
   variantId?: string;
   variantLabel?: string;
+  warehouse?: { _id: string; name: LocalizedField; code: string };
   type: MovementType;
   /** Signed: positive added stock, negative removed it. */
   quantity: number;
@@ -94,6 +104,8 @@ export type MovementsResponse = {
 export type AdjustStockPayload = {
   productId: string;
   variantId?: string;
+  /** Left out means the main warehouse. */
+  warehouseId?: string;
   type: MovementType;
   /** Always positive — the type decides whether stock goes up or down. */
   quantity: number;
@@ -104,6 +116,7 @@ export type AdjustStockPayload = {
 export type StockTakePayload = {
   productId: string;
   variantId?: string;
+  warehouseId?: string;
   countedQuantity: number;
   reason?: string;
 };
@@ -111,15 +124,66 @@ export type StockTakePayload = {
 export type InventoryFilters = {
   status?: "all" | "low" | "out" | "in_stock";
   categoryId?: string;
+  warehouseId?: string;
   search?: string;
 };
 
 export type MovementFilters = {
   productId?: string;
   variantId?: string;
+  warehouseId?: string;
   type?: MovementType;
   from?: string;
   to?: string;
   page?: number;
   limit?: number;
+};
+
+export type Warehouse = {
+  _id: string;
+  name: LocalizedField;
+  code: string;
+  address?: string;
+  notes?: string;
+  isMain: boolean;
+  isActive: boolean;
+  /** Units held, all items together. Negative only on the main one (pre-orders owed). */
+  units: number;
+  /** Items with any units here. */
+  items: number;
+};
+
+export type WarehousesResponse = {
+  data: Warehouse[];
+  /** How many open warehouses the store's plan allows. */
+  max: number;
+};
+
+export type WarehousePayload = {
+  name: LocalizedField;
+  code: string;
+  address?: string;
+  notes?: string;
+  isActive?: boolean;
+};
+
+export type StockTransfer = {
+  _id: string;
+  transferNumber: number;
+  from: { _id: string; name: LocalizedField; code: string };
+  to: { _id: string; name: LocalizedField; code: string };
+  lines: { product: string; variantId?: string; name: LocalizedField; variantLabel?: string; sku?: string; quantity: number }[];
+  totalUnits: number;
+  note?: string;
+  createdBy?: { _id: string; name: string };
+  createdAt: string;
+};
+
+export type TransfersResponse = { data: StockTransfer[]; total: number; page: number; limit: number };
+
+export type TransferPayload = {
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  lines: { productId: string; variantId?: string; quantity: number }[];
+  note?: string;
 };

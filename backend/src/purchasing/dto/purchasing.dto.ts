@@ -106,6 +106,11 @@ export class CreatePurchaseDto {
   @IsDateString()
   dueDate?: string;
 
+  @ApiProperty({ required: false, description: 'Warehouse the goods are received into; left out means the main one' })
+  @IsOptional()
+  @IsMongoId()
+  warehouseId?: string;
+
   @ApiProperty({ type: [PurchaseLineInputDto] })
   @IsArray()
   @ArrayMinSize(1)

@@ -2,6 +2,35 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes, Types } from 'mongoose';
 import { LocalizedField, LocalizedFieldSchema } from '../../common/schemas/localized-field.schema';
 
+/** Units of one product or variant held in one warehouse. */
+@Schema({ _id: false })
+export class WarehouseStock {
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Warehouse', required: true })
+  warehouse!: Types.ObjectId;
+
+  /** Only the main warehouse goes below zero: units sold ahead of a transfer (pre-orders). */
+  @Prop({ default: 0 })
+  qty!: number;
+}
+
+export const WarehouseStockSchema = SchemaFactory.createForClass(WarehouseStock);
+
+/**
+ * Units on hand across every warehouse — what the stock's value is the cost
+ * of. Before warehouses existed there were no entries, and `stock` was all of it.
+ */
+export function totalUnits(source: { stock?: number; stocks?: WarehouseStock[] }): number {
+  return source.stocks?.length ? source.stocks.reduce((t, s) => t + (s.qty ?? 0), 0) : (source.stock ?? 0);
+}
+
+/**
+ * Units that can still be sold ahead of stock: what the other warehouses hold,
+ * less what the main one already owes. Zero when nothing is elsewhere.
+ */
+export function preorderUnits(source: { stock?: number; stocks?: WarehouseStock[] }): number {
+  return Math.max(0, totalUnits(source) - Math.max(source.stock ?? 0, 0));
+}
+
 // Variants carry their own `_id` so stock movements can reference one
 // reliably — an array index would break the moment variants are reordered.
 @Schema()
@@ -32,10 +61,15 @@ export class ProductVariant {
   @Prop({ required: false })
   size?: string;
 
+  /** Units in the main warehouse — what can be sold now. Mirrors its entry in `stocks`. */
   @Prop({ default: 0 })
   stock!: number;
 
-  /** Total cost of the stock on hand (minor units). Unset until its cost is known. */
+  /** Units per warehouse. Written only by InventoryService. */
+  @Prop({ type: [WarehouseStockSchema], default: [] })
+  stocks!: WarehouseStock[];
+
+  /** Total cost of the stock on hand in every warehouse (minor units). Unset until its cost is known. */
   @Prop({ type: Number, required: false })
   inventoryValueMinor?: number | null;
 
@@ -45,6 +79,12 @@ export class ProductVariant {
 }
 
 export const ProductVariantSchema = SchemaFactory.createForClass(ProductVariant);
+
+ProductVariantSchema.virtual('preorderStock').get(function (this: ProductVariant) {
+  return preorderUnits(this);
+});
+ProductVariantSchema.set('toJSON', { virtuals: true });
+ProductVariantSchema.set('toObject', { virtuals: true });
 
 @Schema({ timestamps: true })
 export class Product extends Document {
@@ -112,11 +152,15 @@ export class Product extends Document {
   trackStock!: boolean;
 
   // Only used when the product has no variants. With variants, stock lives on
-  // each variant and `totalStock` sums them.
+  // each variant and `totalStock` sums them. Units in the main warehouse — what
+  // can be sold now; `stocks` has every warehouse, the main one included.
   @Prop({ default: 0 })
   stock!: number;
 
-  // Cost of `stock`, for a product without variants (variants carry their own).
+  @Prop({ type: [WarehouseStockSchema], default: [] })
+  stocks!: WarehouseStock[];
+
+  // Cost of the units in every warehouse, for a product without variants (variants carry their own).
   // Changed only by InventoryService, with the stock, so the two always agree.
   @Prop({ type: Number, required: false })
   inventoryValueMinor?: number | null;
@@ -153,6 +197,12 @@ ProductSchema.virtual('totalStock').get(function (this: Product) {
     return this.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
   }
   return this.stock ?? 0;
+});
+
+/** Units that can be pre-ordered: held in other warehouses and not yet promised. */
+ProductSchema.virtual('preorderStock').get(function (this: Product) {
+  if (this.variants?.length) return this.variants.reduce((sum, v) => sum + preorderUnits(v), 0);
+  return preorderUnits(this);
 });
 
 ProductSchema.set('toJSON', { virtuals: true });

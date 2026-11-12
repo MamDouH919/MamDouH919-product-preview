@@ -1,5 +1,6 @@
 "use client";
 
+import { warehouseName } from "./warehouseName";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -69,7 +70,7 @@ const ProductMovementsDialog = ({ row, onClose }: ProductMovementsDialogProps) =
           </Stack>
           <Stack alignItems="flex-end">
             <Typography variant="h5" fontWeight={700}>
-              {row.trackStock ? row.stock : "∞"}
+              {row.trackStock ? (row.totalStock ?? row.stock) : "∞"}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {t("currentStock")}
@@ -96,6 +97,7 @@ const ProductMovementsDialog = ({ row, onClose }: ProductMovementsDialogProps) =
                 <TableRow>
                   <TableCell>{t("date")}</TableCell>
                   <TableCell>{t("movementType")}</TableCell>
+                  <TableCell>{t("warehouse")}</TableCell>
                   <TableCell align="center">{t("change")}</TableCell>
                   <TableCell align="center">{t("balanceAfter")}</TableCell>
                   <TableCell>{t("reason")}</TableCell>
@@ -118,6 +120,9 @@ const ProductMovementsDialog = ({ row, onClose }: ProductMovementsDialogProps) =
                         variant="outlined"
                         color={isAutomatic(movement.type) ? "info" : "default"}
                       />
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {movement.warehouse ? warehouseName(movement.warehouse, lang) : t("mainWarehouse")}
                     </TableCell>
                     <TableCell align="center">
                       <Typography

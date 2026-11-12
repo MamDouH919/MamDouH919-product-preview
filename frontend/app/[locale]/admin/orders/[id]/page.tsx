@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -150,6 +151,7 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
                 <Button size="small" startIcon={<LocalShippingOutlined />} href={printLink("packing-slip")} target="_blank">
                   {t("packingSlip")}
                 </Button>
+                {order.preorder && <Chip color="warning" variant="outlined" label={t("preorder")} />}
                 <OrderStatusChip status={order.status} size="medium" />
               </Stack>
             </Stack>

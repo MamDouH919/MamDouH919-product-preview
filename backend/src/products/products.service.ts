@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
 import { Product } from './schemas/product.schema';
+import { DeletedProduct } from './schemas/deleted-product.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { CreateProductDto, ProductVariantDto } from './dto/create-product.dto';
@@ -21,6 +22,20 @@ export const productImageStorage = tenantImageStorage('products');
 interface OpeningLine {
   stock: number;
   unitCost?: number;
+  /** Split by warehouse; when present `stock` is their sum and they are what gets booked. */
+  openingStocks?: { warehouseId: string; quantity: number }[];
+}
+
+/** The (warehouse, quantity) pieces of an opening line; no warehouse means the main one. */
+function openingParts(line: OpeningLine): { warehouseId?: string; quantity: number }[] {
+  const split = (line.openingStocks ?? []).filter((s) => s.quantity > 0);
+  if (line.openingStocks?.length) return split;
+  return line.stock > 0 ? [{ quantity: line.stock }] : [];
+}
+
+/** Total cost of one part: the unit cost times its own quantity. */
+function partValue(line: OpeningLine, quantity: number): number | undefined {
+  return openingValue({ ...line, stock: quantity });
 }
 
 /** Total cost of the opening units in minor units; undefined leaves them uncosted. */
@@ -33,12 +48,16 @@ function openingValue(line: OpeningLine): number | undefined {
   }
 }
 
+function totalOpening(split: { quantity: number }[] | undefined, fallback?: number): number {
+  return split?.length ? split.reduce((sum, s) => sum + s.quantity, 0) : (fallback ?? 0);
+}
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(DeletedProduct.name) private deletedModel: Model<DeletedProduct>,
     private readonly inventoryService: InventoryService,
   ) {}
 
@@ -70,16 +89,22 @@ export class ProductsService {
     // count is always the sum of its movements — never a number that appeared
     // from nowhere.
     const opening = {
-      product: { stock: createProductDto.stock ?? 0, unitCost: createProductDto.unitCost },
+      product: {
+        stock: totalOpening(createProductDto.openingStocks, createProductDto.stock),
+        unitCost: createProductDto.unitCost,
+        openingStocks: createProductDto.openingStocks,
+      },
       variants: (createProductDto.variants ?? []).map((v) => ({
         label: v.label,
-        stock: v.stock ?? 0,
+        stock: totalOpening(v.openingStocks, v.stock),
         unitCost: v.unitCost,
+        openingStocks: v.openingStocks,
       })),
     };
     createProductDto.stock = 0;
     delete createProductDto.unitCost;
-    createProductDto.variants = (createProductDto.variants ?? []).map(({ unitCost: _cost, ...v }) => ({
+    delete createProductDto.openingStocks;
+    createProductDto.variants = (createProductDto.variants ?? []).map(({ unitCost: _cost, openingStocks: _split, ...v }) => ({
       ...v,
       stock: 0,
     }));
@@ -403,6 +428,7 @@ export class ProductsService {
     // the incoming variants array replaces the stored one wholesale, and
     // whatever the form sent back is stale by definition.
     delete (updateProductDto as { stock?: number }).stock;
+    delete (updateProductDto as { stocks?: unknown }).stocks;
     delete (updateProductDto as { unitCost?: number }).unitCost;
     // Likewise the rating, which ReviewsService derives from approved reviews.
     delete (updateProductDto as { ratingAverage?: number }).ratingAverage;
@@ -469,7 +495,7 @@ export class ProductsService {
       await this.recordOpeningStock(
         updated,
         { stock: 0 },
-        addedVariants.map((v) => ({ label: v.label, stock: v.stock ?? 0, unitCost: v.unitCost })),
+        addedVariants.map((v) => ({ label: v.label, stock: totalOpening(v.openingStocks, v.stock), unitCost: v.unitCost, openingStocks: v.openingStocks })),
         userId,
       );
       return this.findOne(id);
@@ -495,25 +521,41 @@ export class ProductsService {
   }
 
   /**
-   * Only a product nothing refers to can be deleted. Once it has been ordered
-   * or has stock history, deleting it would orphan order lines and ledger
-   * rows — and with them its cost history — so it can only be deactivated.
+   * A product can be deleted whatever its history — orders already finished
+   * and stock movements stay, pointing at the copy kept in `DeletedProduct`.
+   * The one thing that blocks it is an order still in flight (not delivered or
+   * cancelled), which would otherwise be left with nothing to fulfil.
    */
-  async remove(id: string): Promise<Product> {
+  async remove(id: string, userId?: string): Promise<Product> {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException(`Product with id ${id} not found`);
     const product = await this.productModel.findById(id).exec();
     if (!product) throw new NotFoundException(`Product with id ${id} not found`);
 
-    const [ordered, moved] = await Promise.all([
-      this.orderModel.exists({ 'items.product': product._id }).exec(),
-      this.inventoryService.hasMovements(id),
-    ]);
-    if (ordered || moved) {
+    const open = await this.orderModel
+      .exists({
+        'items.product': product._id,
+        status: { $nin: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
+      })
+      .exec();
+    if (open) {
       throw new ConflictException(
-        'This product has orders or stock history, so it cannot be deleted. Deactivate it instead.',
+        'This product is on an order that is not finished yet, so it cannot be deleted. Finish or cancel the order first.',
       );
     }
 
+    await this.deletedModel
+      .updateOne(
+        { _id: product._id },
+        {
+          $set: {
+            snapshot: product.toObject(),
+            deletedAt: new Date(),
+            ...(userId && Types.ObjectId.isValid(userId) ? { deletedBy: new Types.ObjectId(userId) } : {}),
+          },
+        },
+        { upsert: true },
+      )
+      .exec();
     await this.productModel.deleteOne({ _id: product._id }).exec();
     return product;
   }
@@ -528,14 +570,23 @@ export class ProductsService {
     existing: Product,
     incoming: ProductVariantDto[],
   ): { merged: ProductVariantDto[]; added: ProductVariantDto[] } {
+    // Units per warehouse and their cost belong to the ledger as much as `stock`.
     const stockById = new Map(
-      (existing.variants ?? []).map((v) => [v._id.toString(), v.stock ?? 0]),
+      (existing.variants ?? []).map((v) => [
+        v._id.toString(),
+        {
+          stock: v.stock ?? 0,
+          stocks: v.stocks ?? [],
+          inventoryValueMinor: v.inventoryValueMinor,
+          lastUnitCostMinor: v.lastUnitCostMinor,
+        },
+      ]),
     );
 
     const added: ProductVariantDto[] = [];
     const merged = incoming.map((variant) => {
       if (variant._id && stockById.has(variant._id)) {
-        return { ...variant, stock: stockById.get(variant._id) };
+        return { ...variant, ...stockById.get(variant._id) };
       }
       added.push(variant);
       return { ...variant, stock: 0 };
@@ -561,41 +612,45 @@ export class ProductsService {
     const productId = product._id!.toString();
     const hasVariants = (product.variants?.length ?? 0) > 0;
 
-    if (!hasVariants && productOpening.stock > 0) {
-      await this.inventoryService.adjust(
-        {
-          productId,
-          type: MovementType.OPENING,
-          quantity: productOpening.stock,
-          reason: 'Opening stock',
-        },
-        userId,
-        session,
-        openingValue(productOpening),
-      );
+    if (!hasVariants) {
+      for (const part of openingParts(productOpening)) {
+        await this.inventoryService.adjust(
+          {
+            productId,
+            warehouseId: part.warehouseId,
+            type: MovementType.OPENING,
+            quantity: part.quantity,
+            reason: 'Opening stock',
+          },
+          userId,
+          session,
+          partValue(productOpening, part.quantity),
+        );
+      }
       return;
     }
 
     for (const opening of variants) {
-      if (opening.stock <= 0) continue;
-
       // Variant ids only exist after the save, so match on the label the
       // admin typed.
       const saved = product.variants.find((v) => v.label === opening.label);
       if (!saved) continue;
 
-      await this.inventoryService.adjust(
-        {
-          productId,
-          variantId: saved._id.toString(),
-          type: MovementType.OPENING,
-          quantity: opening.stock,
-          reason: 'Opening stock',
-        },
-        userId,
-        session,
-        openingValue(opening),
-      );
+      for (const part of openingParts(opening)) {
+        await this.inventoryService.adjust(
+          {
+            productId,
+            variantId: saved._id.toString(),
+            warehouseId: part.warehouseId,
+            type: MovementType.OPENING,
+            quantity: part.quantity,
+            reason: 'Opening stock',
+          },
+          userId,
+          session,
+          partValue(opening, part.quantity),
+        );
+      }
     }
   }
 

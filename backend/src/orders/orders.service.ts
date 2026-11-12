@@ -23,7 +23,7 @@ import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import { Order, OrderItem } from './schemas/order.schema';
 import { Counter } from './schemas/counter.schema';
-import { Product } from '../products/schemas/product.schema';
+import { preorderUnits, Product } from '../products/schemas/product.schema';
 import { Setting } from '../settings/schemas/setting.schema';
 import { LocalizedField } from '../common/schemas/localized-field.schema';
 import { InventoryService, varianceLines } from '../inventory/inventory.service';
@@ -71,6 +71,13 @@ export interface QuoteLine {
   lineTotalMinor: number;
   /** Units that can be sold right now; null when the line is not stock-limited. */
   available: number | null;
+  /**
+   * Units that can be pre-ordered on top of `available` (other warehouses'
+   * stock), when the store takes pre-orders; 0 otherwise or when not limited.
+   */
+  preorderAvailable: number;
+  /** Of `quantity`, how many would be pre-ordered. */
+  preorderQuantity: number;
   issue?: QuoteIssue;
 }
 
@@ -409,6 +416,7 @@ export class OrdersService {
     const customerId = (customer._id as Types.ObjectId).toString();
 
     const lines = await this.resolveLines(dto.items);
+    const preorderEnabled = await this.takesPreorders();
     const problems = lines.filter((line) => line.issue);
     if (problems.length) {
       throw new BadRequestException({
@@ -471,6 +479,7 @@ export class OrdersService {
               costEstimated: false,
               costReturnedMinor: 0,
               stockDeducted: line.tracksStock,
+              preorderQuantity: 0,
             })),
             shippingAddress: {
               fullName: address.fullName,
@@ -535,7 +544,7 @@ export class OrdersService {
         }));
       let movements: Awaited<ReturnType<InventoryService['adjustMany']>>;
       try {
-        movements = await this.inventoryService.adjustMany(sales, undefined, session);
+        movements = await this.inventoryService.adjustMany(sales, undefined, session, { preorder: preorderEnabled });
       } catch (error) {
         // The inventory message quotes the stock it read before losing the race
         // ("2 available, 2 requested"), which reads as nonsense to a shopper.
@@ -547,6 +556,8 @@ export class OrdersService {
         throw error;
       }
 
+      // The stock writes, not the quote, say how many units went out ahead of stock.
+      await this.markPreorders(created, lines, movements, session);
       if (this.keepsBooks) await this.reserveCost(created, lines, movements, session);
       return created;
     });
@@ -672,6 +683,7 @@ export class OrdersService {
     }
 
     return withTransaction(this.connection, async (session) => {
+      if (to === OrderStatus.SHIPPED && order.preorder) await this.assertPreordersArrived(order, session);
       const at = new Date();
       const updated = await this.orderModel
         .findOneAndUpdate(
@@ -1028,7 +1040,10 @@ export class OrdersService {
     }
 
     const ids = [...new Set([...merged.values()].map((i) => i.productId))];
-    const products = await this.productModel.find({ _id: { $in: ids } }).exec();
+    const [products, preorderEnabled] = await Promise.all([
+      this.productModel.find({ _id: { $in: ids } }).exec(),
+      this.takesPreorders(),
+    ]);
     const byId = new Map(products.map((p) => [p._id!.toString(), p]));
 
     return [...merged.values()].map((item) => {
@@ -1039,6 +1054,8 @@ export class OrdersService {
         lineTotal: 0,
         lineTotalMinor: 0,
         available: null,
+        preorderAvailable: 0,
+        preorderQuantity: 0,
         tracksStock: false,
       };
 
@@ -1068,7 +1085,10 @@ export class OrdersService {
       // Without inventory nothing is counted, so nothing runs out.
       const tracksStock = this.takesStock && product.trackStock;
       const limited = tracksStock && !product.allowBackorder;
-      const available = limited ? (variant ? variant.stock : product.stock) ?? 0 : null;
+      const stockSource = variant ?? product;
+      const available = limited ? Math.max(stockSource.stock ?? 0, 0) : null;
+      const preorderAvailable = limited && preorderEnabled ? preorderUnits(stockSource) : 0;
+      const preorderQuantity = available !== null ? Math.min(Math.max(item.quantity - available, 0), preorderAvailable) : 0;
 
       const line: ResolvedLine = {
         ...base,
@@ -1082,15 +1102,64 @@ export class OrdersService {
         lineTotal: unitPriceMinor !== undefined ? toMajor(unitPriceMinor * item.quantity) : 0,
         lineTotalMinor: unitPriceMinor !== undefined ? unitPriceMinor * item.quantity : 0,
         available,
+        preorderAvailable,
+        preorderQuantity,
         tracksStock,
       };
 
       if (unitPriceMinor === undefined) return { ...line, issue: 'no_price' };
-      if (available !== null && available < item.quantity) {
+      if (available !== null && available + preorderAvailable < item.quantity) {
         return { ...line, issue: 'insufficient_stock' };
       }
       return line;
     });
+  }
+
+  /** Whether the store takes pre-orders: its setting, and only where stock is counted at all. */
+  private async takesPreorders(): Promise<boolean> {
+    if (!this.takesStock) return false;
+    const settings = await this.settingModel.findOne().select('preorderEnabled').lean().exec();
+    return !!settings?.preorderEnabled;
+  }
+
+  /** Records, line by line, how many units each sale took ahead of stock. */
+  private async markPreorders(
+    order: Order,
+    lines: ResolvedLine[],
+    movements: StockMovement[],
+    session: ClientSession,
+  ): Promise<void> {
+    const tracked = lines.map((line, i) => ({ line, i })).filter(({ line }) => line.tracksStock);
+    const set: Record<string, number | boolean> = {};
+    tracked.forEach(({ i }, k) => {
+      const qty = movements[k]?.preorderQuantity ?? 0;
+      if (qty > 0) set[`items.${i}.preorderQuantity`] = qty;
+    });
+    if (!Object.keys(set).length) return;
+    set.preorder = true;
+    await this.orderModel.updateOne({ _id: order._id }, { $set: set }, { session }).exec();
+    order.preorder = true;
+  }
+
+  /**
+   * A pre-order ships once the main warehouse has the units back: its stock
+   * of every pre-ordered line is no longer below zero.
+   */
+  private async assertPreordersArrived(order: Order, session: ClientSession): Promise<void> {
+    const waiting: string[] = [];
+    for (const item of order.items.filter((i) => (i.preorderQuantity ?? 0) > 0)) {
+      const product = await this.productModel.findById(item.product).session(session).lean().exec();
+      const source = item.variantId ? product?.variants.find((v) => v._id.equals(item.variantId)) : product;
+      if (source && (source.stock ?? 0) < 0) {
+        const name = item.name.en ?? item.name.ar ?? '';
+        waiting.push(item.variantLabel ? `${name} (${item.variantLabel})` : name);
+      }
+    }
+    if (waiting.length) {
+      throw new ConflictException(
+        `This is a pre-order and the main warehouse is still waiting for: ${waiting.join(', ')}. Transfer the stock in before shipping it.`,
+      );
+    }
   }
 
   private async getCheckoutSettings(): Promise<{

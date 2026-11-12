@@ -33,6 +33,8 @@ export type Purchase = {
   _id: string;
   purchaseNumber: number;
   supplier: { _id: string; name: string; phone?: string } | string;
+  /** Where the goods were received; absent on purchases from before warehouses (the main one). */
+  warehouse?: { _id: string; name: { [lang: string]: string | undefined }; code: string } | string;
   supplierInvoiceNo?: string;
   date: string;
   dueDate?: string;
@@ -66,6 +68,8 @@ export type SupplierInput = { name: string; phone?: string; email?: string; taxI
 /** Decimal strings for every amount, so no float ever carries money. */
 export type PurchaseInput = {
   supplierId: string;
+  /** Left out means the main warehouse. */
+  warehouseId?: string;
   supplierInvoiceNo?: string;
   date: string;
   dueDate?: string;

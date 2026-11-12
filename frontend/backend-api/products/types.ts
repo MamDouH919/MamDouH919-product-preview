@@ -1,3 +1,4 @@
+import type { WarehouseStock } from "@/lib/preorder";
 import { LocalizedField } from "../globalTypes";
 import { Category } from "../categories/types";
 import { SubCategory } from "../sub-categories/types";
@@ -12,7 +13,12 @@ export type ProductVariant = {
   gtin?: string;
   color?: string;
   size?: string;
+  /** Units in the main warehouse — what can be sold now. */
   stock: number;
+  /** Units per warehouse, the main one included. */
+  stocks?: WarehouseStock[];
+  /** Cost of one unit at the last receipt, in minor units. Read-only; set by the inventory ledger. */
+  lastUnitCostMinor?: number | null;
 };
 
 export type Product = {
@@ -38,6 +44,10 @@ export type Product = {
   trackStock: boolean;
   /** Product-level stock. Meaningful only when `variants` is empty. */
   stock: number;
+  /** Units per warehouse, the main one included. Product-level, like `stock`. */
+  stocks?: WarehouseStock[];
+  /** Cost of one unit at the last receipt, in minor units. Product-level, like `stock`. */
+  lastUnitCostMinor?: number | null;
   lowStockThreshold: number;
   allowBackorder: boolean;
   /** Virtual: product stock, or the sum of its variants. */

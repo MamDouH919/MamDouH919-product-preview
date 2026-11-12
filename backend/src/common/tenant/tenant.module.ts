@@ -14,6 +14,9 @@ export const TENANT_CONNECTION = 'TENANT_CONNECTION';
  */
 export const STORE_MODULES = 'STORE_MODULES';
 
+/** How many warehouses the requesting store's platform allowance lets it keep. */
+export const MAX_WAREHOUSES = 'MAX_WAREHOUSES';
+
 @Global()
 @Module({
   providers: [
@@ -35,7 +38,14 @@ export const STORE_MODULES = 'STORE_MODULES';
         tenantConnection.getModules(req['tenant'] ?? req.hostname),
       inject: [REQUEST, TenantConnectionService],
     },
+    {
+      provide: MAX_WAREHOUSES,
+      scope: Scope.REQUEST,
+      useFactory: (req: Request, tenantConnection: TenantConnectionService): number =>
+        tenantConnection.getMaxWarehouses(req['tenant'] ?? req.hostname),
+      inject: [REQUEST, TenantConnectionService],
+    },
   ],
-  exports: [TENANT_CONNECTION, STORE_MODULES, TenantConnectionService],
+  exports: [TENANT_CONNECTION, STORE_MODULES, MAX_WAREHOUSES, TenantConnectionService],
 })
 export class TenantModule {}

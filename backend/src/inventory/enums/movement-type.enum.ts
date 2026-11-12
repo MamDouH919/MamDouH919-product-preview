@@ -19,6 +19,10 @@ export enum MovementType {
   PURCHASE_RETURN = 'purchase_return',
   /** Stock on hand given its first cost. Moves no units, only value. */
   COST_SET = 'cost_set',
+  /** Sent to another warehouse. Moves no value: the stock is still the store's. */
+  TRANSFER_OUT = 'transfer_out',
+  /** Arrived from another warehouse. */
+  TRANSFER_IN = 'transfer_in',
 }
 
 /**
@@ -36,6 +40,8 @@ export const MOVEMENT_DIRECTION: Record<MovementType, 1 | -1> = {
   [MovementType.ADJUSTMENT_OUT]: -1,
   [MovementType.PURCHASE_RETURN]: -1,
   [MovementType.COST_SET]: 1,
+  [MovementType.TRANSFER_OUT]: -1,
+  [MovementType.TRANSFER_IN]: 1,
 };
 
 /**

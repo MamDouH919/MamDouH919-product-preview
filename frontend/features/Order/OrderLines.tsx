@@ -16,6 +16,8 @@ export type OrderLine = {
   unitPrice?: number;
   quantity: number;
   lineTotal: number;
+  /** Units of it that are pre-ordered. */
+  preorderQuantity?: number;
 };
 
 /** A read-only list of lines with subtotal, delivery and total underneath. */
@@ -74,6 +76,11 @@ const OrderLines = ({
               {line.variantLabel ? `${line.variantLabel} · ` : ""}
               {line.quantity} × {line.unitPrice != null ? formatMoney(line.unitPrice, currency) : "—"}
             </Typography>
+            {!!line.preorderQuantity && (
+              <Typography variant="caption" color="warning.main" display="block">
+                {t("preorderUnits", { count: line.preorderQuantity })}
+              </Typography>
+            )}
           </Box>
           <Typography variant="body2" fontWeight={600} whiteSpace="nowrap">
             {formatMoney(line.lineTotal, currency)}

@@ -1,5 +1,8 @@
 "use client"
 
+import { useStoreModules } from "@/Hooks/useStoreModules"
+import { preorderUnits } from "@/lib/preorder"
+
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Dialog } from "@mui/material"
@@ -18,11 +21,13 @@ function localized(field: Record<string, string | undefined> | undefined, lang: 
 }
 
 /** Picks the first variant that can actually be bought, so the dialog opens ready to add. */
-function defaultVariant(product: Product): number | null {
+function defaultVariant(product: Product, preorders: boolean): number | null {
   if (!product.variants?.length) return null
   if (!product.trackStock || product.allowBackorder) return 0
   const i = product.variants.findIndex((v) => v.stock > 0)
-  return i === -1 ? 0 : i
+  if (i !== -1) return i
+  const p = preorders ? product.variants.findIndex((v) => preorderUnits(v) > 0) : -1
+  return p === -1 ? 0 : p
 }
 
 export default function QuickAddDialog({
@@ -38,7 +43,8 @@ export default function QuickAddDialog({
   const lang = i18n.language
   const theme = useTheme()
   const currency = useCurrency()
-  const [variantIndex, setVariantIndex] = useState<number | null>(() => defaultVariant(product))
+  const { preorders } = useStoreModules()
+  const [variantIndex, setVariantIndex] = useState<number | null>(() => defaultVariant(product, preorders))
 
   const name = localized(product.name, lang)
   const categoryName = localized(product.category?.name, lang)
@@ -108,7 +114,7 @@ export default function QuickAddDialog({
               <span className="text-sm font-medium text-neutral-500">{t("variants")}</span>
               <div className="flex flex-wrap gap-2">
                 {variants.map((v, i) => {
-                  const soldOut = limited && v.stock <= 0
+                  const soldOut = limited && v.stock <= 0 && !(preorders && preorderUnits(v) > 0)
                   const active = variantIndex === i
                   return (
                     <button

@@ -84,6 +84,14 @@ export class OrderItem {
    */
   @Prop({ default: false })
   stockDeducted!: boolean;
+
+  /**
+   * Of `quantity`, the units sold ahead of stock: the main warehouse was out
+   * and they come from another one by transfer. The order can't ship until
+   * the main warehouse has them.
+   */
+  @Prop({ default: 0, min: 0 })
+  preorderQuantity!: number;
 }
 
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
@@ -294,6 +302,10 @@ export class Order extends Document {
 
   @Prop({ type: String, enum: OrderStatus, default: OrderStatus.PENDING, index: true })
   status!: OrderStatus;
+
+  /** Some of its units were pre-ordered: it waits for a transfer before it can ship. */
+  @Prop({ default: false, index: true })
+  preorder!: boolean;
 
   @Prop({ type: [OrderStatusChangeSchema], default: [] })
   statusHistory!: OrderStatusChange[];

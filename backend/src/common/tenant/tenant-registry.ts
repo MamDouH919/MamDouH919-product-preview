@@ -2,6 +2,7 @@ import mongoose, { Connection, Model, Schema } from 'mongoose';
 import { decryptSecret, encryptSecret } from '../helpers/secret-box';
 import type { TenantConfig } from '../helpers/dynamic-connection';
 import { DEFAULT_PLAN, StorePlan } from './store-plan';
+import { ErrorLogStore } from './error-log-store';
 
 /** One store as the platform dashboard sees it. `mongoUri` is plain text here. */
 export interface TenantRecord extends TenantConfig {
@@ -25,6 +26,8 @@ interface StoredTenant {
   /** Missing on stores registered before languages were set here; read as the defaults. */
   languages?: string[];
   defaultLanguage?: string;
+  /** Missing on stores registered before warehouses; read as DEFAULT_MAX_WAREHOUSES. */
+  maxWarehouses?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +43,7 @@ const StoredTenantSchema = new Schema<StoredTenant>(
     // No defaults: an unset value keeps following DEFAULT_LANGUAGES / DEFAULT_LANGUAGE.
     languages: { type: [String], default: undefined },
     defaultLanguage: { type: String },
+    maxWarehouses: { type: Number, min: 1 },
   },
   { timestamps: true, collection: 'tenants' },
 );
@@ -54,13 +58,16 @@ export class TenantRegistry {
     readonly uri: string,
     private readonly connection: Connection,
     private readonly model: Model<StoredTenant>,
+    readonly errors: ErrorLogStore,
   ) {}
 
   static async open(uri: string): Promise<TenantRegistry> {
     const connection = await mongoose.createConnection(uri).asPromise();
     const model = connection.model<StoredTenant>('PlatformTenant', StoredTenantSchema);
     await model.init();
-    return new TenantRegistry(uri, connection, model);
+    const errors = new ErrorLogStore(connection);
+    await errors.init();
+    return new TenantRegistry(uri, connection, model, errors);
   }
 
   async list(): Promise<TenantRecord[]> {
@@ -74,6 +81,7 @@ export class TenantRegistry {
       plan: doc.plan ?? DEFAULT_PLAN,
       ...(doc.languages?.length ? { languages: [...doc.languages] } : {}),
       ...(doc.defaultLanguage ? { defaultLanguage: doc.defaultLanguage } : {}),
+      ...(doc.maxWarehouses ? { maxWarehouses: doc.maxWarehouses } : {}),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     }));

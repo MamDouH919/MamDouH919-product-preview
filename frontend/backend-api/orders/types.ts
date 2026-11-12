@@ -45,6 +45,10 @@ export type QuoteLine = {
   quantity: number;
   lineTotal: number;
   available: number | null;
+  /** Units that can be pre-ordered on top of `available`, when the store takes pre-orders. */
+  preorderAvailable?: number;
+  /** Of `quantity`, how many would be pre-ordered. */
+  preorderQuantity?: number;
   issue?: QuoteIssue;
 };
 
@@ -74,6 +78,8 @@ export type OrderItem = {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  /** Units sold ahead of stock — they arrive by a transfer from another warehouse. */
+  preorderQuantity?: number;
 };
 
 export type ShippingAddress = {
@@ -120,6 +126,8 @@ export type Order = {
   bookedAt?: string;
   status: OrderStatus;
   statusHistory?: OrderStatusChange[];
+  /** Some units were pre-ordered: it can't ship until they're transferred to the main warehouse. */
+  preorder?: boolean;
   notes?: string;
   createdAt: string;
 };

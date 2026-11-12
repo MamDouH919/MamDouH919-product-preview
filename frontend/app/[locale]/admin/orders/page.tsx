@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
+  Chip,
   MenuItem,
   Stack,
   TablePagination,
@@ -128,7 +129,12 @@ const OrdersPage = () => {
       {
         id: "status",
         header: t("status"),
-        render: (row: Order) => <OrderStatusChip status={row.status} />,
+        render: (row: Order) => (
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <OrderStatusChip status={row.status} />
+            {row.preorder && <Chip size="small" color="warning" variant="outlined" label={t("preorder")} />}
+          </Stack>
+        ),
       },
       {
         id: "actions",

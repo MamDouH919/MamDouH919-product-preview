@@ -10,6 +10,7 @@ import { ApiError } from './api';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { TenantsPage } from './pages/TenantsPage';
+import { ErrorsPage } from './pages/ErrorsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/tenants" replace /> },
       { path: '/tenants', element: <TenantsPage /> },
+      { path: '/errors', element: <ErrorsPage /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

@@ -6,6 +6,8 @@ import {
   MovementTypeInfo,
   MovementsResponse,
   StockLevel,
+  TransfersResponse,
+  WarehousesResponse,
 } from "./types";
 
 export const fetchStockLevels = async (
@@ -34,5 +36,15 @@ export const fetchStockMovements = async (
   params?: MovementFilters
 ): Promise<MovementsResponse> => {
   const response = await api.get("/inventory/movements", { params });
+  return response.data;
+};
+
+export const fetchWarehouses = async (): Promise<WarehousesResponse> => {
+  const response = await api.get("/warehouses");
+  return response.data;
+};
+
+export const fetchTransfers = async (params?: { warehouseId?: string; page?: number; limit?: number }): Promise<TransfersResponse> => {
+  const response = await api.get("/warehouses/transfers", { params });
   return response.data;
 };

@@ -109,4 +109,9 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsIn([true, false, 'true', 'false'])
   costPlus15Percent?: boolean | 'true' | 'false';
+
+  // Form-data strings "true" / "false".
+  @IsOptional()
+  @IsIn([true, false, 'true', 'false'])
+  preorderEnabled?: boolean | 'true' | 'false';
 }

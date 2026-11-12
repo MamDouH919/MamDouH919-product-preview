@@ -15,6 +15,18 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+/** Units a new product or variant starts with in one warehouse. */
+export class OpeningStockDto {
+  @ApiProperty()
+  @IsMongoId()
+  warehouseId!: string;
+
+  @ApiProperty({ minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  quantity!: number;
+}
+
 export class ProductVariantDto {
   // Present when editing an existing variant; absent when adding a new one.
   @ApiProperty({ required: false })
@@ -78,6 +90,14 @@ export class ProductVariantDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   unitCost?: number;
+
+  // Opening stock split by warehouse. When given it replaces `stock`.
+  @ApiProperty({ required: false, type: [OpeningStockDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OpeningStockDto)
+  openingStocks?: OpeningStockDto[];
 }
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 
@@ -197,6 +217,14 @@ export class CreateProductDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   unitCost?: number;
+
+  // Opening stock split by warehouse. When given it replaces `stock`.
+  @ApiProperty({ required: false, type: [OpeningStockDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OpeningStockDto)
+  openingStocks?: OpeningStockDto[];
 
   @ApiProperty({ required: false })
   @IsOptional()

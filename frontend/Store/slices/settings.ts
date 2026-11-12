@@ -17,6 +17,8 @@ export interface SettingsState {
     address?: string;
     socialMedia?: Record<string, string>[];
     showPrices?: boolean;
+    /** Customers may order what the main warehouse is out of while another warehouse holds it. */
+    preorderEnabled?: boolean;
     /** Left unset until settings load, and when they fail to; read as every module. */
     modules?: StoreModule[];
 }
@@ -38,6 +40,7 @@ export const toSettingsState = (settings: any): SettingsState => ({
     address: settings.address,
     socialMedia: settings.socialMedia,
     showPrices: settings.showPrices,
+    preorderEnabled: settings.preorderEnabled,
     modules: settings.modules,
 });
 

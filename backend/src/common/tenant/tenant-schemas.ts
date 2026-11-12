@@ -11,7 +11,10 @@ import { Banner, BannerSchema } from '../../banners/schemas/banner.schema';
 import { Subscribe, SubscribeSchema } from '../../subscribe/schemas/subscribe.schema';
 import { Setting, SettingSchema } from '../../settings/schemas/setting.schema';
 import { Product, ProductSchema } from '../../products/schemas/product.schema';
+import { DeletedProduct, DeletedProductSchema } from '../../products/schemas/deleted-product.schema';
 import { StockMovement, StockMovementSchema } from '../../inventory/schemas/stock-movement.schema';
+import { Warehouse, WarehouseSchema } from '../../inventory/schemas/warehouse.schema';
+import { StockTransfer, StockTransferSchema } from '../../inventory/schemas/stock-transfer.schema';
 import { Customer, CustomerSchema } from '../../customers/schemas/customer.schema';
 import { Order, OrderSchema } from '../../orders/schemas/order.schema';
 import { Counter, CounterSchema } from '../../orders/schemas/counter.schema';
@@ -62,7 +65,10 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: Subscribe.name, schema: SubscribeSchema },
   { name: Setting.name, schema: SettingSchema },
   { name: Product.name, schema: ProductSchema },
+  { name: DeletedProduct.name, schema: DeletedProductSchema },
   { name: StockMovement.name, schema: StockMovementSchema },
+  { name: Warehouse.name, schema: WarehouseSchema },
+  { name: StockTransfer.name, schema: StockTransferSchema },
   { name: Customer.name, schema: CustomerSchema },
   { name: CustomerRefreshToken.name, schema: CustomerRefreshTokenSchema },
   { name: CustomerResetToken.name, schema: CustomerResetTokenSchema },

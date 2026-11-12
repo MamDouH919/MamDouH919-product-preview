@@ -8,6 +8,8 @@ import { Minus, Plus, ShoppingCart } from "lucide-react"
 import { Product } from "@/backend-api/products/types"
 import { useAppDispatch, useAppSelector } from "@/Store/store"
 import { addToCart } from "@/Store/slices/cart"
+import { useStoreModules } from "@/Hooks/useStoreModules"
+import { preorderUnits } from "@/lib/preorder"
 
 /**
  * Quantity stepper + add button for the product page. Caps the quantity at
@@ -29,6 +31,7 @@ export default function AddToCart({
   const router = useRouter()
   const dispatch = useAppDispatch()
   const [quantity, setQuantity] = useState(1)
+  const { preorders } = useStoreModules()
 
   const hasVariants = product.variants?.length > 0
   const variant = hasVariants && variantIndex !== null ? product.variants[variantIndex] : undefined
@@ -41,14 +44,21 @@ export default function AddToCart({
   )
 
   const limited = product.trackStock && !product.allowBackorder
-  const stock = variant ? variant.stock : product.stock
-  const remaining = limited ? Math.max(0, (stock ?? 0) - inCart) : Infinity
+  const source = variant ?? product
+  const stock = Math.max(source?.stock ?? 0, 0)
+  // Held in another warehouse: can be ordered now, arrives after a transfer.
+  const preorderable = limited && preorders ? preorderUnits(source) : 0
+  const remaining = limited ? Math.max(0, stock + preorderable - inCart) : Infinity
+  // What's left of the shelf after the cart; anything beyond it is a pre-order.
+  const onShelf = Math.max(0, stock - inCart)
 
   const needsVariant = hasVariants && !variant
-  const outOfStock = limited && (stock ?? 0) <= 0
+  const outOfStock = limited && stock + preorderable <= 0
+
   const noPrice = price == null
   const disabled = needsVariant || outOfStock || noPrice || remaining <= 0
   const qty = Math.min(quantity, remaining === Infinity ? 999 : Math.max(1, remaining))
+  const preordering = limited && !outOfStock && qty > onShelf
 
   const add = () => {
     dispatch(
@@ -75,6 +85,7 @@ export default function AddToCart({
 
   let label = t("addToCart")
   if (outOfStock) label = t("outOfStock")
+  else if (preordering && !needsVariant && remaining > 0) label = t("preorderNow")
   else if (needsVariant) label = t("chooseVariant")
   else if (limited && remaining <= 0) label = t("allInCart")
 
@@ -114,8 +125,17 @@ export default function AddToCart({
         </button>
       </div>
 
-      {limited && !outOfStock && (stock ?? 0) <= Math.max(product.lowStockThreshold ?? 0, 5) && (
-        <p className="text-sm text-amber-600">{t("onlyNLeft", { count: stock })}</p>
+      {limited && !outOfStock && preordering ? (
+        <p className="text-sm text-amber-600">
+          {onShelf > 0 ? t("preorderPartHint", { count: onShelf }) : t("preorderHint")}
+        </p>
+      ) : (
+        limited &&
+        !outOfStock &&
+        stock > 0 &&
+        stock <= Math.max(product.lowStockThreshold ?? 0, 5) && (
+          <p className="text-sm text-amber-600">{t("onlyNLeft", { count: stock })}</p>
+        )
       )}
     </div>
   )

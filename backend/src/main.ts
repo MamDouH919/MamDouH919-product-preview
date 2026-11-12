@@ -1,7 +1,7 @@
 import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { MongoErrorFilter } from './common/filters/mongo-error.filter';
+import { ErrorLogFilter } from './common/filters/error-log.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { TenantConnectionService } from './common/helpers/dynamic-connection';
@@ -60,8 +60,8 @@ async function bootstrap() {
     }),
   );
 
-  // ✅ Malformed ids → 400, duplicate unique keys → 409 (instead of 500)
-  app.useGlobalFilters(new MongoErrorFilter(app.get(HttpAdapterHost).httpAdapter));
+  // ✅ Malformed ids → 400, duplicate unique keys → 409 (instead of 500); server errors are logged for the platform dashboard
+  app.useGlobalFilters(new ErrorLogFilter(app.get(HttpAdapterHost).httpAdapter, tenants));
 
   await app.listen(process.env.PORT ?? 3023);
 }

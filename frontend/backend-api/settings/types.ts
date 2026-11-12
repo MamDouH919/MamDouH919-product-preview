@@ -37,6 +37,8 @@ export type Setting = {
   bannerStyle?: BannerStyle;
   /** Whether the storefront shows prices; only a store without online orders may turn it off. */
   showPrices?: boolean;
+  /** Customers may order what the main warehouse is out of while another holds it. */
+  preorderEnabled?: boolean;
   contentLanguages?: ContentLanguages;
   /** Show unit costs with 5% / 15% added where they are typed; display only, set by a super admin. */
   costPlus5Percent?: boolean;

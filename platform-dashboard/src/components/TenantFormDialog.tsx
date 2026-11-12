@@ -96,6 +96,8 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const [plan, setPlan] = useState<StorePlan>(tenant?.plan ?? 'full');
   const [languages, setLanguages] = useState<StoreLanguage[]>(tenant?.languages ?? DEFAULT_LANGUAGES);
   const [defaultLanguage, setDefaultLanguage] = useState<StoreLanguage>(tenant?.defaultLanguage ?? DEFAULT_LANGUAGE);
+  const [maxWarehouses, setMaxWarehouses] = useState(String(tenant?.maxWarehouses ?? 1));
+  const warehousesValid = /^\d+$/.test(maxWarehouses) && Number(maxWarehouses) >= 1 && Number(maxWarehouses) <= 100;
   const create = useCreateTenant();
   const update = useUpdateTenant();
   const mutation = editing ? update : create;
@@ -129,13 +131,13 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
         patch: {
           frontendUrl,
           aliasOf: aliasOf || null,
-          ...(aliasOf ? {} : { plan, ...languageFields }),
+          ...(aliasOf ? {} : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses) }),
           ...(mongoUri.trim() ? { mongoUri: mongoUri.trim() } : {}),
         },
       });
       onSaved(`${tenant.host} updated`);
     } else {
-      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields }) });
+      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses) }) });
       onSaved(`${host} added`);
     }
     onClose();
@@ -213,6 +215,18 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
               ))}
             </TextField>
           )}
+          {!aliasOf && plan === 'full' && (
+            <TextField
+              label="Warehouses"
+              type="number"
+              helperText="How many open warehouses the store may keep. Sales take stock from its main one; the others transfer to it."
+              required
+              error={!warehousesValid}
+              value={maxWarehouses}
+              onChange={(e) => setMaxWarehouses(e.target.value)}
+              slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
+            />
+          )}
           {editing && !aliasOf && plan !== tenant!.plan && (
             <Alert severity="info">
               {switchNote(tenant!.plan, plan)}
@@ -270,7 +284,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="contained" loading={mutation.isPending}>
+        <Button type="submit" variant="contained" loading={mutation.isPending} disabled={!aliasOf && plan === 'full' && !warehousesValid}>
           {editing ? 'Save changes' : 'Add store'}
         </Button>
       </DialogActions>

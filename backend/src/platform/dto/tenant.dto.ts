@@ -6,6 +6,9 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
+  Max,
+  Min,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -70,6 +73,13 @@ export class CreateTenantDto {
   @IsOptional()
   @IsIn(SUPPORTED_LANGUAGES, { message: `defaultLanguage must be one of: ${SUPPORTED_LANGUAGES.join(', ')}` })
   defaultLanguage?: StoreLanguage;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, description: 'How many warehouses the store may keep. Left out means 1' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  maxWarehouses?: number;
 }
 
 export class UpdateTenantDto {
@@ -117,6 +127,13 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsIn(SUPPORTED_LANGUAGES, { message: `defaultLanguage must be one of: ${SUPPORTED_LANGUAGES.join(', ')}` })
   defaultLanguage?: StoreLanguage;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, description: 'How many warehouses the store may keep. Left out means 1' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  maxWarehouses?: number;
 }
 
 export class SeedUserDto {

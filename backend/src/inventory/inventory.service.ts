@@ -7,8 +7,13 @@ import { formatMinor } from '../common/money/money';
 import { JournalService } from '../finance/journal.service';
 import { ACCOUNT } from '../finance/accounts';
 import { isValued, issue, issueAt, Pool, receive, unitCost, UnvaluedStockError } from './valuation';
-import { Product, ProductVariant } from '../products/schemas/product.schema';
+import { preorderUnits, Product, ProductVariant, totalUnits, WarehouseStock } from '../products/schemas/product.schema';
 import { StockMovement } from './schemas/stock-movement.schema';
+import { StockTransfer } from './schemas/stock-transfer.schema';
+import { Warehouse } from './schemas/warehouse.schema';
+import { Counter } from '../orders/schemas/counter.schema';
+import { WarehousesService } from './warehouses.service';
+import { CreateTransferDto, QueryTransfersDto } from './dto/warehouse.dto';
 import {
   MANUAL_MOVEMENT_TYPES,
   MOVEMENT_DIRECTION,
@@ -40,6 +45,22 @@ export function signedLine(account: string, amountMinor: number) {
   return { account, debitMinor: Math.max(amountMinor, 0), creditMinor: Math.max(-amountMinor, 0) };
 }
 
+/** What only the system may ask of a stock change. */
+export interface AdjustOptions {
+  /**
+   * A sale may take the main warehouse below zero by as much as the other
+   * warehouses hold and haven't already promised — a pre-order.
+   */
+  preorder?: boolean;
+}
+
+/** Movements that leave an opening cost standing: the opening itself, setting its cost, and moving units between warehouses. */
+const COST_NEUTRAL_TYPES = [MovementType.OPENING, MovementType.COST_SET, MovementType.TRANSFER_IN, MovementType.TRANSFER_OUT];
+
+function entryQty(entries: { warehouse: Types.ObjectId; qty: number }[], warehouse: Types.ObjectId): number {
+  return entries.find((e) => e.warehouse.equals(warehouse))?.qty ?? 0;
+}
+
 /** One line of the stock report — a product, or one variant of one. */
 export interface StockLevel {
   productId: string;
@@ -50,7 +71,14 @@ export interface StockLevel {
   image?: string;
   category?: unknown;
   trackStock: boolean;
+  /** Units in the main warehouse — what can be sold now. Negative: pre-orders owed. */
   stock: number;
+  /** Units in every warehouse together. */
+  totalStock: number;
+  /** Units per warehouse, every warehouse that has an entry. */
+  stocks: { warehouseId: string; qty: number }[];
+  /** Units that can still be pre-ordered from the other warehouses. */
+  preorderStock: number;
   lowStockThreshold: number;
   status: 'out' | 'low' | 'in_stock' | 'untracked';
   price?: number;
@@ -69,8 +97,11 @@ export class InventoryService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(StockMovement.name) private movementModel: Model<StockMovement>,
+    @InjectModel(StockTransfer.name) private transferModel: Model<StockTransfer>,
+    @InjectModel(Counter.name) private counterModel: Model<Counter>,
     @Inject(TENANT_CONNECTION) private connection: Connection,
     private readonly journal: JournalService,
+    private readonly warehouses: WarehousesService,
   ) {}
 
   // ── Writing stock ───────────────────────────────────────────────────────────
@@ -96,9 +127,13 @@ export class InventoryService {
     userId?: string,
     session?: ClientSession,
     valueMinor?: number,
+    options: AdjustOptions = {},
   ): Promise<StockMovement> {
-    if (!session) return withTransaction(this.connection, (s) => this.adjust(dto, userId, s, valueMinor));
+    if (!session) return withTransaction(this.connection, (s) => this.adjust(dto, userId, s, valueMinor, options));
     const delta = this.signedQuantity(dto.type, dto.quantity);
+    if (dto.type === MovementType.TRANSFER_IN || dto.type === MovementType.TRANSFER_OUT) {
+      throw new BadRequestException('Move stock between warehouses with a transfer');
+    }
 
     const product = await this.productModel.findById(dto.productId).session(session).exec();
     if (!product) throw new NotFoundException(`Product ${dto.productId} not found`);
@@ -123,7 +158,33 @@ export class InventoryService {
       : undefined;
     if (hasVariants && !variant) throw new NotFoundException(`Variant ${dto.variantId} not found on this product`);
 
-    const pool = this.poolOf(product, variant);
+    const main = await this.warehouses.main();
+    const warehouse = await this.warehouses.resolve(dto.warehouseId, session);
+    const isMain = (warehouse._id as Types.ObjectId).equals(main._id as Types.ObjectId);
+    const entries = await this.prepareEntries(product, variant, [warehouse._id as Types.ObjectId], session);
+    const here = entryQty(entries, warehouse._id as Types.ObjectId);
+    const total = entries.reduce((t, e) => t + e.qty, 0);
+    const label = variant ? `"${variant.label}"` : 'this product';
+
+    // Only the main warehouse may stand below zero — by a backorder, or by a
+    // pre-order covered by what the other warehouses hold and haven't promised.
+    let preorderQuantity = 0;
+    if (delta < 0) {
+      const need = -delta;
+      const backorder = isMain && product.allowBackorder;
+      if (!backorder && here < need) {
+        if (isMain && options.preorder && total >= need) {
+          preorderQuantity = need - Math.max(here, 0);
+        } else {
+          throw new BadRequestException(`Not enough stock for ${label} in ${this.warehouseName(warehouse)}: ${here} available, ${need} requested.`);
+        }
+      }
+      if (!backorder && !isMain && total - need < 0) {
+        throw new BadRequestException(`These units of ${label} are promised to pre-orders; transfer them to the main warehouse instead.`);
+      }
+    }
+
+    const pool = { ...this.poolOf(product, variant), qty: total };
     let moved: { next: Pool; valueMinor?: number; estimated: boolean; varianceMinor: number };
     try {
       if (delta > 0) {
@@ -153,9 +214,7 @@ export class InventoryService {
       throw error;
     }
 
-    const balanceAfter = hasVariants
-      ? await this.applyVariantDelta(product, dto.variantId!, delta, moved.next, session)
-      : await this.applyProductDelta(product, delta, moved.next, session);
+    await this.applyDelta(product, variant, [{ warehouse: warehouse._id as Types.ObjectId, delta, isMain }], moved.next, session);
 
     const [movement] = await this.movementModel.create(
       [
@@ -163,9 +222,11 @@ export class InventoryService {
           product: new Types.ObjectId(dto.productId),
           variantId: dto.variantId ? new Types.ObjectId(dto.variantId) : undefined,
           variantLabel: variant?.label,
+          warehouse: warehouse._id,
           type: dto.type,
           quantity: delta,
-          balanceAfter,
+          balanceAfter: here + delta,
+          preorderQuantity: preorderQuantity || undefined,
           valueMinor: moved.valueMinor,
           valueAfterMinor: moved.next.valueMinor ?? undefined,
           costEstimated: moved.estimated,
@@ -296,7 +357,7 @@ export class InventoryService {
         .exists({
           product: product._id,
           variantId: variant?._id ?? null,
-          type: { $nin: [MovementType.OPENING, MovementType.COST_SET] },
+          type: { $nin: COST_NEUTRAL_TYPES },
         })
         .session(session)
         .exec();
@@ -372,11 +433,11 @@ export class InventoryService {
     );
   }
 
-  /** Quantity and value of one product's or variant's stock. */
+  /** Value of one product's or variant's stock; its units are those of every warehouse. */
   private poolOf(product: Product, variant?: ProductVariant): Pool {
     const source = variant ?? product;
     return {
-      qty: source.stock ?? 0,
+      qty: totalUnits(source),
       valueMinor: source.inventoryValueMinor ?? null,
       lastUnitCostMinor: source.lastUnitCostMinor ?? null,
     };
@@ -388,10 +449,15 @@ export class InventoryService {
    * line lands or none does, and a refused batch leaves no ledger rows behind
    * because none were ever committed.
    */
-  async adjustMany(items: AdjustStockDto[], userId?: string, session?: ClientSession): Promise<StockMovement[]> {
+  async adjustMany(
+    items: AdjustStockDto[],
+    userId?: string,
+    session?: ClientSession,
+    options: AdjustOptions = {},
+  ): Promise<StockMovement[]> {
     const run = async (s: ClientSession) => {
       const applied: StockMovement[] = [];
-      for (const item of items) applied.push(await this.adjust(item, userId, s));
+      for (const item of items) applied.push(await this.adjust(item, userId, s, undefined, options));
       return applied;
     };
     return session ? run(session) : withTransaction(this.connection, run);
@@ -402,9 +468,9 @@ export class InventoryService {
     return !!(await this.movementModel.exists({ product: new Types.ObjectId(productId) }).exec());
   }
 
-  /** Reconciles recorded stock against a physical count. */
+  /** Reconciles recorded stock in one warehouse (the main one by default) against a physical count. */
   async stockTake(dto: StockTakeDto, userId?: string): Promise<StockMovement | null> {
-    const current = await this.currentStock(dto.productId, dto.variantId);
+    const current = await this.currentStock(dto.productId, dto.variantId, dto.warehouseId);
     const delta = dto.countedQuantity - current;
 
     if (delta === 0) return null;
@@ -415,6 +481,7 @@ export class InventoryService {
       {
         productId: dto.productId,
         variantId: dto.variantId,
+        warehouseId: dto.warehouseId,
         type: delta > 0 ? MovementType.ADJUSTMENT_IN : MovementType.ADJUSTMENT_OUT,
         quantity: Math.abs(delta),
         reason: dto.reason ?? `Stock take: counted ${dto.countedQuantity}, recorded ${current}`,
@@ -423,64 +490,210 @@ export class InventoryService {
     );
   }
 
-  private async applyProductDelta(product: Product, delta: number, next: Pool, session: ClientSession): Promise<number> {
-    const filter: QueryFilter<Product> = { _id: product._id };
-    if (delta < 0 && !product.allowBackorder) {
-      filter.stock = { $gte: -delta };
-    }
+  // ── Transfers ───────────────────────────────────────────────────────────────
 
-    const updated = await this.productModel
-      .findOneAndUpdate(
-        filter,
-        { $inc: { stock: delta }, ...(next.valueMinor === null ? {} : { $set: this.valueFields('', next) }) },
-        { returnDocument: 'after', session },
-      )
-      .exec();
+  /**
+   * Moves units from one warehouse to another, all lines or none, in one
+   * step. Only quantities move — the stock stays the store's, so its value
+   * and the books are untouched; what the move cost is an expense. Units the
+   * main warehouse owes to pre-orders are not there to send.
+   */
+  async transfer(dto: CreateTransferDto, userId?: string): Promise<StockTransfer> {
+    if (dto.fromWarehouseId === dto.toWarehouseId) throw new BadRequestException('Pick two different warehouses');
+    return withTransaction(this.connection, async (session) => {
+      const main = await this.warehouses.main();
+      const from = await this.warehouses.resolve(dto.fromWarehouseId, session);
+      const to = await this.warehouses.resolve(dto.toWarehouseId, session);
+      const fromId = from._id as Types.ObjectId;
+      const toId = to._id as Types.ObjectId;
+      const transferId = new Types.ObjectId();
+      const counter = await this.counterModel
+        .findOneAndUpdate({ name: 'stockTransfer' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after', session })
+        .exec();
+      const transferNumber = 1000 + counter!.seq;
+      const reference = `Transfer #${transferNumber}`;
 
-    if (!updated) {
-      throw new BadRequestException(
-        `Not enough stock: ${product.stock} available, ${-delta} requested.`,
+      const lines: StockTransfer['lines'] = [];
+      for (const [i, line] of dto.lines.entries()) {
+        const product = await this.productModel.findById(line.productId).session(session).exec();
+        if (!product) throw new NotFoundException(`Line ${i + 1}: product not found`);
+        const name = product.name.en ?? product.name.ar;
+        if (!product.trackStock) throw new BadRequestException(`Line ${i + 1}: ${name} doesn't track stock`);
+        const hasVariants = (product.variants?.length ?? 0) > 0;
+        const variant = line.variantId ? product.variants.find((v) => v._id.toString() === line.variantId) : undefined;
+        if (hasVariants ? !variant : !!line.variantId) {
+          throw new BadRequestException(`Line ${i + 1}: ${hasVariants ? 'pick which variant to move' : 'this product has no variants'}`);
+        }
+
+        const entries = await this.prepareEntries(product, variant, [fromId, toId], session);
+        const available = entryQty(entries, fromId);
+        if (available < line.quantity) {
+          throw new BadRequestException(
+            `Line ${i + 1}: only ${Math.max(available, 0)} of ${name}${variant ? ` (${variant.label})` : ''} in ${this.warehouseName(from)}`,
+          );
+        }
+
+        await this.applyDelta(
+          product,
+          variant,
+          [
+            { warehouse: fromId, delta: -line.quantity, isMain: fromId.equals(main._id as Types.ObjectId) },
+            { warehouse: toId, delta: line.quantity, isMain: toId.equals(main._id as Types.ObjectId) },
+          ],
+          null,
+          session,
+        );
+
+        const pool = this.poolOf(product, variant);
+        const base = {
+          product: product._id,
+          variantId: variant?._id,
+          variantLabel: variant?.label,
+          transfer: transferId,
+          reference,
+          reason: dto.note,
+          valueAfterMinor: pool.valueMinor ?? undefined,
+          user: userId ? new Types.ObjectId(userId) : undefined,
+        };
+        await this.movementModel.create(
+          [
+            { ...base, warehouse: fromId, type: MovementType.TRANSFER_OUT, quantity: -line.quantity, balanceAfter: available - line.quantity },
+            {
+              ...base,
+              warehouse: toId,
+              type: MovementType.TRANSFER_IN,
+              quantity: line.quantity,
+              balanceAfter: entryQty(entries, toId) + line.quantity,
+            },
+          ],
+          { session, ordered: true },
+        );
+        lines.push({
+          product: product._id as Types.ObjectId,
+          variantId: variant?._id,
+          name: product.name,
+          variantLabel: variant?.label,
+          sku: variant?.sku ?? product.sku,
+          quantity: line.quantity,
+        });
+      }
+
+      const [transfer] = await this.transferModel.create(
+        [
+          {
+            _id: transferId,
+            transferNumber,
+            from: fromId,
+            to: toId,
+            lines,
+            totalUnits: lines.reduce((t, l) => t + l.quantity, 0),
+            note: dto.note,
+            createdBy: userId ? new Types.ObjectId(userId) : undefined,
+          },
+        ],
+        { session },
       );
-    }
-    return updated.stock;
+      return transfer;
+    });
   }
 
-  private async applyVariantDelta(
+  async getTransfers(query: QueryTransfersDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 25, 100);
+    const filter: QueryFilter<StockTransfer> = {};
+    if (query.warehouseId) {
+      const id = new Types.ObjectId(query.warehouseId);
+      filter.$or = [{ from: id }, { to: id }];
+    }
+    const [data, total] = await Promise.all([
+      this.transferModel
+        .find(filter)
+        .populate('from', 'name code')
+        .populate('to', 'name code')
+        .populate('createdBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .exec(),
+      this.transferModel.countDocuments(filter).exec(),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  // ── Warehouse entries ───────────────────────────────────────────────────────
+
+  /**
+   * The warehouse entries of one product or variant, with an entry for each
+   * of `needed` — written now if any was missing, so the `$inc` that follows
+   * has an element to land on. Stock from before warehouses (no entries) is
+   * the main warehouse's.
+   */
+  private async prepareEntries(
     product: Product,
-    variantId: string,
-    delta: number,
-    next: Pool,
+    variant: ProductVariant | undefined,
+    needed: Types.ObjectId[],
     session: ClientSession,
-  ): Promise<number> {
-    const variantObjectId = new Types.ObjectId(variantId);
-    const variant = product.variants.find((v) => v._id.toString() === variantId)!;
-
-    const filter: QueryFilter<Product> = { _id: product._id };
-    if (delta < 0 && !product.allowBackorder) {
-      filter.variants = { $elemMatch: { _id: variantObjectId, stock: { $gte: -delta } } };
-    } else {
-      filter['variants._id'] = variantObjectId;
+  ): Promise<{ warehouse: Types.ObjectId; qty: number }[]> {
+    const source = variant ?? product;
+    const main = (await this.warehouses.main())._id as Types.ObjectId;
+    let changed = false;
+    const entries: { warehouse: Types.ObjectId; qty: number }[] = (source.stocks ?? []).map((e: WarehouseStock) => ({
+      warehouse: e.warehouse,
+      qty: e.qty ?? 0,
+    }));
+    if (!entries.length) {
+      entries.push({ warehouse: main, qty: source.stock ?? 0 });
+      changed = true;
     }
-
-    const updated = await this.productModel
-      .findOneAndUpdate(
-        filter,
-        {
-          $inc: { 'variants.$[v].stock': delta },
-          ...(next.valueMinor === null ? {} : { $set: this.valueFields('variants.$[v].', next) }),
-        },
-        { returnDocument: 'after', arrayFilters: [{ 'v._id': variantObjectId }], session },
-      )
-      .exec();
-
-    if (!updated) {
-      throw new BadRequestException(
-        `Not enough stock for "${variant.label}": ${variant.stock} available, ${-delta} requested.`,
-      );
+    for (const id of needed) {
+      if (!entries.some((e) => e.warehouse.equals(id))) {
+        entries.push({ warehouse: id, qty: 0 });
+        changed = true;
+      }
     }
+    if (changed) {
+      if (variant) {
+        await this.productModel
+          .updateOne({ _id: product._id }, { $set: { 'variants.$[v].stocks': entries } }, { session, arrayFilters: [{ 'v._id': variant._id }] })
+          .exec();
+      } else {
+        await this.productModel.updateOne({ _id: product._id }, { $set: { stocks: entries } }, { session }).exec();
+      }
+    }
+    return entries;
+  }
 
-    const updatedVariant = updated.variants.find((v) => v._id.toString() === variantId);
-    return updatedVariant?.stock ?? 0;
+  /**
+   * Moves units in one or more warehouses of one product or variant, keeping
+   * `stock` equal to the main warehouse's entry, and writes the stock's new
+   * value beside it (`next`; null leaves the value alone). The checks were
+   * made on what this transaction read; a concurrent change to the same
+   * product makes one of the two transactions retry.
+   */
+  private async applyDelta(
+    product: Product,
+    variant: ProductVariant | undefined,
+    moves: { warehouse: Types.ObjectId; delta: number; isMain: boolean }[],
+    next: Pool | null,
+    session: ClientSession,
+  ): Promise<void> {
+    const prefix = variant ? 'variants.$[v].' : '';
+    const inc: Record<string, number> = {};
+    const arrayFilters: Record<string, unknown>[] = variant ? [{ 'v._id': variant._id }] : [];
+    moves.forEach((move, i) => {
+      inc[`${prefix}stocks.$[w${i}].qty`] = move.delta;
+      arrayFilters.push({ [`w${i}.warehouse`]: move.warehouse });
+      if (move.isMain) inc[`${prefix}stock`] = (inc[`${prefix}stock`] ?? 0) + move.delta;
+    });
+    if (inc[`${prefix}stock`] === 0) delete inc[`${prefix}stock`];
+
+    const update: Record<string, unknown> = { $inc: inc };
+    if (next && next.valueMinor !== null) update.$set = this.valueFields(prefix, next);
+    await this.productModel.updateOne({ _id: product._id }, update, { session, arrayFilters }).exec();
+  }
+
+  private warehouseName(warehouse: Warehouse): string {
+    return warehouse.name.en ?? warehouse.name.ar ?? warehouse.code;
   }
 
   /**
@@ -515,25 +728,37 @@ export class InventoryService {
     return MOVEMENT_TYPE_INFO;
   }
 
-  /** Stock of one product or variant right now. */
-  async currentStock(productId: string, variantId?: string): Promise<number> {
-    const product = await this.productModel.findById(productId).exec();
+  /** The warehouse a caller names, checked to exist and be open; the main one when it names none. */
+  resolveWarehouse(id?: string, session?: ClientSession): Promise<Warehouse> {
+    return this.warehouses.resolve(id, session);
+  }
+
+  /** Stock of one product or variant right now, in one warehouse (the main one by default). */
+  async currentStock(productId: string, variantId?: string, warehouseId?: string, session?: ClientSession): Promise<number> {
+    const product = await this.productModel.findById(productId).session(session ?? null).exec();
     if (!product) throw new NotFoundException(`Product ${productId} not found`);
 
-    if (!variantId) return product.stock ?? 0;
-
-    const variant = product.variants.find((v) => v._id.toString() === variantId);
-    if (!variant) throw new NotFoundException(`Variant ${variantId} not found on this product`);
-    return variant.stock ?? 0;
+    let source: Product | ProductVariant = product;
+    if (variantId) {
+      const variant = product.variants.find((v) => v._id.toString() === variantId);
+      if (!variant) throw new NotFoundException(`Variant ${variantId} not found on this product`);
+      source = variant;
+    }
+    if (!warehouseId) return source.stock ?? 0;
+    const main = await this.warehouses.main();
+    const id = new Types.ObjectId(warehouseId);
+    if (!source.stocks?.length) return id.equals(main._id as Types.ObjectId) ? (source.stock ?? 0) : 0;
+    return source.stocks.find((e) => e.warehouse.equals(id))?.qty ?? 0;
   }
 
   /**
-   * Whether a basket can be fulfilled. Used by checkout before any stock moves,
-   * so the customer gets a clear list of what is short rather than a failure
-   * halfway through.
+   * Whether a basket can be fulfilled from the main warehouse — or, with
+   * `preorder`, from it and what the others hold. Lets a caller list what is
+   * short before any stock moves.
    */
   async checkAvailability(
     items: { productId: string; variantId?: string; quantity: number }[],
+    preorder = false,
   ): Promise<{ available: boolean; shortages: { productId: string; variantId?: string; requested: number; available: number }[] }> {
     const shortages: { productId: string; variantId?: string; requested: number; available: number }[] = [];
 
@@ -545,9 +770,9 @@ export class InventoryService {
       }
       if (!product.trackStock || product.allowBackorder) continue;
 
-      const available = item.variantId
-        ? (product.variants.find((v) => v._id.toString() === item.variantId)?.stock ?? 0)
-        : (product.stock ?? 0);
+      const source = item.variantId ? product.variants.find((v) => v._id.toString() === item.variantId) : product;
+      const now = Math.max(source?.stock ?? 0, 0);
+      const available = now + (preorder && source ? preorderUnits(source) : 0);
 
       if (available < item.quantity) {
         shortages.push({
@@ -578,11 +803,13 @@ export class InventoryService {
       .exec();
 
     const touched = await this.touchedSinceOpening(products.map((p) => p._id as Types.ObjectId));
-    const rows = products.flatMap((product) =>
+    const main = String((await this.warehouses.main())._id);
+    let rows = products.flatMap((product) =>
       product.variants?.length
-        ? product.variants.map((variant) => this.toLevel(product, variant, touched))
-        : [this.toLevel(product, undefined, touched)],
+        ? product.variants.map((variant) => this.toLevel(product, variant, touched, main))
+        : [this.toLevel(product, undefined, touched, main)],
     );
+    if (query.warehouseId) rows = rows.filter((row) => row.stocks.some((e) => e.warehouseId === query.warehouseId && e.qty !== 0));
 
     return this.filterByStatus(rows, query.status);
   }
@@ -606,12 +833,12 @@ export class InventoryService {
 
     return {
       trackedItems: tracked.length,
-      totalUnits: tracked.reduce((sum, row) => sum + row.stock, 0),
+      totalUnits: tracked.reduce((sum, row) => sum + row.totalStock, 0),
       // At selling prices — what the stock would fetch, not what it cost.
-      stockValue: tracked.reduce((sum, row) => sum + row.stock * (row.price ?? 0), 0),
+      stockValue: tracked.reduce((sum, row) => sum + Math.max(row.totalStock, 0) * (row.price ?? 0), 0),
       // At cost — what the books carry as inventory. Uncosted stock isn't in it.
       costValueMinor: tracked.reduce((sum, row) => sum + (row.valueMinor ?? 0), 0),
-      uncostedItems: tracked.filter((row) => !row.valued && row.stock > 0).length,
+      uncostedItems: tracked.filter((row) => !row.valued && row.totalStock > 0).length,
       lowStockCount: tracked.filter((row) => row.status === 'low').length,
       outOfStockCount: tracked.filter((row) => row.status === 'out').length,
     };
@@ -628,8 +855,8 @@ export class InventoryService {
       asOf: new Date(),
       rows,
       totalValueMinor: rows.reduce((t, r) => t + (r.valueMinor ?? 0), 0),
-      totalUnits: rows.reduce((t, r) => t + r.stock, 0),
-      uncosted: rows.filter((r) => !r.valued && r.stock > 0).map((r) => ({ productId: r.productId, variantId: r.variantId, name: r.name, variantLabel: r.variantLabel, stock: r.stock })),
+      totalUnits: rows.reduce((t, r) => t + r.totalStock, 0),
+      uncosted: rows.filter((r) => !r.valued && r.totalStock > 0).map((r) => ({ productId: r.productId, variantId: r.variantId, name: r.name, variantLabel: r.variantLabel, stock: r.totalStock })),
     };
   }
 
@@ -647,6 +874,12 @@ export class InventoryService {
     if (query.productId) filter.product = new Types.ObjectId(query.productId);
     if (query.variantId) filter.variantId = new Types.ObjectId(query.variantId);
     if (query.type) filter.type = query.type;
+    if (query.warehouseId) {
+      const id = new Types.ObjectId(query.warehouseId);
+      const main = await this.warehouses.main();
+      // Rows from before warehouses name none; they were the main warehouse's.
+      filter.$or = (main._id as Types.ObjectId).equals(id) ? [{ warehouse: id }, { warehouse: { $exists: false } }] : [{ warehouse: id }];
+    }
     if (query.from || query.to) {
       filter.createdAt = {};
       if (query.from) filter.createdAt.$gte = new Date(query.from);
@@ -660,8 +893,8 @@ export class InventoryService {
     const [data, total] = await Promise.all([
       this.movementModel
         .find(filter)
-        .populate('product', 'name slug images sku')
         .populate('user', 'name email')
+        .populate('warehouse', 'name code')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -669,7 +902,31 @@ export class InventoryService {
       this.movementModel.countDocuments(filter).exec(),
     ]);
 
-    return { data, total, page, limit };
+    return { data: (await this.withProducts(data)) as unknown as StockMovement[], total, page, limit };
+  }
+
+  /**
+   * Attaches each movement's product — the live one, or the copy kept when it
+   * was deleted (flagged `deleted: true`) so its history still has a name.
+   */
+  private async withProducts(movements: StockMovement[]) {
+    const ids = [...new Set(movements.map((m) => String(m.product)))].map((id) => new Types.ObjectId(id));
+    const pick = 'name slug images sku';
+    const live = await this.productModel.find({ _id: { $in: ids } }).select(pick).lean().exec();
+    const byId = new Map<string, Record<string, unknown>>(live.map((p) => [String(p._id), p as unknown as Record<string, unknown>]));
+    const missing = ids.filter((id) => !byId.has(String(id)));
+    if (missing.length) {
+      const gone = await this.connection
+        .model('DeletedProduct')
+        .find({ _id: { $in: missing } })
+        .lean<{ _id: Types.ObjectId; snapshot: Record<string, unknown> }[]>()
+        .exec();
+      for (const d of gone) {
+        const { name, slug, images, sku } = d.snapshot ?? {};
+        byId.set(String(d._id), { _id: d._id, name, slug, images, sku, deleted: true });
+      }
+    }
+    return movements.map((m) => ({ ...m.toObject(), product: byId.get(String(m.product)) ?? null }));
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -679,15 +936,19 @@ export class InventoryService {
     if (!productIds.length) return new Set();
     const groups = await this.movementModel
       .aggregate<{ _id: { product: Types.ObjectId; variantId?: Types.ObjectId } }>([
-        { $match: { product: { $in: productIds }, type: { $nin: [MovementType.OPENING, MovementType.COST_SET] } } },
+        { $match: { product: { $in: productIds }, type: { $nin: COST_NEUTRAL_TYPES } } },
         { $group: { _id: { product: '$product', variantId: '$variantId' } } },
       ])
       .exec();
     return new Set(groups.map((g) => `${g._id.product.toString()}:${g._id.variantId?.toString() ?? ''}`));
   }
 
-  private toLevel(product: Product, variant: ProductVariant | undefined, touched: Set<string>): StockLevel {
-    const stock = variant ? (variant.stock ?? 0) : (product.stock ?? 0);
+  private toLevel(product: Product, variant: ProductVariant | undefined, touched: Set<string>, mainId: string): StockLevel {
+    const source = variant ?? product;
+    const stock = source.stock ?? 0;
+    const stocks = source.stocks?.length
+      ? source.stocks.map((e) => ({ warehouseId: String(e.warehouse), qty: e.qty ?? 0 }))
+      : [{ warehouseId: mainId, qty: stock }];
     const pool = this.poolOf(product, variant);
     const threshold = product.lowStockThreshold ?? 0;
 
@@ -707,6 +968,9 @@ export class InventoryService {
       category: product.category,
       trackStock: product.trackStock,
       stock,
+      totalStock: totalUnits(source),
+      stocks,
+      preorderStock: preorderUnits(source),
       lowStockThreshold: threshold,
       status,
       price: variant?.price ?? product.price,

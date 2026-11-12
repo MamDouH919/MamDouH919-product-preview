@@ -26,6 +26,11 @@ export class AdjustStockDto {
   @IsMongoId()
   variantId?: string;
 
+  @ApiProperty({ required: false, description: 'Left out means the main warehouse' })
+  @IsOptional()
+  @IsMongoId()
+  warehouseId?: string;
+
   @ApiProperty({
     enum: MANUAL_MOVEMENT_TYPES,
     description:
@@ -79,6 +84,11 @@ export class StockTakeDto {
   @IsOptional()
   @IsMongoId()
   variantId?: string;
+
+  @ApiProperty({ required: false, description: 'Left out means the main warehouse' })
+  @IsOptional()
+  @IsMongoId()
+  warehouseId?: string;
 
   @ApiProperty({ description: 'Units actually counted', minimum: 0 })
   @IsInt()
