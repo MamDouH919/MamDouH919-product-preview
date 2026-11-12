@@ -7,8 +7,8 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Box, Button, Chip, IconButton, Stack, Switch } from "@mui/material";
-import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
-import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
+import TableViewOutlined from "@mui/icons-material/TableViewOutlined";
+import CloudUploadOutlined from "@mui/icons-material/CloudUploadOutlined";
 import { exportProductsCsv } from "@/backend-api/products/queries";
 import ProductCsvDialog from "@/features/Product/ProductCsvDialog";
 import { datedFilename, downloadFile } from "@/utils/downloadFile";
@@ -249,13 +249,13 @@ const ProductsPage = () => {
       <Stack direction="row" spacing={1} justifyContent="flex-end">
         <Button
           size="small"
-          startIcon={<FileDownloadOutlined />}
+          startIcon={<TableViewOutlined />}
           disabled={exportMutation.isPending}
           onClick={() => exportMutation.mutate()}
         >
           {t("exportCsv")}
         </Button>
-        <Button size="small" startIcon={<FileUploadOutlined />} onClick={() => setImportOpen(true)}>
+        <Button size="small" startIcon={<CloudUploadOutlined />} onClick={() => setImportOpen(true)}>
           {t("importCsv")}
         </Button>
       </Stack>

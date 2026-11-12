@@ -229,6 +229,30 @@ const InventoryPage = () => {
           ),
       },
       {
+        id: "price",
+        header: t("sellingPrice"),
+        render: (row: StockLevel) => (row.price != null ? row.price.toLocaleString() : "—"),
+      },
+      {
+        id: "margin",
+        header: t("profitMargin"),
+        render: (row: StockLevel) => {
+          if (!row.trackStock || !row.valued || row.unitCostMinor == null || !(row.price && row.price > 0)) return "—";
+          const priceMinor = Math.round(row.price * 100);
+          const profit = priceMinor - row.unitCostMinor;
+          return (
+            <Stack>
+              <Typography variant="body2" fontWeight={700} color={profit < 0 ? "error.main" : "success.main"}>
+                {((profit / priceMinor) * 100).toFixed(1)}%
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatMinorMoney(profit, currency)}
+              </Typography>
+            </Stack>
+          );
+        },
+      },
+      {
         id: "value",
         header: t("valueAtCost"),
         render: (row: StockLevel) => (row.valued && row.valueMinor !== null ? formatMinorMoney(row.valueMinor, currency) : "—"),
