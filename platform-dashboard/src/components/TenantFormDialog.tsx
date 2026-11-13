@@ -128,7 +128,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const twinMissing =
     twin !== null &&
     !extraList.includes(twin) &&
-    !tenants.some((t) => t.host !== tenant?.host && [t.frontendUrl, ...t.extraFrontendUrls].some((u) => u.replace(/\/+$/, '') === twin));
+    !tenants.some((t) => t.host !== tenant?.host && [t.frontendUrl, ...(t.extraFrontendUrls ?? [])].some((u) => u.replace(/\/+$/, '') === twin));
 
   const onHostChange = (value: string) => {
     const clean = value.trim().toLowerCase();
