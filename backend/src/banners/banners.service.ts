@@ -4,10 +4,10 @@ import { Model } from 'mongoose';
 import { Banner } from './schemas/banner.schema';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
-import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
+import { processMedia, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
 
-export const bannerImageStorage = tenantImageStorage('banners');
+export const bannerImageStorage = tenantImageStorage('banners', { allowVideo: true });
 
 export type BannerFiles = {
   image?: Express.Multer.File[];
@@ -27,10 +27,10 @@ export class BannersService {
     const image = files.image?.[0];
     const mobileImage = files.mobileImage?.[0];
     if (image) {
-      createBannerDto.image = toPublicPath(await compressImage(image, { maxWidth: DESKTOP_MAX_WIDTH }));
+      createBannerDto.image = toPublicPath(await processMedia(image, { maxWidth: DESKTOP_MAX_WIDTH }));
     }
     if (mobileImage) {
-      createBannerDto.mobileImage = toPublicPath(await compressImage(mobileImage, { maxWidth: MOBILE_MAX_WIDTH }));
+      createBannerDto.mobileImage = toPublicPath(await processMedia(mobileImage, { maxWidth: MOBILE_MAX_WIDTH }));
     } else if (!createBannerDto.mobileImage) {
       delete createBannerDto.mobileImage;
     }
@@ -64,12 +64,12 @@ export class BannersService {
 
     if (image) {
       if (existing.image) await deleteFile(existing.image);
-      updateBannerDto.image = toPublicPath(await compressImage(image, { maxWidth: DESKTOP_MAX_WIDTH }));
+      updateBannerDto.image = toPublicPath(await processMedia(image, { maxWidth: DESKTOP_MAX_WIDTH }));
     }
 
     if (mobileImage) {
       if (existing.mobileImage) await deleteFile(existing.mobileImage);
-      updateBannerDto.mobileImage = toPublicPath(await compressImage(mobileImage, { maxWidth: MOBILE_MAX_WIDTH }));
+      updateBannerDto.mobileImage = toPublicPath(await processMedia(mobileImage, { maxWidth: MOBILE_MAX_WIDTH }));
     } else if (updateBannerDto.mobileImage === '') {
       // An empty value removes the phone image; the slider falls back to the main one.
       if (existing.mobileImage) await deleteFile(existing.mobileImage);

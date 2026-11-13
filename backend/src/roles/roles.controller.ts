@@ -18,7 +18,12 @@ import { Permissions } from '../decorators/permissions.decorator';
 import { AuthService } from '../auth/auth.service';
 import { Resource } from './enums/resource.enum';
 import { Action } from './enums/action.enum';
+import { RequireModules } from '../decorators/store-module.decorator';
+import { StoreModule } from '../common/tenant/store-plan';
+import { missingPermissions } from './permissions.util';
 
+/** Part of the paid staff add-on: answers 404 on a store that hasn't got it. */
+@RequireModules(StoreModule.TEAM)
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 @Controller('roles')
 export class RolesController {
@@ -71,15 +76,9 @@ export class RolesController {
     const user = await this.authService.getMe(userId);
     if (user.isSuper) return;
 
-    const own = (await this.authService.getUserPermissions(userId)) ?? [];
-    for (const permission of requested) {
-      const held = own.find((p) => p.resource === permission.resource)?.actions ?? [];
-      const missing = permission.actions.filter((action) => !held.includes(action));
-      if (missing.length) {
-        throw new ForbiddenException(
-          `You cannot grant ${missing.join(', ')} on ${permission.resource} — you don't have it yourself`,
-        );
-      }
+    const missing = missingPermissions(await this.authService.getUserPermissions(userId), requested);
+    if (missing.length) {
+      throw new ForbiddenException(`You cannot grant ${missing.join(', ')} — you don't have it yourself`);
     }
   }
 }

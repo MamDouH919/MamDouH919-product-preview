@@ -24,6 +24,8 @@ interface ImageInputProps {
   imagePath?: string;
 }
 
+const VIDEO_URL = /\.(mp4|webm|mov)(\?.*)?$/i;
+
 export function ImageInput({
   name,
   control,
@@ -85,6 +87,8 @@ export function ImageInput({
     }
   }, [value, imagePath, imageCleared]);
 
+  const isVideo =
+    value instanceof File ? value.type.startsWith("video/") : !!preview && VIDEO_URL.test(preview);
   const showDropzone = !preview;
 
   // ----------------- VARIANT: INPUT -----------------
@@ -108,15 +112,19 @@ export function ImageInput({
           {preview ? (
             <>
               {/* Full image preview */}
-              <img
-                src={preview}
-                alt="preview"
-                style={{
-                  objectFit: "cover",
-                }}
-                height={"100%"}
-                width={"100%"}
-              />
+              {isVideo ? (
+                <video src={preview} muted playsInline controls style={{ objectFit: "cover" }} height={"100%"} width={"100%"} />
+              ) : (
+                <img
+                  src={preview}
+                  alt="preview"
+                  style={{
+                    objectFit: "cover",
+                  }}
+                  height={"100%"}
+                  width={"100%"}
+                />
+              )}
 
               {/* Delete overlay button */}
               <IconButton
@@ -248,15 +256,18 @@ export function ImageInput({
             cursor: "pointer",
           }}
         >
-          {preview && (
-            <img
-              src={preview}
-              alt="Uploaded image"
-              style={{ objectFit: "contain" }}
-              width={"100%"}
-              height={"100%"}
-            />
-          )}
+          {preview &&
+            (isVideo ? (
+              <video src={preview} muted playsInline loop autoPlay style={{ objectFit: "contain" }} width={"100%"} height={"100%"} />
+            ) : (
+              <img
+                src={preview}
+                alt="Uploaded image"
+                style={{ objectFit: "contain" }}
+                width={"100%"}
+                height={"100%"}
+              />
+            ))}
 
           {!disabled && hovered && (
             <Box

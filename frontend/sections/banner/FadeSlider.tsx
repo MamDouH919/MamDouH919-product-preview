@@ -9,7 +9,10 @@ import {
   navButton,
   BannerPicture,
   SliderIndicators,
+  slideDurationMs,
+  slideIsVideo,
   useActiveBanners,
+  useIsMobile,
   usePlaybackBlockers,
 } from "./shared"
 
@@ -39,6 +42,7 @@ export default function FadeSlider() {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({})
   const [dragStart, setDragStart] = useState<number | null>(null)
   const { pageHidden, reducedMotion } = usePlaybackBlockers()
+  const isMobile = useIsMobile()
 
   // A banner switched off in the dashboard can shrink the list under us.
   const active = count ? current % count : 0
@@ -56,11 +60,14 @@ export default function FadeSlider() {
 
   const autoplaying = looping && !hovered && !paused && !pageHidden && !reducedMotion && dragStart === null
 
+  // A video slide stays for the video's length; a photo for the normal time.
+  const currentMs = count ? slideDurationMs(slides[active], isMobile) : AUTOPLAY_MS
+
   useEffect(() => {
     if (!autoplaying) return
-    const id = setTimeout(goNext, AUTOPLAY_MS)
+    const id = setTimeout(goNext, currentMs)
     return () => clearTimeout(id)
-  }, [autoplaying, goNext, step])
+  }, [autoplaying, goNext, step, currentMs])
 
   // Swipe: nothing slides with the finger in a fade, so only the release counts.
   const onPointerDown = (e: React.PointerEvent) => {
@@ -134,6 +141,7 @@ export default function FadeSlider() {
                 slide={slide}
                 alt={title}
                 priority={index === 0}
+                active={isActive}
                 sizes="100vw"
                 mobileSizes="100vw"
                 onLoad={() => setLoaded((l) => (l[slide._id] ? l : { ...l, [slide._id]: true }))}
@@ -144,7 +152,7 @@ export default function FadeSlider() {
                   loaded[slide._id] || index === 0 ? "opacity-100" : "opacity-0"
                 }`}
                 style={
-                  !reducedMotion && (isActive || index === previous % count)
+                  !reducedMotion && !slideIsVideo(slide, isMobile) && (isActive || index === previous % count)
                     ? {
                         animation: `banner-zoom ${AUTOPLAY_MS + FADE_MS}ms linear forwards`,
                         animationPlayState: isActive && !autoplaying ? "paused" : "running",
@@ -181,6 +189,7 @@ export default function FadeSlider() {
               current={active}
               progressKey={`${step}-${autoplaying}`}
               autoplaying={autoplaying}
+              durationMs={currentMs}
               paused={paused}
               onSelect={(i) => i !== active && goTo(i)}
               onTogglePause={() => setPaused((p) => !p)}

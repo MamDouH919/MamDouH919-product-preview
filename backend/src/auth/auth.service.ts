@@ -133,6 +133,10 @@ export class AuthService {
       throw new BadRequestException('wrong credentials');
     }
 
+    if (user.isActive === false) {
+      throw new UnauthorizedException('This account has been deactivated');
+    }
+
     if (!user.isVerified) {
       throw new BadRequestException({
         message: 'Email not verified',
@@ -144,7 +148,7 @@ export class AuthService {
 
     return {
       ...tokens,
-      user,
+      user: await this.withPermissions(user),
     };
   }
 
@@ -317,12 +321,25 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * The signed-in user as the dashboard needs them: without the password hash,
+   * and with what their role allows, so it can hide what they couldn't use.
+   */
+  async withPermissions(user: User) {
+    const { password: _password, ...rest } = user.toObject();
+    const role = user.roleId
+      ? await this.rolesService.getRoleForPermissions(user.roleId.toString()).catch(() => null)
+      : null;
+    const permissions = (role?.permissions ?? []).map((p) => ({ resource: p.resource, actions: p.actions }));
+    return { ...rest, permissions };
+  }
+
   async getUserPermissions(userId: string) {
     const user = await this.UserModel.findOne({ _id: userId });
     if (!user) {
       throw new BadRequestException('User not found');
     }
-    const role = await this.rolesService.getRoleById(user.roleId.toString());
+    const role = await this.rolesService.getRoleForPermissions(user.roleId.toString());
     return role?.permissions;
   }
 }

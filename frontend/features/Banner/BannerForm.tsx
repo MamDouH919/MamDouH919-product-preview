@@ -45,7 +45,53 @@ const BANNER_SIZE_NOTES = [
   "bannerSizeNoteMobile",
   "bannerSizeNoteSafeArea",
   "bannerSizeNoteFormat",
+  "bannerVideoNote",
 ] as const;
+
+/** Banners take photos or short videos; videos are uploaded as they are. */
+const BANNER_MEDIA_ACCEPT = {
+  "image/*": [],
+  "video/mp4": [".mp4"],
+  "video/webm": [".webm"],
+  "video/quicktime": [".mov"],
+};
+
+const MAX_VIDEO_SECONDS = 30;
+const MAX_VIDEO_TOLERANCE = 0.5;
+
+class VideoTooLongError extends Error {}
+
+/** Length of a video file in seconds, read from its metadata. */
+const readVideoDuration = (file: File) =>
+  new Promise<number>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(video.duration);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("unreadable video"));
+    };
+    video.src = url;
+  });
+
+/** Appends a banner image or video and its duration (0 for a photo). Rejects videos over 30 seconds. */
+const appendMedia = async (formData: FormData, field: "image" | "mobileImage", file: File) => {
+  const durationField = field === "image" ? "duration" : "mobileDuration";
+  if (file.type.startsWith("video/")) {
+    const seconds = await readVideoDuration(file);
+    if (seconds > MAX_VIDEO_SECONDS + MAX_VIDEO_TOLERANCE) throw new VideoTooLongError();
+    formData.append(field, file);
+    formData.append(durationField, String(Math.round(seconds * 10) / 10));
+    return;
+  }
+  const compressed = await handleCompression(file);
+  if (compressed) formData.append(field, compressed);
+  formData.append(durationField, "0");
+};
 
 const BannerForm = ({ defaultData }: BannerFormProps) => {
   const { t } = useTranslation();
@@ -77,16 +123,15 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
       const formData = new FormData();
 
       if (data.image instanceof File) {
-        const compressed = await handleCompression(data.image);
-        if (compressed) formData.append("image", compressed);
+        await appendMedia(formData, "image", data.image);
       }
 
       if (data.mobileImage instanceof File) {
-        const compressed = await handleCompression(data.mobileImage);
-        if (compressed) formData.append("mobileImage", compressed);
+        await appendMedia(formData, "mobileImage", data.mobileImage);
       } else if (!data.mobileImage && defaultData?.mobileImage) {
         // Cleared in the form: the backend removes it and phones fall back to the main image.
         formData.append("mobileImage", "");
+        formData.append("mobileDuration", "0");
       }
 
       formData.append("active", String(data.active));
@@ -107,8 +152,8 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
       queryClient.invalidateQueries({ queryKey: [BANNERS_QUERY_KEY] });
       router.back();
     },
-    onError: () => {
-      toast.error(t("somethingWentWrong"));
+    onError: (error) => {
+      toast.error(error instanceof VideoTooLongError ? t("bannerVideoTooLong") : t("somethingWentWrong"));
     },
   });
 
@@ -140,6 +185,8 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
             <ImageInput
               name="image"
               control={control as any}
+              accept={BANNER_MEDIA_ACCEPT}
+              maxSize={50 * 1024 * 1024}
               imagePath={defaultData?.image ? getBackendUri(defaultData.image) : ""}
             />
           </Stack>
@@ -151,6 +198,8 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
             <ImageInput
               name="mobileImage"
               control={control as any}
+              accept={BANNER_MEDIA_ACCEPT}
+              maxSize={50 * 1024 * 1024}
               imagePath={defaultData?.mobileImage ? getBackendUri(defaultData.mobileImage) : ""}
             />
           </Stack>

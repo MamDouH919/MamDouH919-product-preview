@@ -27,7 +27,7 @@ const bannerUploads = FileFieldsInterceptor(
     { name: 'image', maxCount: 1 },
     { name: 'mobileImage', maxCount: 1 },
   ],
-  { storage: bannerImageStorage },
+  { storage: bannerImageStorage, limits: { fileSize: 50 * 1024 * 1024 } },
 );
 
 @Controller('banners')

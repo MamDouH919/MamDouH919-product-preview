@@ -58,7 +58,7 @@ export class AuthController {
   @UseGuards(AuthenticationGuard)
   @Get('me')
   async getMe(@Req() req: { userId: string }) {
-    return this.authService.getMe(req.userId);
+    return this.authService.withPermissions(await this.authService.getMe(req.userId));
   }
 
   @UseGuards(AuthenticationGuard)

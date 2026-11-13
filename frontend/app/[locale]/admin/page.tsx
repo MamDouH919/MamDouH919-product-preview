@@ -32,6 +32,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import type { LocalizedField } from "@/backend-api/globalTypes";
 import SalesOverview from "@/features/Dashboard/SalesOverview";
 import { useStoreModules } from "@/Hooks/useStoreModules";
+import { usePermissions } from "@/Hooks/usePermissions";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +175,7 @@ const Dashboard = () => {
   const lang = i18n.language;
   const dispatch = useAppDispatch();
   const { has } = useStoreModules();
+  const { can, canOpen } = usePermissions();
 
   const { data: banners, isLoading: loadingBanners } = useBannersQuery();
   const { data: products, isLoading: loadingProducts } = useProductsQuery();
@@ -210,7 +212,7 @@ const Dashboard = () => {
 
   const maxCategoryCount = byCategory[0]?.count ?? 0;
 
-  const stats = [
+  const allStats = [
     {
       label: t("products"),
       total: productList.length,
@@ -259,12 +261,15 @@ const Dashboard = () => {
     },
   ];
 
+  // Only the areas the user's role can open.
+  const stats = allStats.filter((stat) => canOpen(stat.href));
+
   const inactiveProducts = productList.length - activeProducts;
 
   return (
     <Container maxWidth="xl" disableGutters>
       <Stack spacing={4}>
-        {has("orders") && <SalesOverview />}
+        {has("orders") && can("orders", "read") && <SalesOverview />}
 
         <Typography variant="h6" fontWeight={800}>
           {t("catalogOverview")}

@@ -11,6 +11,14 @@ export class Banner extends Document {
   @Prop({ required: false })
   mobileImage?: string;
 
+  /** Seconds of `image` when it is a video (max 30); 0 / unset for a photo. */
+  @Prop({ required: false })
+  duration?: number;
+
+  /** Seconds of `mobileImage` when it is a video (max 30); 0 / unset for a photo. */
+  @Prop({ required: false })
+  mobileDuration?: number;
+
   @Prop({ required: true, type: LocalizedFieldSchema })
   title!: LocalizedField;
 

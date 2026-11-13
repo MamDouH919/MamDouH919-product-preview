@@ -28,6 +28,8 @@ interface StoredTenant {
   defaultLanguage?: string;
   /** Missing on stores registered before warehouses; read as DEFAULT_MAX_WAREHOUSES. */
   maxWarehouses?: number;
+  /** The paid staff-accounts add-on; missing reads as off. */
+  team?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +46,7 @@ const StoredTenantSchema = new Schema<StoredTenant>(
     languages: { type: [String], default: undefined },
     defaultLanguage: { type: String },
     maxWarehouses: { type: Number, min: 1 },
+    team: { type: Boolean },
   },
   { timestamps: true, collection: 'tenants' },
 );
@@ -82,6 +85,7 @@ export class TenantRegistry {
       ...(doc.languages?.length ? { languages: [...doc.languages] } : {}),
       ...(doc.defaultLanguage ? { defaultLanguage: doc.defaultLanguage } : {}),
       ...(doc.maxWarehouses ? { maxWarehouses: doc.maxWarehouses } : {}),
+      ...(doc.team ? { team: true } : {}),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     }));

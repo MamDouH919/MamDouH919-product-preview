@@ -258,6 +258,7 @@ export function TenantsPage() {
                       {!t.aliasOf && t.plan === 'full' && (
                         <Chip size="small" variant="outlined" label={`${t.maxWarehouses} warehouse${t.maxWarehouses === 1 ? '' : 's'}`} />
                       )}
+                      {!t.aliasOf && t.team && <Chip size="small" variant="outlined" color="success" label="Users & roles" />}
                       {!t.aliasOf && (
                         <Chip
                           size="small"

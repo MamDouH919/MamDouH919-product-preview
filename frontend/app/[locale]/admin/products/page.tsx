@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Box, Button, Chip, IconButton, Stack, Switch } from "@mui/material";
@@ -15,13 +18,19 @@ import { datedFilename, downloadFile } from "@/utils/downloadFile";
 import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import Image from "next/image";
-import { useProductsQuery, PRODUCTS_QUERY_KEY } from "@/backend-api/products/hooks";
+import {
+  useProductsQuery,
+  PRODUCTS_QUERY_KEY,
+} from "@/backend-api/products/hooks";
 import { deleteProduct, updateProduct } from "@/backend-api/products/mutations";
 import { Product } from "@/backend-api/products/types";
 import { getBackendUri } from "@/utils/helperFunctions";
 import SimpleTable from "@/components/Table/SimpleTable";
+import Can from "@/components/Can";
+import { usePermissions } from "@/Hooks/usePermissions";
 import CustomLink from "@/components/CustomLink";
 import { useCurrency } from "@/Hooks/useCurrency";
+import { useStoreModules } from "@/Hooks/useStoreModules";
 import { formatMinorMoney } from "@/features/Order/format";
 
 type Unit = { price: number; costMinor: number };
@@ -29,10 +38,15 @@ type Unit = { price: number; costMinor: number };
 /** Sellable units with both a price and a known cost: the variants, or the product itself. */
 const costedUnits = (p: Product): Unit[] => {
   const src = p.variants?.length
-    ? p.variants.map((v) => ({ price: v.price ?? p.price, cost: v.lastUnitCostMinor }))
+    ? p.variants.map((v) => ({
+        price: v.price ?? p.price,
+        cost: v.lastUnitCostMinor,
+      }))
     : [{ price: p.price, cost: p.lastUnitCostMinor }];
   return src.flatMap((u) =>
-    u.price != null && u.price > 0 && u.cost != null ? [{ price: u.price, costMinor: u.cost }] : []
+    u.price != null && u.price > 0 && u.cost != null
+      ? [{ price: u.price, costMinor: u.cost }]
+      : [],
   );
 };
 
@@ -45,10 +59,14 @@ const range = (values: number[], fmt: (n: number) => string) => {
 
 const ProductsPage = () => {
   const { t, i18n } = useTranslation();
+  const { can } = usePermissions();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const lang = i18n.language;
   const currency = useCurrency();
+  // Cost (and so profit and margin) comes from the inventory ledger.
+  const { has } = useStoreModules();
+  const tracksInventory = has("inventory");
 
   const { data: products, isLoading } = useProductsQuery();
 
@@ -74,7 +92,13 @@ const ProductsPage = () => {
     },
     onError: (error: any) => {
       // 409: the product has orders or stock history and can only be turned off.
-      toast.error(t(error?.response?.status === 409 ? "productHasHistory" : "somethingWentWrong"));
+      toast.error(
+        t(
+          error?.response?.status === 409
+            ? "productHasHistory"
+            : "somethingWentWrong",
+        ),
+      );
     },
   });
 
@@ -89,14 +113,14 @@ const ProductsPage = () => {
     dispatch(
       changeBreadCrumbActions({
         breadCrumb: [{ title: t("products") }],
-        breadCrumbBtns: [
+        breadCrumbBtns: can("products", "create") ? [
           {
             title: t("createProduct"),
             icon: "add",
             link: `/${i18n.language}/admin/products/create`,
           },
-        ],
-      })
+        ] : [],
+      }),
     );
     return () => {
       dispatch(resetBreadCrumbActions());
@@ -119,7 +143,12 @@ const ProductsPage = () => {
                 alt={row.name[lang] ?? ""}
                 width={60}
                 height={60}
-                style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 4 }}
+                style={{
+                  width: 60,
+                  height: 60,
+                  objectFit: "cover",
+                  borderRadius: 4,
+                }}
                 loading="eager"
               />
             </Stack>
@@ -129,7 +158,8 @@ const ProductsPage = () => {
       {
         id: "name",
         header: t("name"),
-        render: (row: Product) => row.name[lang] ?? row.name.en ?? row.name.ar ?? "",
+        render: (row: Product) =>
+          row.name[lang] ?? row.name.en ?? row.name.ar ?? "",
       },
       {
         id: "category",
@@ -146,64 +176,101 @@ const ProductsPage = () => {
       {
         id: "price",
         header: t("sellingPrice"),
-        render: (row: Product) =>
-          row.price !== undefined ? row.price : "—",
+        render: (row: Product) => (row.price !== undefined ? row.price : "—"),
       },
-      {
-        id: "cost",
-        header: t("unitCost"),
-        render: (row: Product) => {
-          const u = costedUnits(row);
-          return u.length ? range(u.map((x) => x.costMinor), (n) => formatMinorMoney(n, currency)) : "—";
-        },
-      },
-      {
-        id: "profit",
-        header: t("profitPerUnit"),
-        render: (row: Product) => {
-          const u = costedUnits(row);
-          if (!u.length) return "—";
-          const profits = u.map((x) => Math.round(x.price * 100) - x.costMinor);
-          return (
-            <Box component="span" color={Math.min(...profits) < 0 ? "error.main" : "success.main"}>
-              {range(profits, (n) => formatMinorMoney(n, currency))}
-            </Box>
-          );
-        },
-      },
-      {
-        id: "margin",
-        header: t("profitMargin"),
-        render: (row: Product) => {
-          const u = costedUnits(row);
-          if (!u.length) return "—";
-          const margins = u.map((x) => ((x.price * 100 - x.costMinor) / (x.price * 100)) * 100);
-          return (
-            <Box component="span" color={Math.min(...margins) < 0 ? "error.main" : "success.main"}>
-              {range(margins, (n) => `${n.toFixed(1)}%`)}
-            </Box>
-          );
-        },
-      },
+      ...(tracksInventory
+        ? [
+            {
+              id: "cost",
+              header: t("unitCost"),
+              render: (row: Product) => {
+                const u = costedUnits(row);
+                return u.length
+                  ? range(
+                      u.map((x) => x.costMinor),
+                      (n) => formatMinorMoney(n, currency),
+                    )
+                  : "—";
+              },
+            },
+            {
+              id: "profit",
+              header: t("profitPerUnit"),
+              render: (row: Product) => {
+                const u = costedUnits(row);
+                if (!u.length) return "—";
+                const profits = u.map(
+                  (x) => Math.round(x.price * 100) - x.costMinor,
+                );
+                return (
+                  <Box
+                    component="span"
+                    color={
+                      Math.min(...profits) < 0 ? "error.main" : "success.main"
+                    }
+                  >
+                    {range(profits, (n) => formatMinorMoney(n, currency))}
+                  </Box>
+                );
+              },
+            },
+            {
+              id: "margin",
+              header: t("profitMargin"),
+              render: (row: Product) => {
+                const u = costedUnits(row);
+                if (!u.length) return "—";
+                const margins = u.map(
+                  (x) =>
+                    ((x.price * 100 - x.costMinor) / (x.price * 100)) * 100,
+                );
+                return (
+                  <Box
+                    component="span"
+                    color={
+                      Math.min(...margins) < 0 ? "error.main" : "success.main"
+                    }
+                  >
+                    {range(margins, (n) => `${n.toFixed(1)}%`)}
+                  </Box>
+                );
+              },
+            },
+          ]
+        : []),
       {
         id: "images",
         header: t("images"),
         render: (row: Product) => (
-          <Chip label={row.images?.length ?? 0} size="small" variant="outlined" />
+          <Chip
+            label={row.images?.length ?? 0}
+            size="small"
+            variant="outlined"
+          />
         ),
       },
       {
         id: "views",
         header: t("views"),
         render: (row: Product) => (
-          <Chip label={row.views ?? 0} size="small" variant="outlined" color="info" />
+          <Chip
+            label={row.views ?? 0}
+            size="small"
+            variant="outlined"
+            color="info"
+          />
         ),
       },
       {
         id: "whatsappClicks",
         header: t("whatsappClicks"),
         render: (row: Product) => (
-          <Chip label={row.whatsappClicks ?? 0} size="small" variant="outlined" color="success" />
+          <Chip
+            label={row.whatsappClicks ?? 0}
+            size="small"
+            variant="outlined"
+            color="success"
+          />
         ),
       },
       {
@@ -213,7 +280,10 @@ const ProductsPage = () => {
           <Switch
             checked={!!row.isActive}
             onChange={(e) =>
-              toggleActiveMutation.mutate({ id: row._id, isActive: e.target.checked })
+              toggleActiveMutation.mutate({
+                id: row._id,
+                isActive: e.target.checked,
+              })
             }
             disabled={toggleActiveMutation.isPending}
             size="small"
@@ -225,23 +295,27 @@ const ProductsPage = () => {
         header: t("actions"),
         render: (row: Product) => (
           <Stack direction="row">
-            <CustomLink href={`/admin/products/${row._id}`}>
+            <Can resource="products" action="update">
+              <CustomLink href={`/admin/products/${row._id}`}>
               <IconButton>
                 <Edit />
               </IconButton>
             </CustomLink>
-            <IconButton
+            </Can>
+            <Can resource="products" action="delete">
+              <IconButton
               color="error"
               onClick={() => deleteMutation.mutate(row._id)}
               disabled={deleteMutation.isPending}
             >
               <Delete />
             </IconButton>
+            </Can>
           </Stack>
         ),
       },
     ],
-    [t, lang, currency, toggleActiveMutation, deleteMutation]
+    [can, t, lang, currency, tracksInventory, toggleActiveMutation, deleteMutation],
   );
 
   return (
@@ -255,7 +329,11 @@ const ProductsPage = () => {
         >
           {t("exportCsv")}
         </Button>
-        <Button size="small" startIcon={<CloudUploadOutlined />} onClick={() => setImportOpen(true)}>
+        <Button
+          size="small"
+          startIcon={<CloudUploadOutlined />}
+          onClick={() => setImportOpen(true)}
+        >
           {t("importCsv")}
         </Button>
       </Stack>
@@ -268,7 +346,10 @@ const ProductsPage = () => {
           loading={isLoading}
         />
       </Box>
-      <ProductCsvDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      <ProductCsvDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+      />
     </Stack>
   );
 };

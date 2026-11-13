@@ -5,6 +5,8 @@ export type AuthUser = {
     isSuper: boolean;
     isVerified: boolean;
     roleId?: string;
+    /** What the user's role allows, resource by resource. */
+    permissions?: { resource: string; actions: string[] }[];
 };
 
 export type LoginResponse = {

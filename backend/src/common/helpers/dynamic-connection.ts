@@ -45,6 +45,8 @@ export interface TenantConfig {
     defaultLanguage?: string;
     /** How many warehouses the store may keep. Left out means DEFAULT_MAX_WAREHOUSES. */
     maxWarehouses?: number;
+    /** The paid staff-accounts add-on (StoreModule.TEAM). Left out means off. An alias follows its primary host. */
+    team?: boolean;
 }
 
 /** Stores the platform hasn't given a warehouse allowance keep the one main warehouse. */
@@ -99,12 +101,13 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
  */
 export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
     const all: Record<string, TenantConfig> = {};
-    for (const { host, mongoUri, frontendUrl, aliasOf, plan, languages, defaultLanguage, maxWarehouses } of records) {
+    for (const { host, mongoUri, frontendUrl, aliasOf, plan, languages, defaultLanguage, maxWarehouses, team } of records) {
         all[host] = {
             mongoUri,
             frontendUrl,
             plan,
             ...(maxWarehouses ? { maxWarehouses } : {}),
+            ...(team ? { team } : {}),
             ...(languages?.length ? { languages } : {}),
             ...(defaultLanguage ? { defaultLanguage } : {}),
             ...(aliasOf ? { aliasOf } : {}),
@@ -266,8 +269,13 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
         return primary?.maxWarehouses ?? DEFAULT_MAX_WAREHOUSES;
     }
 
+    /** What the plan includes, plus the paid staff add-on when the platform has switched it on. */
     getModules(host: string): readonly StoreModule[] {
-        return PLAN_MODULES[this.getPlan(host)];
+        const tenantMap = this.loadTenantMap();
+        const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
+        const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
+        const planModules = PLAN_MODULES[this.getPlan(host)];
+        return primary?.team ? [...planModules, StoreModule.TEAM] : planModules;
     }
 
     hasModule(host: string, module: StoreModule): boolean {

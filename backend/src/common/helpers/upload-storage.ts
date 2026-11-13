@@ -41,6 +41,19 @@ const EXT_BY_TYPE: Record<string, string> = {
   'image/tiff': '.tiff',
 };
 
+/** Videos are stored as uploaded (no re-encoding). Only for storages that opt in. */
+const VIDEO_TYPES: Record<string, string[]> = {
+  '.mp4': ['video/mp4'],
+  '.webm': ['video/webm'],
+  '.mov': ['video/quicktime'],
+};
+
+const VIDEO_EXT_BY_TYPE: Record<string, string> = {
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/quicktime': '.mov',
+};
+
 /**
  * Multer disk storage that writes uploads under a per-tenant folder:
  *
@@ -49,7 +62,10 @@ const EXT_BY_TYPE: Record<string, string> = {
  * Because the tenant is baked into the path that gets stored in the DB, tenants
  * never share or overwrite each other's files. The folder is created on demand.
  */
-export function tenantImageStorage(subdir: string) {
+export function tenantImageStorage(subdir: string, options: { allowVideo?: boolean } = {}) {
+  const imageTypes = IMAGE_TYPES;
+  const types = options.allowVideo ? { ...IMAGE_TYPES, ...VIDEO_TYPES } : imageTypes;
+  const extByType = options.allowVideo ? { ...EXT_BY_TYPE, ...VIDEO_EXT_BY_TYPE } : EXT_BY_TYPE;
   return diskStorage({
     destination: (req, _file, cb) => {
       const dir = `./uploads/${tenantFolder(req as Request)}/${subdir}`;
@@ -61,9 +77,9 @@ export function tenantImageStorage(subdir: string) {
       // extension from the type then. Otherwise both must agree. The content
       // itself is checked when sharp reads it.
       const named = extname(file.originalname).toLowerCase();
-      const ext = named || EXT_BY_TYPE[file.mimetype];
-      if (!ext || !IMAGE_TYPES[ext]?.includes(file.mimetype)) {
-        return cb(new BadRequestException(`"${file.originalname}" is not a supported image (JPG, PNG, WebP, AVIF, GIF)`), '');
+      const ext = named || extByType[file.mimetype];
+      if (!ext || !types[ext]?.includes(file.mimetype)) {
+        return cb(new BadRequestException(`"${file.originalname}" is not a supported ${options.allowVideo ? 'image or video (JPG, PNG, WebP, AVIF, GIF, MP4, WebM)' : 'image (JPG, PNG, WebP, AVIF, GIF)'}`), '');
       }
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       cb(null, uniqueSuffix + ext);

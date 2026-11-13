@@ -1470,6 +1470,8 @@
     "helpQuestion": "Q",
     "helpNextTopic": "Next",
     "homeSections": "Home page sections",
+    "noAccess": "You don't have access to this page",
+    "noAccessHint": "Your role doesn't include this area. Ask an admin to change your role if you need it.",
     "notInPlan": "Not part of your store's plan",
     "notInPlanHint": "This page isn't part of your store's plan. Contact us if you'd like to add it.",
     "storefront": "Storefront",
@@ -1487,6 +1489,8 @@
     "bannerDesktopImageHint": "Recommended 2200 × 1000 px (11:5). Keep text and products in the middle.",
     "bannerMobileImage": "Phone image (optional)",
     "bannerMobileImageHint": "Recommended 1080 × 750 px. Without it, phones show the main image cropped.",
+    "bannerVideoTooLong": "The video is longer than 30 seconds. Please upload a shorter one.",
+    "bannerVideoNote": "Videos (MP4 or WebM) can be up to 30 seconds and 50 MB. The slide stays on screen for the length of the video; photos keep the normal time. Short, compressed videos load faster on the home page.",
     "bannerSizeNotesTitle": "Image sizes for the banner",
     "bannerSizeNoteDesktop": "Laptop & desktop image: 2200 × 1000 px (wide, 11:5). It also shows on tablets.",
     "bannerSizeNoteMobile": "Phone image: 1080 × 750 px (optional). Without it, phones show the laptop image cropped from both sides.",
@@ -1644,5 +1648,119 @@
     "preorderHint": "Not in stock right now — pre-order it and it ships as soon as it arrives.",
     "preorderPartHint": "{{count}} in stock now; the rest is a pre-order that ships once it arrives.",
     "movement_transfer_out": "Transfer out",
-    "movement_transfer_in": "Transfer in"
+    "movement_transfer_in": "Transfer in",
+    "team": {
+        "users": "Users",
+        "roles": "Roles",
+        "role": "Role",
+        "you": "You",
+        "addUser": "Add user",
+        "editUser": "Edit user",
+        "addRole": "Add role",
+        "editRole": "Edit role",
+        "roleName": "Role name",
+        "newPassword": "New password",
+        "addedOn": "Added",
+        "passwordHint": "At least 8 characters, including a number.",
+        "passwordKeepHint": "Leave blank to keep the current password. Setting one signs the user out everywhere.",
+        "ownRoleHint": "You can't change your own role.",
+        "emailInvalid": "Enter a valid email address",
+        "emailTaken": "A user with this email already exists",
+        "startFromTemplate": "Start from a ready-made role",
+        "templates": {
+            "accountsManager": {
+                "name": "Accounts Manager",
+                "description": "Approves payments, expenses and refunds, manages cash accounts and sees financial reports"
+            },
+            "accountant": {
+                "name": "Accountant",
+                "description": "Records payments and expenses and views reports; cannot approve"
+            },
+            "productsManager": {
+                "name": "Products Manager",
+                "description": "Manages products, categories, prices and reviews"
+            },
+            "ordersManager": {
+                "name": "Orders Manager",
+                "description": "Handles orders, customers, coupons and courier settlements"
+            },
+            "customerService": {
+                "name": "Customer Service",
+                "description": "Follows up orders, customers, reviews and messages"
+            },
+            "inventoryManager": {
+                "name": "Inventory Manager",
+                "description": "Manages stock, suppliers and purchases"
+            },
+            "warehouseKeeper": {
+                "name": "Warehouse Keeper",
+                "description": "Updates stock levels and views orders"
+            },
+            "contentManager": {
+                "name": "Content Manager",
+                "description": "Manages pages, banners, sections and messages"
+            },
+            "viewer": {
+                "name": "Viewer (read only)",
+                "description": "Can view data but change nothing"
+            }
+        },
+        "roleNameTaken": "A role with this name already exists",
+        "pickPermission": "Give the role at least one permission.",
+        "cannotDeleteSelf": "You can't delete your own account",
+        "deleteUserConfirm": "Delete {{name}}?",
+        "deleteUserHint": "They are signed out and lose access immediately. This can't be undone — to keep the account, switch it off instead.",
+        "deleteRoleConfirm": "Delete the role \"{{name}}\"?",
+        "deleteRoleHint": "This can't be undone.",
+        "roleInUse": "Move its users to another role first",
+        "builtIn": "Built in",
+        "view": "View",
+        "builtInHint": "The admin role has every permission and can't be changed.",
+        "permissions": "Permissions",
+        "permissionsSummary": "{{count}} permissions in {{areas}} areas",
+        "groups": {
+            "catalog": "Catalog",
+            "sales": "Sales & delivery",
+            "stock": "Stock",
+            "finance": "Finance",
+            "website": "Website",
+            "admin": "Store settings & team"
+        },
+        "actions": {
+            "create": "Create",
+            "read": "View",
+            "update": "Edit",
+            "delete": "Delete",
+            "approve": "Approve",
+            "request": "Request",
+            "execute": "Carry out"
+        },
+        "resources": {
+            "products": "Products",
+            "categories": "Categories",
+            "sub-categories": "Sub-categories",
+            "reviews": "Reviews",
+            "orders": "Orders",
+            "customers": "Customers",
+            "coupons": "Coupons",
+            "price-list": "Delivery prices",
+            "refunds": "Refunds",
+            "settlements": "Courier settlements",
+            "inventory": "Inventory",
+            "purchases": "Purchases",
+            "payments": "Customer payments",
+            "expenses": "Expenses",
+            "money-accounts": "Money accounts",
+            "finance-reports": "Financial reports",
+            "pages": "Pages",
+            "banners": "Banners",
+            "sections": "Sections",
+            "contact": "Contact messages",
+            "subscribe": "Subscribers",
+            "settings": "Settings",
+            "activity-log": "Activity log",
+            "users": "Users",
+            "roles": "Roles"
+        }
+    }
 }

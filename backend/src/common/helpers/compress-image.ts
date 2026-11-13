@@ -84,6 +84,16 @@ export async function compressImage(
   return store(outputPath);
 }
 
+/** True for an uploaded video (kept as it is: no re-encoding). */
+export function isVideoFile(file: Express.Multer.File): boolean {
+  return file.mimetype.startsWith('video/');
+}
+
+/** Image → compressed; video → stored untouched. Returns the path to save in the database. */
+export async function processMedia(file: Express.Multer.File, options: CompressOptions = {}): Promise<string> {
+  return isVideoFile(file) ? store(file.path) : compressImage(file, options);
+}
+
 /** Moves a finished file to R2 when it's configured; otherwise leaves it on disk. */
 async function store(filePath: string): Promise<string> {
   if (!r2Enabled()) return filePath;

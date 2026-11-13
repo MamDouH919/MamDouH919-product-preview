@@ -1,4 +1,5 @@
 "use client";
+import { toPermissionMap } from "@/lib/permissions";
 import { useEffect } from 'react';
 import { Button, Link as MuiLink, Stack, Typography } from '@mui/material';
 import LoginOutlined from '@mui/icons-material/LoginOutlined';
@@ -46,6 +47,7 @@ const Login = () => {
         user: { id: data.user._id, name: data.user.name, email: data.user.email },
         role: data.user.roleId ?? "",
         isSuper: data.user.isSuper ?? false,
+        permissions: toPermissionMap(data.user.permissions),
       }));
 
       toast.success(t("loginSuccess"));

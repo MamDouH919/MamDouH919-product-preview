@@ -10,6 +10,8 @@ import { getBackendUri } from '@/utils/helperFunctions';
 import { Box, IconButton, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
+import Can from "@/components/Can";
+import { usePermissions } from "@/Hooks/usePermissions";
 import CustomLink from '@/components/CustomLink';
 import { changeBreadCrumbActions, resetBreadCrumbActions } from '@/Store/slices/bread-crumb';
 import { useAppDispatch } from '@/Store/store';
@@ -26,6 +28,7 @@ const getNestedValue = (obj: any, path: string) => {
 
 const BannersList = () => {
   const { t, i18n } = useTranslation();
+  const { can } = usePermissions();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const lang = i18n.language;
@@ -91,13 +94,13 @@ const BannersList = () => {
       breadCrumb: [
         { title: t("banners") },
       ],
-      breadCrumbBtns: [
+      breadCrumbBtns: can("banners", "create") ? [
         {
           title: t("createBanner"),
           icon: "add",
           link: `/${i18n.language}/admin/banners/create`,
         },
-      ],
+      ] : [],
     }));
     return () => {
       dispatch(resetBreadCrumbActions());
@@ -148,22 +151,26 @@ const BannersList = () => {
       header: t("actions"),
       render: (row: any) => (
         <Stack direction="row">
-          <CustomLink href={`/admin/banners/${row._id}`}>
+          <Can resource="banners" action="update">
+            <CustomLink href={`/admin/banners/${row._id}`}>
             <IconButton>
               <Edit />
             </IconButton>
           </CustomLink>
-          <IconButton
+          </Can>
+          <Can resource="banners" action="delete">
+            <IconButton
             color="error"
             onClick={() => deleteMutation.mutate(row._id)}
             disabled={deleteMutation.isPending}
           >
             <Delete />
           </IconButton>
+          </Can>
         </Stack>
       ),
     },
-  ], [t, lang, deleteMutation, toggleActiveMutation]);
+  ], [can, t, lang, deleteMutation, toggleActiveMutation]);
 
   return (
     <Stack height='100%'>

@@ -13,6 +13,8 @@ export interface AuthState {
     isInitialized: boolean,
     role: string,
     isSuper: boolean,
+    /** Resource -> actions the user's role allows. */
+    permissions: Record<string, string[]>,
     user: User | null,
 }
 
@@ -21,6 +23,7 @@ const initialState: AuthState = {
     isInitialized: false,
     role: "",
     isSuper: false,
+    permissions: {},
     user: null,
 }
 
@@ -51,6 +54,9 @@ export const authSlice = createSlice({
             if (action.payload.isSuper !== undefined) {
                 state.isSuper = action.payload.isSuper;
             }
+            if (action.payload.permissions !== undefined) {
+                state.permissions = action.payload.permissions;
+            }
             if (action.payload.isInitialized !== undefined) {
                 state.isInitialized = action.payload.isInitialized;
             }
@@ -59,6 +65,8 @@ export const authSlice = createSlice({
             state.isLoggedIn = false;
             state.isInitialized = true;
             state.role = initialState.role;
+            state.isSuper = false;
+            state.permissions = {};
             state.user = initialState.user;
         }
     },

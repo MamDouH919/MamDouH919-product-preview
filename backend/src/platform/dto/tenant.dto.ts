@@ -80,6 +80,13 @@ export class CreateTenantDto {
   @Min(1)
   @Max(100)
   maxWarehouses?: number;
+
+  @ApiPropertyOptional({
+    description: 'Paid add-on: staff accounts and roles in the store\'s dashboard. Left out means off. Ignored on an alias',
+  })
+  @IsOptional()
+  @IsBoolean()
+  team?: boolean;
 }
 
 export class UpdateTenantDto {
@@ -134,6 +141,13 @@ export class UpdateTenantDto {
   @Min(1)
   @Max(100)
   maxWarehouses?: number;
+
+  @ApiPropertyOptional({
+    description: 'Paid add-on: staff accounts and roles in the store\'s dashboard. Left out means off. Ignored on an alias',
+  })
+  @IsOptional()
+  @IsBoolean()
+  team?: boolean;
 }
 
 export class SeedUserDto {

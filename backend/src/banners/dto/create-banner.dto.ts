@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { LocalizedFieldDto } from '../../common/dto/localized-field.dto';
 
 export class CreateBannerDto {
@@ -14,6 +14,23 @@ export class CreateBannerDto {
   @IsOptional()
   @IsString()
   mobileImage?: string;
+
+  /** Video length in seconds; 0 for a photo. Videos are limited to 30 seconds. */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(30.5)
+  duration?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(30.5)
+  mobileDuration?: number;
 
   @ApiProperty({ required: true })
   @ValidateNested()

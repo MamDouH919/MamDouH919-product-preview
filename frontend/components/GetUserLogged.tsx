@@ -1,4 +1,5 @@
 "use client";
+import { toPermissionMap } from "@/lib/permissions";
 import { useEffect, useRef } from "react";
 import { useAppDispatch } from "@/Store/store";
 import { changeAuthData } from "@/Store/slices/auth";
@@ -37,6 +38,7 @@ const GetUserLogged = ({ children }: { children: React.ReactNode }) => {
                     user: { id: user._id, name: user.name, email: user.email },
                     role: user.roleId ?? "",
                     isSuper: user.isSuper ?? false,
+        permissions: toPermissionMap(user.permissions),
                 }));
             } catch {
                 handleLogout();

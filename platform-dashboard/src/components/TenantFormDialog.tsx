@@ -14,6 +14,7 @@ import {
   FormLabel,
   MenuItem,
   Stack,
+  Switch,
   TextField,
 } from '@mui/material';
 import { LANGUAGE_LABELS, PLAN_LABELS, type StoreLanguage, type StorePlan, type Tenant } from '../api';
@@ -97,6 +98,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const [languages, setLanguages] = useState<StoreLanguage[]>(tenant?.languages ?? DEFAULT_LANGUAGES);
   const [defaultLanguage, setDefaultLanguage] = useState<StoreLanguage>(tenant?.defaultLanguage ?? DEFAULT_LANGUAGE);
   const [maxWarehouses, setMaxWarehouses] = useState(String(tenant?.maxWarehouses ?? 1));
+  const [team, setTeam] = useState(tenant?.team ?? false);
   const warehousesValid = /^\d+$/.test(maxWarehouses) && Number(maxWarehouses) >= 1 && Number(maxWarehouses) <= 100;
   const create = useCreateTenant();
   const update = useUpdateTenant();
@@ -131,13 +133,13 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
         patch: {
           frontendUrl,
           aliasOf: aliasOf || null,
-          ...(aliasOf ? {} : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses) }),
+          ...(aliasOf ? {} : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }),
           ...(mongoUri.trim() ? { mongoUri: mongoUri.trim() } : {}),
         },
       });
       onSaved(`${tenant.host} updated`);
     } else {
-      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses) }) });
+      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }) });
       onSaved(`${host} added`);
     }
     onClose();
@@ -226,6 +228,19 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
               onChange={(e) => setMaxWarehouses(e.target.value)}
               slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
             />
+          )}
+          {!aliasOf && (
+            <FormControl component="fieldset">
+              <FormControlLabel
+                label="Users & roles (paid add-on)"
+                control={<Switch checked={team} onChange={(e) => setTeam(e.target.checked)} />}
+              />
+              <FormHelperText sx={{ mt: -0.5 }}>
+                {team
+                  ? 'The store\'s admins get Users and Roles pages to add staff and choose what each may do. Your own super admin account is never shown to them.'
+                  : 'Off: the store has no Users or Roles pages, and those routes answer 404. Accounts and roles already created are kept.'}
+              </FormHelperText>
+            </FormControl>
           )}
           {editing && !aliasOf && plan !== tenant!.plan && (
             <Alert severity="info">

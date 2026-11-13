@@ -24,6 +24,9 @@ const CONTENT_TYPES: Record<string, string> = {
   '.gif': 'image/gif',
   '.tif': 'image/tiff',
   '.tiff': 'image/tiff',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
 };
 
 let client: S3Client | null = null;

@@ -33,6 +33,8 @@ export interface Tenant {
   defaultLanguage: StoreLanguage;
   /** How many open warehouses the store may keep. */
   maxWarehouses: number;
+  /** The paid add-on that gives the store's dashboard users and roles pages. An alias follows its primary store. */
+  team: boolean;
   /** Connection string with credentials replaced by `***`. */
   database: string;
   connected: boolean;
@@ -49,6 +51,7 @@ export interface TenantInput {
   languages?: StoreLanguage[];
   defaultLanguage?: StoreLanguage;
   maxWarehouses?: number;
+  team?: boolean;
 }
 
 export interface TenantPatch {
@@ -60,6 +63,7 @@ export interface TenantPatch {
   languages?: StoreLanguage[];
   defaultLanguage?: StoreLanguage;
   maxWarehouses?: number;
+  team?: boolean;
 }
 
 export interface TenantCheck {

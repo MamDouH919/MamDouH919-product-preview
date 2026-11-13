@@ -15,10 +15,13 @@ import { deleteSubCategory, updateSubCategory } from "@/backend-api/sub-categori
 import { SubCategory } from "@/backend-api/sub-categories/types";
 import { getBackendUri } from "@/utils/helperFunctions";
 import SimpleTable from "@/components/Table/SimpleTable";
+import Can from "@/components/Can";
+import { usePermissions } from "@/Hooks/usePermissions";
 import CustomLink from "@/components/CustomLink";
 
 const SubCategoriesPage = () => {
   const { t, i18n } = useTranslation();
+  const { can } = usePermissions();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const lang = i18n.language;
@@ -54,13 +57,13 @@ const SubCategoriesPage = () => {
     dispatch(
       changeBreadCrumbActions({
         breadCrumb: [{ title: t("subCategories") }],
-        breadCrumbBtns: [
+        breadCrumbBtns: can("sub-categories", "create") ? [
           {
             title: t("createSubCategory"),
             icon: "add",
             link: `/${i18n.language}/admin/sub-categories/create`,
           },
-        ],
+        ] : [],
       })
     );
     return () => {
@@ -129,23 +132,27 @@ const SubCategoriesPage = () => {
         header: t("actions"),
         render: (row: SubCategory) => (
           <Stack direction="row">
-            <CustomLink href={`/admin/sub-categories/${row._id}`}>
+            <Can resource="sub-categories" action="update">
+              <CustomLink href={`/admin/sub-categories/${row._id}`}>
               <IconButton>
                 <Edit />
               </IconButton>
             </CustomLink>
-            <IconButton
+            </Can>
+            <Can resource="sub-categories" action="delete">
+              <IconButton
               color="error"
               onClick={() => deleteMutation.mutate(row._id)}
               disabled={deleteMutation.isPending}
             >
               <Delete />
             </IconButton>
+            </Can>
           </Stack>
         ),
       },
     ],
-    [t, lang, toggleActiveMutation, deleteMutation]
+    [can, t, lang, toggleActiveMutation, deleteMutation]
   );
 
   return (

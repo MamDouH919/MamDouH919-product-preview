@@ -20,6 +20,10 @@ export class User extends Document {
 
   @Prop({ default: false })
   isSuper!: boolean;
+
+  /** A switched-off account can't sign in and its sessions end; nothing else about it is lost. */
+  @Prop({ default: true })
+  isActive!: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

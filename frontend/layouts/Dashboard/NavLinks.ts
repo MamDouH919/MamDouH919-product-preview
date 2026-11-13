@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStoreModules } from "@/Hooks/useStoreModules";
+import { usePermissions } from "@/Hooks/usePermissions";
 
 export interface LinkItem {
     primary: string;
@@ -29,6 +30,7 @@ export interface LinkItem {
 export const useLinksList = () => {
     const { t } = useTranslation()
     const { allows } = useStoreModules()
+    const { canOpen } = usePermissions()
 
     const linksList: LinkItem[] = useMemo(() => [
         {
@@ -114,6 +116,8 @@ export const useLinksList = () => {
                 { primary: t("generalSettings"), pathname: "/admin/settings", exact: true },
                 { primary: t("mailSettings"), pathname: "/admin/settings/mail" },
                 { primary: t("activityLog"), pathname: "/admin/activity" },
+                { primary: t("team.users"), pathname: "/admin/users" },
+                { primary: t("team.roles"), pathname: "/admin/roles" },
             ],
         },
         {
@@ -123,11 +127,11 @@ export const useLinksList = () => {
         },
     ], [t]);
 
-    // Links the store's plan leaves out go, and so does a group left empty.
+    // Links the store's plan leaves out or the user's role can't open go, and so does a group left empty.
     return useMemo(() => linksList.flatMap((link): LinkItem[] => {
-        if (link.pathname && !allows(link.pathname)) return []
+        if (link.pathname && !(allows(link.pathname) && canOpen(link.pathname))) return []
         if (!link.children) return [link]
-        const children = link.children.filter((child) => !child.pathname || allows(child.pathname))
+        const children = link.children.filter((child) => !child.pathname || (allows(child.pathname) && canOpen(child.pathname)))
         return children.length ? [{ ...link, children }] : []
-    }), [linksList, allows])
+    }), [linksList, allows, canOpen])
 }

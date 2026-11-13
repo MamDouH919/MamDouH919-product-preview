@@ -25,6 +25,12 @@ export enum StoreModule {
   INVENTORY = 'inventory',
   /** The books: accounts, expenses, refunds and statements. */
   FINANCE = 'finance',
+  /**
+   * Staff accounts and the roles that decide what they may do. A paid add-on,
+   * not part of any plan: the platform switches it on per store (`team`), on
+   * top of whatever the plan already gives.
+   */
+  TEAM = 'team',
 }
 
 /**

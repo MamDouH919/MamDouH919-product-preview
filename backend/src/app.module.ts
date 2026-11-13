@@ -7,6 +7,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
 import { RolesModule } from './roles/roles.module';
+import { UsersModule } from './users/users.module';
 import { BannersModule } from './banners/banners.module';
 import { SettingsModule } from './settings/settings.module';
 import { SectionsModule } from './sections/sections.module';
@@ -74,6 +75,7 @@ import { StoreModuleGuard } from './guards/store-module.guard';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
     AuthModule,
     RolesModule,
+    UsersModule,
     BannersModule,
     SettingsModule,
     SectionsModule,

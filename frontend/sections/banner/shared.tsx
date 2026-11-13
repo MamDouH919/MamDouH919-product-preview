@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { preload } from "react-dom"
 import { getImageProps } from "next/image"
 import { getBackendUri } from "@/utils/helperFunctions"
@@ -21,12 +21,112 @@ export const navButton =
  * the one it shows. Fills its (positioned) parent like `<Image fill>`.
  * The phone image is used below 640px (Tailwind's `sm`).
  */
+const VIDEO_URL = /\.(mp4|webm|mov)(\?.*)?$/i
+
+export const isVideoUrl = (url?: string) => !!url && VIDEO_URL.test(url)
+
+/** True below 640px (Tailwind's `sm`), where phones get the phone media. False until mounted. */
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)")
+    const update = () => setIsMobile(mq.matches)
+    update()
+    mq.addEventListener("change", update)
+    return () => mq.removeEventListener("change", update)
+  }, [])
+  return isMobile
+}
+
+/** How long a slide stays up: a video's own length (max 30s), otherwise the normal time. */
+export function slideDurationMs(slide: Banner, isMobile: boolean) {
+  const url = isMobile && slide.mobileImage ? slide.mobileImage : slide.image
+  const seconds = isMobile && slide.mobileImage ? slide.mobileDuration : slide.duration
+  return isVideoUrl(url) && seconds && seconds > 0 ? Math.round(seconds * 1000) : AUTOPLAY_MS
+}
+
+/** Whether the media shown on this screen is a video. */
+export function slideIsVideo(slide: Banner, isMobile: boolean) {
+  return isVideoUrl(isMobile && slide.mobileImage ? slide.mobileImage : slide.image)
+}
+
+/**
+ * Video banner: muted, inline, filling its parent. It restarts when its slide
+ * becomes the current one and pauses while it is hidden. Only the first
+ * slide downloads eagerly; the rest fetch just their metadata.
+ */
+function BannerVideo({
+  slide,
+  active,
+  priority,
+  className,
+  style,
+  onLoad,
+}: {
+  slide: Banner
+  active?: boolean
+  priority?: boolean
+  className?: string
+  style?: React.CSSProperties
+  onLoad?: () => void
+}) {
+  const isMobile = useIsMobile()
+  const ref = useRef<HTMLVideoElement>(null)
+  // The first slide downloads at once; the others start 1.5s later, once it has
+  // had the bandwidth, so they are ready by the time their turn comes.
+  const [warm, setWarm] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setWarm(true), 1500)
+    return () => clearTimeout(id)
+  }, [])
+  const desktop = getBackendUri(slide.image)
+  const src = isMobile && slide.mobileImage ? getBackendUri(slide.mobileImage) : desktop
+  const box: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", ...style }
+
+  useEffect(() => {
+    const v = ref.current
+    if (!v) return
+    if (active) {
+      v.currentTime = 0
+      v.play().catch(() => {})
+    } else {
+      v.pause()
+    }
+    // A video can finish loading before React attaches onLoadedData (server-rendered page).
+    if (v.readyState >= 2) onLoad?.()
+  }, [active, src]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!isVideoUrl(src)) {
+    // Mixed case (video on one screen size, photo on the other): show the photo.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" draggable={false} onLoad={onLoad} className={className} style={box} />
+  }
+  return (
+    <video
+      ref={ref}
+      key={src}
+      // #t=0.001 makes the browser paint the first frame, so a waiting slide isn't a black box.
+      src={`${src}#t=0.001`}
+      autoPlay={priority}
+      muted
+      loop
+      playsInline
+      preload={priority || warm || active ? "auto" : "metadata"}
+      onLoadedData={onLoad}
+      onCanPlay={onLoad}
+      className={className}
+      style={box}
+    />
+  )
+}
+
 export function BannerPicture({
   slide,
   alt,
   priority,
   sizes,
   mobileSizes,
+  active,
   className,
   style,
   onLoad,
@@ -38,10 +138,15 @@ export function BannerPicture({
   sizes: string
   /** `sizes` for the phone image. */
   mobileSizes: string
+  /** Whether this is the slide on show; a video only plays then. */
+  active?: boolean
   className?: string
   style?: React.CSSProperties
   onLoad?: () => void
 }) {
+  if (VIDEO_URL.test(slide.image ?? "") || (slide.mobileImage && VIDEO_URL.test(slide.mobileImage))) {
+    return <BannerVideo slide={slide} active={active} priority={priority} className={className} style={style} onLoad={onLoad} />
+  }
   // The first banner is the page's LCP: fetched first, never lazily. (`priority`
   // is deprecated in Next 16, and getImageProps can't add the preload itself.)
   const common = { alt, fill: true, ...(priority ? { loading: "eager" as const, fetchPriority: "high" as const } : {}) }
@@ -117,6 +222,7 @@ export function SliderIndicators({
   current,
   progressKey,
   autoplaying,
+  durationMs = AUTOPLAY_MS,
   paused,
   onSelect,
   onTogglePause,
@@ -126,6 +232,8 @@ export function SliderIndicators({
   /** Changes whenever the slide or autoplay changes, restarting the fill. */
   progressKey: string
   autoplaying: boolean
+  /** How long the current slide stays up; the dot fills over this time. */
+  durationMs?: number
   paused: boolean
   onSelect: (index: number) => void
   onTogglePause: () => void
@@ -153,7 +261,7 @@ export function SliderIndicators({
                   className="absolute inset-y-0 start-0 rounded-full bg-white"
                   style={
                     autoplaying
-                      ? { animation: `banner-progress ${AUTOPLAY_MS}ms linear forwards` }
+                      ? { animation: `banner-progress ${durationMs}ms linear forwards` }
                       : { width: "100%" }
                   }
                 />

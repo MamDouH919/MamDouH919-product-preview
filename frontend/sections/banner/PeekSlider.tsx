@@ -10,6 +10,8 @@ import {
   navButton,
   BannerPicture,
   SliderIndicators,
+  slideDurationMs,
+  useIsMobile,
   useActiveBanners,
   usePlaybackBlockers,
 } from "./shared"
@@ -55,6 +57,7 @@ export default function PeekSlider() {
   const [paused, setPaused] = useState(false)
   const [loaded, setLoaded] = useState<Record<string, boolean>>({})
   const { pageHidden, reducedMotion } = usePlaybackBlockers()
+  const isMobile = useIsMobile()
   const [drag, setDrag] = useState<{ start: number; dx: number } | null>(null)
 
   const moveTo = useCallback(
@@ -83,11 +86,14 @@ export default function PeekSlider() {
 
   const autoplaying = looping && !hovered && !paused && !pageHidden && !reducedMotion && !drag
 
+  // A video slide stays for the video's length; a photo for the normal time.
+  const currentMs = count ? slideDurationMs(slides[current], isMobile) : AUTOPLAY_MS
+
   useEffect(() => {
     if (!autoplaying) return
-    const id = setTimeout(goNext, AUTOPLAY_MS)
+    const id = setTimeout(goNext, currentMs)
     return () => clearTimeout(id)
-  }, [autoplaying, goNext, pos])
+  }, [autoplaying, goNext, pos, currentMs])
 
   // Swipe / drag — the slide follows the finger, then snaps.
   const onPointerDown = (e: React.PointerEvent) => {
@@ -187,6 +193,7 @@ export default function PeekSlider() {
                   slide={slide}
                   alt={title}
                   priority={index % count === 0}
+                  active={active}
                   sizes="(min-width: 1024px) 80vw, 86vw"
                   mobileSizes="90vw"
                   onLoad={() => setLoaded((l) => (l[slide._id] ? l : { ...l, [slide._id]: true }))}
@@ -232,6 +239,7 @@ export default function PeekSlider() {
               current={current}
               progressKey={`${pos}-${autoplaying}`}
               autoplaying={autoplaying}
+              durationMs={currentMs}
               paused={paused}
               onSelect={goTo}
               onTogglePause={() => setPaused((p) => !p)}

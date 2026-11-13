@@ -15,10 +15,13 @@ import { deleteCategory, updateCategory } from "@/backend-api/categories/mutatio
 import { Category } from "@/backend-api/categories/types";
 import { getBackendUri } from "@/utils/helperFunctions";
 import SimpleTable from "@/components/Table/SimpleTable";
+import Can from "@/components/Can";
+import { usePermissions } from "@/Hooks/usePermissions";
 import CustomLink from "@/components/CustomLink";
 
 const CategoriesPage = () => {
   const { t, i18n } = useTranslation();
+  const { can } = usePermissions();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const lang = i18n.language;
@@ -54,13 +57,13 @@ const CategoriesPage = () => {
     dispatch(
       changeBreadCrumbActions({
         breadCrumb: [{ title: t("categories") }],
-        breadCrumbBtns: [
+        breadCrumbBtns: can("categories", "create") ? [
           {
             title: t("createCategory"),
             icon: "add",
             link: `/${i18n.language}/admin/categories/create`,
           },
-        ],
+        ] : [],
       })
     );
     return () => {
@@ -123,23 +126,27 @@ const CategoriesPage = () => {
         header: t("actions"),
         render: (row: Category) => (
           <Stack direction="row">
-            <CustomLink href={`/admin/categories/${row._id}`}>
+            <Can resource="categories" action="update">
+              <CustomLink href={`/admin/categories/${row._id}`}>
               <IconButton>
                 <Edit />
               </IconButton>
             </CustomLink>
-            <IconButton
+            </Can>
+            <Can resource="categories" action="delete">
+              <IconButton
               color="error"
               onClick={() => deleteMutation.mutate(row._id)}
               disabled={deleteMutation.isPending}
             >
               <Delete />
             </IconButton>
+            </Can>
           </Stack>
         ),
       },
     ],
-    [t, lang, toggleActiveMutation, deleteMutation]
+    [can, t, lang, toggleActiveMutation, deleteMutation]
   );
 
   return (
