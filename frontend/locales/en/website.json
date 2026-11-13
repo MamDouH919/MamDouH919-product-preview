@@ -1426,6 +1426,8 @@
     "shortDescriptionHint": "One or two lines summarizing the product.",
     "descriptionHint": "Full details: materials, sizes, how to use, what's in the box…",
     "productImagesHint": "The first image is the main one, shown on product cards and in search. Add more to show the product from different angles.",
+    "productImageSizeHint": "Recommended size: 1000 × 1000 px (square, 1:1). Other shapes are cropped on product cards.",
+    "setAsMainImage": "Set as main image",
     "addImage": "Add image",
     "productClassification": "Category & tags",
     "productClassificationHint": "Decides where the product appears in the store and helps customers find it with filters and search.",

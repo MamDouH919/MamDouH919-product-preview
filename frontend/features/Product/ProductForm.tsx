@@ -31,6 +31,7 @@ import {
 import Grid from "@mui/material/Grid";
 import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
+import StarBorder from "@mui/icons-material/StarBorder";
 import TextInputComponent from "@/components/MUI/ControlMUItextField";
 import LanguageTabs from "@/components/LanguageTabs";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
@@ -183,7 +184,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
 
   const { data: subCategories = [] } = useSubCategoriesQuery(selectedCategory || undefined);
 
-  const { fields: imageFields, append: appendImage, remove: removeImage } =
+  const { fields: imageFields, append: appendImage, remove: removeImage, move: moveImage } =
     useFieldArray({ control, name: "images" });
 
   const { fields: variantFields, append: appendVariant, remove: removeVariant } =
@@ -468,7 +469,7 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
         <TabPanel active={tab === "images"}>
           <FormSection
                       title={t("images")}
-            hint={t("productImagesHint")}
+            hint={`${t("productImagesHint")} ${t("productImageSizeHint")}`}
             action={
               <Button size="small" variant="outlined" startIcon={<Add />} onClick={() => appendImage({ file: null })}>
                 {t("addImage")}
@@ -489,6 +490,17 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
                         >
                           {t("mainImage")}
                         </Typography>
+                      )}
+                      {index > 0 && (
+                        <Tooltip title={t("setAsMainImage")}>
+                          <IconButton
+                            size="small"
+                            onClick={() => moveImage(index, 0)}
+                            sx={{ position: "absolute", top: 8, left: 8, zIndex: 1, bgcolor: "background.paper" }}
+                          >
+                            <StarBorder fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                       <Tooltip title={t("delete")}>
                         <IconButton

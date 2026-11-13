@@ -62,123 +62,119 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
   return (
     <article
       style={cssVars}
-      className="group relative isolate aspect-3/4 overflow-hidden rounded-[28px] bg-neutral-900 shadow-[0_2px_6px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition-shadow duration-300 hover:shadow-[0_24px_44px_-22px_var(--primary-glow)]"
+      className="group relative isolate flex h-full flex-col overflow-hidden rounded-[20px] bg-white ring-1 ring-inset ring-[#ECECE8] transition-shadow duration-300 hover:shadow-[0_24px_44px_-22px_var(--primary-glow)]"
     >
       {/* Whole-card link; every interactive control sits above it (z-20) so nothing nests inside the anchor */}
       <CustomLink
         href={`/products/${product.slug}`}
         ariaLabel={name}
-        className="absolute inset-0 z-10 rounded-[28px] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
+        className="absolute inset-0 z-10 rounded-[20px] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-(--primary)"
       />
 
-      {/* Media */}
-      {image ? (
-        <>
-          <Image
-            src={getBackendUri(image)}
-            alt={name}
-            fill
-            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-            className={`object-cover will-change-transform transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.05] ${
-              hoverImage ? "md:group-hover:opacity-0" : ""
-            } ${soldOut ? "grayscale" : ""}`}
-          />
-          {hoverImage && (
+      {/* Media: the whole photo is shown, nothing is written over it */}
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-[#F6F6F3]">
+        {image ? (
+          <>
             <Image
-              src={getBackendUri(hoverImage)}
-              alt=""
+              src={getBackendUri(image)}
+              alt={name}
               fill
               sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-              className="hidden object-cover opacity-0 will-change-transform transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.05] group-hover:opacity-100 md:block"
+              className={`object-cover transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.04] ${
+                hoverImage ? "md:group-hover:opacity-0" : ""
+              } ${soldOut ? "grayscale opacity-50" : ""}`}
             />
-          )}
-        </>
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(120%_90%_at_30%_10%,var(--primary)_0%,var(--primary-dark)_55%,#0a0a0a_100%)]">
-          <ShoppingBag className="h-12 w-12 text-white/30" strokeWidth={1.25} />
-        </div>
-      )}
+            {hoverImage && (
+              <Image
+                src={getBackendUri(hoverImage)}
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                className="hidden object-cover opacity-0 transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.04] group-hover:opacity-100 md:block"
+              />
+            )}
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(120%_90%_at_30%_10%,var(--primary)_0%,var(--primary-dark)_55%,#0a0a0a_100%)]">
+            <ShoppingBag className="h-12 w-12 text-white/30" strokeWidth={1.25} />
+          </div>
+        )}
 
-      {/* Readability scrim behind the bottom text, plus a light one so top controls hold on bright photos */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-linear-to-t from-black/90 via-black/50 via-45% to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 bg-linear-to-b from-black/25 to-transparent" />
+        {/* Status badge (start) and actions (end) */}
+        <div className="absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            {soldOut && (
+              <span className="pointer-events-none rounded-full bg-neutral-900 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
+                {t("outOfStock")}
+              </span>
+            )}
+            {preorderOnly && (
+              <span className="pointer-events-none rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800 shadow-sm">
+                {t("preorder")}
+              </span>
+            )}
+          </div>
 
-      {/* Top row */}
-      <div className="absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col items-start gap-1.5">
-          {categoryName && (
-            <span className="pointer-events-none max-w-full truncate rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-neutral-800 shadow-md">
-              {categoryName}
-            </span>
-          )}
-          {soldOut && (
-            <span className="pointer-events-none rounded-full bg-neutral-900 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-md">
-              {t("outOfStock")}
-            </span>
-          )}
-          {preorderOnly && (
-            <span className="pointer-events-none rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-md">
-              {t("preorder")}
-            </span>
-          )}
-        </div>
-
-        <div className="flex shrink-0 flex-col gap-2">
-          {sells && <WishlistButton productId={product._id} />}
-          <WhatsAppButton slug={product.slug} productName={name} className="h-9! w-9! shadow-md" />
+          <div className="flex shrink-0 flex-col gap-2">
+            {sells && <WishlistButton productId={product._id} />}
+            <WhatsAppButton slug={product.slug} productName={name} className="h-9! w-9! shadow-md" />
+          </div>
         </div>
       </div>
 
-      {/* Bottom info */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2.5 p-4">
+      {/* Info */}
+      <div className="pointer-events-none relative z-20 flex flex-1 flex-col gap-2 p-4">
+        {(categoryName || !!product.ratingCount) && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-[11px] font-semibold tracking-wide text-(--primary)">{categoryName}</span>
+            {!!product.ratingCount && (
+              <span
+                className="flex shrink-0 items-center gap-1 text-xs text-neutral-500"
+                aria-label={t("ratingOutOfFive", { rating: (product.ratingAverage ?? 0).toFixed(1) })}
+              >
+                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" aria-hidden />
+                <span className="font-semibold text-neutral-900 tabular-nums">{(product.ratingAverage ?? 0).toFixed(1)}</span>
+                <span className="tabular-nums">({product.ratingCount})</span>
+              </span>
+            )}
+          </div>
+        )}
+
+        <h3 className="text-[15px] font-semibold leading-snug text-neutral-900 line-clamp-2">{name}</h3>
+
         {visibleVariants.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {visibleVariants.map((v) => (
               <span
                 key={v._id}
-                className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white ring-1 ring-white/20"
+                className="rounded-lg bg-[#F6F6F3] px-2 py-px text-[11px] font-medium text-neutral-500 ring-1 ring-inset ring-[#ECECE8]"
               >
                 {v.label}
               </span>
             ))}
             {extraVariantCount > 0 && (
-              <span className="rounded-md px-1 py-0.5 text-[10px] font-medium text-white/60">+{extraVariantCount}</span>
+              <span className="rounded-lg px-1 py-px text-[11px] font-medium text-neutral-400">+{extraVariantCount}</span>
             )}
           </div>
         )}
 
-        <h3 className="text-base font-semibold leading-snug text-white line-clamp-2 [text-shadow:0_1px_12px_rgba(0,0,0,0.35)]">
-          {name}
-        </h3>
-
-        {!!product.ratingCount && (
-          <span
-            className="flex items-center gap-1 text-xs text-white/80"
-            aria-label={t("ratingOutOfFive", { rating: (product.ratingAverage ?? 0).toFixed(1) })}
-          >
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden />
-            <span className="font-semibold text-white tabular-nums">{(product.ratingAverage ?? 0).toFixed(1)}</span>
-            <span className="tabular-nums">({product.ratingCount})</span>
-          </span>
-        )}
-
         {(showPrices || sells) && (
-          <div className="flex items-end justify-between gap-3">
+          <div className="mt-auto flex items-end justify-between gap-3 pt-3">
             {showPrices && (
               <div className="flex min-w-0 flex-col leading-none">
                 {variants.length > 1 && displayPrice != null && (
-                  <span className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/55">{t("from")}</span>
+                  <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">{t("from")}</span>
                 )}
                 {displayPrice != null ? (
-                  <span className="flex items-baseline gap-1 text-white">
-                    <span className="text-xl font-extrabold tabular-nums tracking-tight">{displayPrice.toLocaleString()}</span>
-                    <span className="text-[11px] font-medium text-white/60">{currency}</span>
+                  <span className="flex flex-wrap items-baseline gap-x-1 text-neutral-900">
+                    <span className={`text-[22px] font-extrabold leading-[30px] tabular-nums tracking-tight ${soldOut ? "text-neutral-400" : ""}`}>{displayPrice.toLocaleString()}</span>
+                    <span className="text-[11px] font-medium text-neutral-500">{currency}</span>
                     {wasPrice != null && (
-                      <span className="ms-1 text-xs tabular-nums text-white/55 line-through">{wasPrice.toLocaleString()}</span>
+                      <span className="ms-1 text-xs tabular-nums text-neutral-400 line-through">{wasPrice.toLocaleString()}</span>
                     )}
                   </span>
                 ) : (
-                  <span className="text-sm text-white/40">—</span>
+                  <span className="text-sm text-neutral-300">—</span>
                 )}
               </div>
             )}
@@ -191,7 +187,7 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
                 disabled={!canQuickAdd}
                 aria-label={t("addToCart")}
                 title={t("addToCart")}
-                className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-neutral-900 shadow-lg transition-[background-color,color,transform] duration-200 hover:scale-105 group-hover:bg-(--primary) group-hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"
+                className="pointer-events-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--primary) text-white transition-[background-color,color,transform] duration-200 hover:scale-105 hover:bg-(--primary-dark) active:scale-95 disabled:cursor-not-allowed disabled:bg-[#EBEBE8] disabled:text-neutral-400"
               >
                 <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.25} />
               </button>
@@ -207,15 +203,15 @@ export default function ProductCard({ product, lang }: { product: Product; lang:
 
 export function ProductCardSkeleton() {
   return (
-    <div className="relative aspect-3/4 overflow-hidden rounded-[28px] bg-neutral-200 animate-pulse">
-      <div className="absolute inset-s-3 top-3 h-6 w-20 rounded-full bg-neutral-300" />
-      <div className="absolute inset-e-3 top-3 h-9 w-9 rounded-full bg-neutral-300" />
-      <div className="absolute inset-x-4 bottom-4 flex flex-col gap-2.5">
-        <div className="h-4 w-4/5 rounded-lg bg-neutral-300" />
-        <div className="h-4 w-3/5 rounded-lg bg-neutral-300" />
-        <div className="flex items-end justify-between">
-          <div className="h-6 w-1/3 rounded-lg bg-neutral-300" />
-          <div className="h-11 w-11 rounded-full bg-neutral-300" />
+    <div className="flex h-full animate-pulse flex-col overflow-hidden rounded-[20px] bg-white ring-1 ring-inset ring-[#ECECE8]">
+      <div className="aspect-square w-full bg-neutral-200" />
+      <div className="flex flex-col gap-2 p-4">
+        <div className="h-3 w-1/4 rounded bg-neutral-200" />
+        <div className="h-4 w-4/5 rounded-lg bg-neutral-200" />
+        <div className="h-4 w-3/5 rounded-lg bg-neutral-200" />
+        <div className="mt-3 flex items-end justify-between border-t border-neutral-100 pt-3">
+          <div className="h-6 w-1/3 rounded-lg bg-neutral-200" />
+          <div className="h-10 w-10 rounded-full bg-neutral-200" />
         </div>
       </div>
     </div>
