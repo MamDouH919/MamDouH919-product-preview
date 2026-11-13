@@ -18,6 +18,7 @@ const api: Record<string, string> = {
   "demo.novaslash.com": "https://api-demo.novaslash.com",
   "mk.novaslash.com": "https://api-mk.novaslash.com",
   "nuxi-eg.com": "https://api.nuxi-eg.com",
+  "www.nuxi-eg.com": "https://api.nuxi-eg.com",
 }
 
 export function getBackendUrl(): string {
