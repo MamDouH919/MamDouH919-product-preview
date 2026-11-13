@@ -116,6 +116,12 @@ export const useLinksList = () => {
                 { primary: t("generalSettings"), pathname: "/admin/settings", exact: true },
                 { primary: t("mailSettings"), pathname: "/admin/settings/mail" },
                 { primary: t("activityLog"), pathname: "/admin/activity" },
+            ],
+        },
+        {
+            primary: t("navTeam"),
+            icon: Users,
+            children: [
                 { primary: t("team.users"), pathname: "/admin/users" },
                 { primary: t("team.roles"), pathname: "/admin/roles" },
             ],
