@@ -87,10 +87,25 @@ function languageNotes(tenant: Tenant, languages: StoreLanguage[], defaultLangua
   return notes;
 }
 
+const SECOND_LEVEL = new Set(['co', 'com', 'org', 'net', 'gov', 'edu']);
+
+/** `https://nuxi-eg.com` → `https://www.nuxi-eg.com`; null when the URL isn't a bare apex domain. */
+function wwwTwin(url: string): string | null {
+  try {
+    const { protocol, hostname, port } = new URL(url);
+    const labels = hostname.split('.');
+    const apex = labels.length === 2 || (labels.length === 3 && SECOND_LEVEL.has(labels[1]) && labels[2].length === 2);
+    return apex ? `${protocol}//www.${hostname}${port ? `:${port}` : ''}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const editing = Boolean(tenant);
   const [host, setHost] = useState(tenant?.host ?? '');
   const [frontendUrl, setFrontendUrl] = useState(tenant?.frontendUrl ?? '');
+  const [extraUrls, setExtraUrls] = useState((tenant?.extraFrontendUrls ?? []).join('\n'));
   const [urlTouched, setUrlTouched] = useState(editing);
   const [mongoUri, setMongoUri] = useState('');
   const [aliasOf, setAliasOf] = useState(tenant?.aliasOf ?? '');
@@ -106,6 +121,14 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
 
   // An alias must point at a primary store, never at another alias or itself.
   const primaries = tenants.filter((t) => !t.aliasOf && t.host !== tenant?.host);
+
+  // CORS only allows registered frontend URLs, so an apex domain breaks on its www. twin unless that is registered too.
+  const twin = wwwTwin(frontendUrl.replace(/\/+$/, ''));
+  const extraList = extraUrls.split(/[\s,]+/).map((u) => u.trim().replace(/\/+$/, '')).filter(Boolean);
+  const twinMissing =
+    twin !== null &&
+    !extraList.includes(twin) &&
+    !tenants.some((t) => t.host !== tenant?.host && [t.frontendUrl, ...t.extraFrontendUrls].some((u) => u.replace(/\/+$/, '') === twin));
 
   const onHostChange = (value: string) => {
     const clean = value.trim().toLowerCase();
@@ -132,6 +155,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
         host: tenant.host,
         patch: {
           frontendUrl,
+          extraFrontendUrls: extraList,
           aliasOf: aliasOf || null,
           ...(aliasOf ? {} : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }),
           ...(mongoUri.trim() ? { mongoUri: mongoUri.trim() } : {}),
@@ -139,7 +163,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
       });
       onSaved(`${tenant.host} updated`);
     } else {
-      await create.mutateAsync({ host, frontendUrl, mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }) });
+      await create.mutateAsync({ host, frontendUrl, ...(extraList.length ? { extraFrontendUrls: extraList } : {}), mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }) });
       onSaved(`${host} added`);
     }
     onClose();
@@ -165,6 +189,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
             label="Frontend URL"
             placeholder="https://shop.example.com"
             helperText="Allowed by CORS and used in email links."
+            error={twinMissing}
             required
             type="url"
             value={frontendUrl}
@@ -173,6 +198,28 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
               setFrontendUrl(e.target.value);
             }}
           />
+          <TextField
+            label="Extra frontend URLs"
+            placeholder="https://www.shop.example.com"
+            helperText="Other addresses of the same storefront (e.g. www.). One per line; allowed by CORS."
+            multiline
+            minRows={1}
+            value={extraUrls}
+            onChange={(e) => setExtraUrls(e.target.value)}
+            slotProps={{ htmlInput: { spellCheck: false } }}
+          />
+          {twinMissing && (
+            <Alert
+              severity="warning"
+              action={
+                <Button color="inherit" size="small" onClick={() => setExtraUrls([...extraList, twin!].join('\n'))}>
+                  Add
+                </Button>
+              }
+            >
+              {frontendUrl} is a main domain. Add {twin} too, or visitors on the www. address will be blocked by CORS.
+            </Alert>
+          )}
           <TextField
             label="MongoDB connection string"
             placeholder={editing ? 'Leave blank to keep the current one' : 'mongodb+srv://user:pass@cluster/shop-db'}

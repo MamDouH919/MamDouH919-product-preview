@@ -20,6 +20,7 @@ interface StoredTenant {
   /** Encrypted with secret-box: connection strings carry database credentials. */
   mongoUri: string;
   frontendUrl: string;
+  extraFrontendUrls?: string[];
   aliasOf?: string;
   disabled: boolean;
   /** Missing on stores registered before plans existed; read as DEFAULT_PLAN. */
@@ -40,6 +41,7 @@ const StoredTenantSchema = new Schema<StoredTenant>(
     host: { type: String, required: true, unique: true },
     mongoUri: { type: String, required: true },
     frontendUrl: { type: String, required: true },
+    extraFrontendUrls: { type: [String], default: undefined },
     aliasOf: { type: String },
     disabled: { type: Boolean, default: false },
     plan: { type: String, enum: Object.values(StorePlan), default: DEFAULT_PLAN },
@@ -83,6 +85,7 @@ export class TenantRegistry {
       host: doc.host,
       mongoUri: decryptSecret(doc.mongoUri),
       frontendUrl: doc.frontendUrl,
+      ...(doc.extraFrontendUrls?.length ? { extraFrontendUrls: [...doc.extraFrontendUrls] } : {}),
       ...(doc.aliasOf ? { aliasOf: doc.aliasOf } : {}),
       disabled: Boolean(doc.disabled),
       plan: doc.plan ?? DEFAULT_PLAN,
@@ -105,9 +108,18 @@ export class TenantRegistry {
 
   /** Writes the whole record; `aliasOf` left out clears it. */
   async replace(record: Omit<TenantRecord, 'createdAt' | 'updatedAt'>): Promise<void> {
-    const { aliasOf, ...rest } = record;
-    const $set = { ...rest, mongoUri: encryptSecret(record.mongoUri), ...(aliasOf ? { aliasOf } : {}) };
-    await this.model.updateOne({ host: record.host }, aliasOf ? { $set } : { $set, $unset: { aliasOf: 1 } });
+    const { aliasOf, extraFrontendUrls, ...rest } = record;
+    const $set = {
+      ...rest,
+      mongoUri: encryptSecret(record.mongoUri),
+      ...(aliasOf ? { aliasOf } : {}),
+      ...(extraFrontendUrls?.length ? { extraFrontendUrls } : {}),
+    };
+    const $unset = {
+      ...(aliasOf ? {} : { aliasOf: 1 }),
+      ...(extraFrontendUrls?.length ? {} : { extraFrontendUrls: 1 }),
+    };
+    await this.model.updateOne({ host: record.host }, Object.keys($unset).length ? { $set, $unset } : { $set });
   }
 
   async remove(host: string): Promise<void> {

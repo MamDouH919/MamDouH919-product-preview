@@ -27,6 +27,8 @@ export interface TenantConfig {
     /** Public frontend origin, e.g. "https://ranoshka.com". Used for CORS and
      *  for building links in emails (password reset, etc.). */
     frontendUrl: string;
+    /** More frontend origins of the same store (e.g. the www. twin). Allowed by CORS only. */
+    extraFrontendUrls?: string[];
     /**
      * Set on a second host for the same store (e.g. "www.example.com" with
      * aliasOf "example.com"). It must use the same database as that host.
@@ -101,10 +103,11 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
  */
 export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
     const all: Record<string, TenantConfig> = {};
-    for (const { host, mongoUri, frontendUrl, aliasOf, plan, languages, defaultLanguage, maxWarehouses, team } of records) {
+    for (const { host, mongoUri, frontendUrl, extraFrontendUrls, aliasOf, plan, languages, defaultLanguage, maxWarehouses, team } of records) {
         all[host] = {
             mongoUri,
             frontendUrl,
+            ...(extraFrontendUrls?.length ? { extraFrontendUrls } : {}),
             plan,
             ...(maxWarehouses ? { maxWarehouses } : {}),
             ...(team ? { team } : {}),
@@ -301,7 +304,8 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
     getAllowedOrigins(): string[] {
         const tenantMap = this.loadTenantMap();
         return Object.values(tenantMap)
-            .map((cfg) => cfg.frontendUrl?.replace(/\/+$/, ''))
+            .flatMap((cfg) => [cfg.frontendUrl, ...(cfg.extraFrontendUrls ?? [])])
+            .map((url) => url?.replace(/\/+$/, ''))
             .filter((url): url is string => Boolean(url));
     }
 

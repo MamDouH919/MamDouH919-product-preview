@@ -18,6 +18,7 @@ import { CreateTenantDto, SeedTenantDto, UpdateTenantDto } from './dto/tenant.dt
 export interface TenantView {
   host: string;
   frontendUrl: string;
+  extraFrontendUrls: string[];
   aliasOf: string | null;
   disabled: boolean;
   /** An alias's own plan is ignored: it serves its primary host's. */
@@ -72,6 +73,7 @@ export class PlatformTenantsService {
       host: dto.host,
       mongoUri: dto.mongoUri,
       frontendUrl: stripSlash(dto.frontendUrl),
+      ...(dto.extraFrontendUrls?.length ? { extraFrontendUrls: dto.extraFrontendUrls.map(stripSlash) } : {}),
       ...(dto.aliasOf ? { aliasOf: dto.aliasOf } : {}),
       disabled: false,
       plan: dto.plan ?? DEFAULT_PLAN,
@@ -103,6 +105,8 @@ export class PlatformTenantsService {
       maxWarehouses: dto.maxWarehouses ?? current.maxWarehouses,
       team: dto.team ?? current.team,
     };
+    if (dto.extraFrontendUrls) next.extraFrontendUrls = dto.extraFrontendUrls.map(stripSlash);
+    if (!next.extraFrontendUrls?.length) delete next.extraFrontendUrls;
     if (!next.maxWarehouses) delete next.maxWarehouses;
     if (!next.languages) delete next.languages;
     if (!next.defaultLanguage) delete next.defaultLanguage;
@@ -208,6 +212,7 @@ export class PlatformTenantsService {
     return {
       host: record.host,
       frontendUrl: record.frontendUrl,
+      extraFrontendUrls: record.extraFrontendUrls ?? [],
       aliasOf: record.aliasOf ?? null,
       disabled: record.disabled,
       plan: record.plan,

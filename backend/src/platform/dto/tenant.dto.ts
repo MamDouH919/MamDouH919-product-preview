@@ -46,6 +46,14 @@ export class CreateTenantDto {
   @IsUrl(URL_OPTIONS)
   frontendUrl!: string;
 
+  @ApiPropertyOptional({ type: [String], description: 'More frontend origins of this store, e.g. the www. twin. Allowed by CORS' })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @Transform(({ value }) => (Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v.trim() : v)) : value))
+  @IsUrl(URL_OPTIONS, { each: true })
+  extraFrontendUrls?: string[];
+
   @ApiPropertyOptional({ description: 'Primary host this one is a second name for' })
   @IsOptional()
   @Transform(lowerTrim)
@@ -101,6 +109,14 @@ export class UpdateTenantDto {
   @Transform(trim)
   @IsUrl(URL_OPTIONS)
   frontendUrl?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'More frontend origins of this store, e.g. the www. twin. Allowed by CORS' })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @Transform(({ value }) => (Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v.trim() : v)) : value))
+  @IsUrl(URL_OPTIONS, { each: true })
+  extraFrontendUrls?: string[];
 
   @ApiPropertyOptional({ description: 'Empty string or null clears it', nullable: true })
   @IsOptional()

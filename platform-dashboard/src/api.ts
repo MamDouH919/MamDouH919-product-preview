@@ -24,6 +24,7 @@ export const LANGUAGE_LABELS: Record<StoreLanguage, string> = {
 export interface Tenant {
   host: string;
   frontendUrl: string;
+  extraFrontendUrls: string[];
   aliasOf: string | null;
   disabled: boolean;
   /** An alias's own plan is ignored: it serves its primary host's. */
@@ -46,6 +47,7 @@ export interface TenantInput {
   host: string;
   mongoUri: string;
   frontendUrl: string;
+  extraFrontendUrls?: string[];
   aliasOf?: string;
   plan?: StorePlan;
   languages?: StoreLanguage[];
@@ -57,6 +59,7 @@ export interface TenantInput {
 export interface TenantPatch {
   mongoUri?: string;
   frontendUrl?: string;
+  extraFrontendUrls?: string[];
   aliasOf?: string | null;
   disabled?: boolean;
   plan?: StorePlan;
