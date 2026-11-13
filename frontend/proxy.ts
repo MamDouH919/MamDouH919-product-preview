@@ -12,6 +12,11 @@ import {
 
 const PUBLIC_FILE = /\.(.*)$/;
 
+/** Alias host → canonical host, per tenant, so search engines see a single site. */
+const CANONICAL_HOST: Record<string, string> = {
+  'www.nuxi-eg.com': 'nuxi-eg.com',
+};
+
 // ── The store's languages ──────────────────────────────────────────────────
 // Asked of the API (an in-memory read there) and kept here per host, so a
 // page view doesn't wait on it: past the TTL the last answer is used while a
@@ -92,6 +97,14 @@ export async function proxy(req: NextRequest) {
   }
 
   const host = (req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host).split(',')[0].trim();
+
+  // Per-tenant: an alias host permanently redirects to its canonical host.
+  // Only hosts listed in CANONICAL_HOST are touched; every other tenant is unaffected.
+  const canonicalHost = CANONICAL_HOST[host.split(':')[0]];
+  if (canonicalHost) {
+    return NextResponse.redirect(`https://${canonicalHost}${pathname}${req.nextUrl.search}`, 301);
+  }
+
   const { locale: pathLocale, rest } = splitLocale(pathname);
   const staff = isStaffPath(pathLocale ? rest : pathname);
 
