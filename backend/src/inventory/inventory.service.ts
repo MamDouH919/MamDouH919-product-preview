@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, QueryFilter, Model, Types } from 'mongoose';
-import { TENANT_CONNECTION } from '../common/tenant/tenant.module';
-import { withTransaction } from '../common/tenant/with-transaction';
-import { formatMinor } from '../common/money/money';
+import { STORE_HOST, TENANT_CONNECTION } from '../common/tenant/tenant.module';
+import { afterCommit, withTransaction } from '../common/tenant/with-transaction';
+import { DEFAULT_MINOR_UNIT, formatMinor } from '../common/money/money';
+import { PriceChangeRecorder } from '../common/tenant/price-change-recorder';
+import type { PriceSource } from '../common/tenant/price-change-store';
 import { JournalService } from '../finance/journal.service';
 import { ACCOUNT } from '../finance/accounts';
 import { isValued, issue, issueAt, Pool, receive, unitCost, UnvaluedStockError } from './valuation';
@@ -102,7 +104,39 @@ export class InventoryService {
     @Inject(TENANT_CONNECTION) private connection: Connection,
     private readonly journal: JournalService,
     private readonly warehouses: WarehousesService,
+    // Where cost changes are reported for the platform to follow. Optional so a service built by hand (tests, scripts) still works.
+    @Optional() @Inject(STORE_HOST) private readonly storeHost?: string,
+    @Optional() private readonly priceLog?: PriceChangeRecorder,
   ) {}
+
+  /**
+   * Tells the platform a unit's cost changed — once the transaction that
+   * changed it has committed, so a rolled-back purchase leaves no trace.
+   * Costs are kept in minor units; the log reads in the currency's own.
+   */
+  private logCostChange(
+    session: ClientSession | undefined,
+    product: Product,
+    variant: ProductVariant | undefined,
+    oldMinor: number | null,
+    newMinor: number | null,
+    source: PriceSource,
+    userId?: string,
+  ) {
+    if (!this.priceLog || oldMinor === newMinor) return;
+    const major = (minor: number | null) => (minor === null ? null : minor / 10 ** DEFAULT_MINOR_UNIT);
+    const draft = {
+      productId: String(product._id),
+      productName: product.name?.en || product.name?.ar || 'Product',
+      ...((variant?.sku ?? product.sku) ? { sku: variant?.sku ?? product.sku } : {}),
+      ...(variant ? { variantLabel: variant.label } : {}),
+      kind: 'cost' as const,
+      oldValue: major(oldMinor),
+      newValue: major(newMinor),
+      source,
+    };
+    afterCommit(session, () => this.priceLog?.record(this.storeHost, userId, [draft]));
+  }
 
   // ── Writing stock ───────────────────────────────────────────────────────────
 
@@ -216,6 +250,20 @@ export class InventoryService {
 
     await this.applyDelta(product, variant, [{ warehouse: warehouse._id as Types.ObjectId, delta, isMain }], moved.next, session);
 
+    // A receipt or an opening stock with a cost moves the average; what the
+    // platform follows is what a unit costs now against what it did.
+    if (delta > 0 && valueMinor !== undefined && (dto.type === MovementType.PURCHASE || dto.type === MovementType.OPENING)) {
+      this.logCostChange(
+        session,
+        product,
+        variant,
+        unitCost(pool),
+        unitCost(moved.next),
+        dto.type === MovementType.PURCHASE ? 'purchase' : 'opening_stock',
+        userId,
+      );
+    }
+
     const [movement] = await this.movementModel.create(
       [
         {
@@ -325,6 +373,7 @@ export class InventoryService {
         },
         session,
       );
+      this.logCostChange(session, product, variant, null, unitCostMinor, 'opening_cost', userId);
       return movement;
     });
   }
@@ -406,6 +455,7 @@ export class InventoryService {
         },
         session,
       );
+      this.logCostChange(session, product, variant, oldUnitMinor, unitCostMinor, 'opening_cost_corrected', userId);
       return movement;
     });
   }

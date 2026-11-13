@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
 import { Product } from './schemas/product.schema';
@@ -15,6 +15,9 @@ import { MovementType } from '../inventory/enums/movement-type.enum';
 import { withTransaction } from '../common/tenant/with-transaction';
 import { buildSlug } from '../common/helpers/slug';
 import { parseMoney } from '../common/money/money';
+import { STORE_HOST } from '../common/tenant/tenant.module';
+import { PriceChangeRecorder } from '../common/tenant/price-change-recorder';
+import { diffProductPrices } from './price-diff';
 
 export const productImageStorage = tenantImageStorage('products');
 
@@ -59,6 +62,9 @@ export class ProductsService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(DeletedProduct.name) private deletedModel: Model<DeletedProduct>,
     private readonly inventoryService: InventoryService,
+    // Where price changes are reported for the platform to follow. Optional so a service built by hand (tests, scripts) still works.
+    @Optional() @Inject(STORE_HOST) private readonly storeHost?: string,
+    @Optional() private readonly priceLog?: PriceChangeRecorder,
   ) {}
 
   async create(
@@ -126,7 +132,9 @@ export class ProductsService {
       throw error;
     }
 
-    return this.findOne(productId);
+    const created = await this.findOne(productId);
+    this.priceLog?.record(this.storeHost, userId, diffProductPrices(null, created.toObject(), 'product_created'));
+    return created;
   }
 
   /** A SKU names one sellable item, so it can't repeat across products or variants. */
@@ -478,6 +486,7 @@ export class ProductsService {
       ? [...new Set([...(existing.previousSlugs ?? []), existing.slug])].filter((s) => s !== updateProductDto.slug)
       : undefined;
 
+    const before = existing.toObject();
     const updated = (await this.productModel
       .findByIdAndUpdate(id, previousSlugs ? { ...updateProductDto, previousSlugs } : updateProductDto, {
         returnDocument: 'after',
@@ -488,6 +497,8 @@ export class ProductsService {
 
     // Files go only once the product no longer points at them.
     await Promise.all(removedImages.map(deleteFile));
+
+    this.priceLog?.record(this.storeHost, userId, diffProductPrices(before, updated.toObject(), 'product_edit'));
 
     // Variants added during this edit get their opening stock through the
     // ledger too. They were stored at zero above, so this is what fills them.

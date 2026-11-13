@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PlatformAuthController, PlatformBackupsController, PlatformErrorsController, PlatformTenantsController } from './platform.controller';
+import { PlatformAuthController, PlatformBackupsController, PlatformErrorsController, PlatformPriceChangesController, PlatformTenantsController } from './platform.controller';
 import { BackupModule } from '../backup/backup.module';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformTenantsService } from './platform-tenants.service';
@@ -10,7 +10,7 @@ import { PlatformTenantsService } from './platform-tenants.service';
  */
 @Module({
   imports: [BackupModule],
-  controllers: [PlatformAuthController, PlatformTenantsController, PlatformBackupsController, PlatformErrorsController],
+  controllers: [PlatformAuthController, PlatformTenantsController, PlatformBackupsController, PlatformErrorsController, PlatformPriceChangesController],
   providers: [PlatformAuthService, PlatformTenantsService],
 })
 export class PlatformModule {}

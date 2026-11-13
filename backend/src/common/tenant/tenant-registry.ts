@@ -3,6 +3,7 @@ import { decryptSecret, encryptSecret } from '../helpers/secret-box';
 import type { TenantConfig } from '../helpers/dynamic-connection';
 import { DEFAULT_PLAN, StorePlan } from './store-plan';
 import { ErrorLogStore } from './error-log-store';
+import { PriceChangeStore } from './price-change-store';
 
 /** One store as the platform dashboard sees it. `mongoUri` is plain text here. */
 export interface TenantRecord extends TenantConfig {
@@ -62,6 +63,7 @@ export class TenantRegistry {
     private readonly connection: Connection,
     private readonly model: Model<StoredTenant>,
     readonly errors: ErrorLogStore,
+    readonly priceChanges: PriceChangeStore,
   ) {}
 
   static async open(uri: string): Promise<TenantRegistry> {
@@ -70,7 +72,9 @@ export class TenantRegistry {
     await model.init();
     const errors = new ErrorLogStore(connection);
     await errors.init();
-    return new TenantRegistry(uri, connection, model, errors);
+    const priceChanges = new PriceChangeStore(connection);
+    await priceChanges.init();
+    return new TenantRegistry(uri, connection, model, errors, priceChanges);
   }
 
   async list(): Promise<TenantRecord[]> {

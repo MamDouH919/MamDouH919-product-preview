@@ -11,6 +11,7 @@ import { RestoreBackupDto } from './dto/backup.dto';
 import { BackupService } from '../backup/backup.service';
 import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 import { ErrorStatsQueryDto, QueryErrorsDto, UpdateErrorDto } from './dto/errors.dto';
+import { PriceChangeSummaryQueryDto, QueryPriceChangesDto } from './dto/price-changes.dto';
 
 /** Login for the platform dashboard. Not tied to any store's host. */
 @Controller('platform/auth')
@@ -132,5 +133,22 @@ export class PlatformErrorsController {
   @HttpCode(204)
   async remove(@Param('id') id: string) {
     if (!(await this.tenants.getRegistry().errors.remove(id))) throw new NotFoundException('Error not found');
+  }
+}
+
+/** Every change to a product's selling price or cost, from every store — read-only, for following what stores charge. */
+@Controller('platform/price-changes')
+@UseGuards(PlatformAuthGuard)
+export class PlatformPriceChangesController {
+  constructor(private readonly tenants: TenantConnectionService) {}
+
+  @Get()
+  list(@Query() query: QueryPriceChangesDto) {
+    return this.tenants.getRegistry().priceChanges.list({ ...query, page: query.page ?? 1, limit: query.limit ?? 25 });
+  }
+
+  @Get('summary')
+  summary(@Query() query: PriceChangeSummaryQueryDto) {
+    return this.tenants.getRegistry().priceChanges.summary(query.days ?? 7, query.host);
   }
 }

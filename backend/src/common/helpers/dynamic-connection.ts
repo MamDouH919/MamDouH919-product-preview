@@ -250,6 +250,13 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
         return primary?.plan ?? DEFAULT_PLAN;
     }
 
+    /** A store's own host: an alias answers with the primary it is a second name for. */
+    primaryHost(host: string): string {
+        const tenantMap = this.loadTenantMap();
+        const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
+        return own?.aliasOf ?? host;
+    }
+
     /**
      * The languages the store's site is published in; an alias answers with
      * its primary host's. An unknown host gets the defaults.

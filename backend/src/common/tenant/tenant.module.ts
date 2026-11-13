@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { Connection } from 'mongoose';
 import { TenantConnectionService } from '../helpers/dynamic-connection';
 import { StoreModule } from './store-plan';
+import { PriceChangeRecorder } from './price-change-recorder';
 
 export const TENANT_CONNECTION = 'TENANT_CONNECTION';
 
@@ -14,6 +15,9 @@ export const TENANT_CONNECTION = 'TENANT_CONNECTION';
  */
 export const STORE_MODULES = 'STORE_MODULES';
 
+/** The host the current request is for — which store a log entry belongs to. */
+export const STORE_HOST = 'STORE_HOST';
+
 /** How many warehouses the requesting store's platform allowance lets it keep. */
 export const MAX_WAREHOUSES = 'MAX_WAREHOUSES';
 
@@ -21,6 +25,13 @@ export const MAX_WAREHOUSES = 'MAX_WAREHOUSES';
 @Module({
   providers: [
     TenantConnectionService,
+    PriceChangeRecorder,
+    {
+      provide: STORE_HOST,
+      scope: Scope.REQUEST,
+      useFactory: (req: Request): string => req['tenant'] ?? req.hostname,
+      inject: [REQUEST],
+    },
     {
       provide: TENANT_CONNECTION,
       scope: Scope.REQUEST,
@@ -46,6 +57,6 @@ export const MAX_WAREHOUSES = 'MAX_WAREHOUSES';
       inject: [REQUEST, TenantConnectionService],
     },
   ],
-  exports: [TENANT_CONNECTION, STORE_MODULES, MAX_WAREHOUSES, TenantConnectionService],
+  exports: [TENANT_CONNECTION, STORE_MODULES, MAX_WAREHOUSES, STORE_HOST, PriceChangeRecorder, TenantConnectionService],
 })
 export class TenantModule {}

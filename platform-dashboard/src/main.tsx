@@ -11,6 +11,7 @@ import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { TenantsPage } from './pages/TenantsPage';
 import { ErrorsPage } from './pages/ErrorsPage';
+import { PriceChangesPage } from './pages/PriceChangesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/tenants" replace /> },
       { path: '/tenants', element: <TenantsPage /> },
+      { path: '/price-changes', element: <PriceChangesPage /> },
       { path: '/errors', element: <ErrorsPage /> },
     ],
   },

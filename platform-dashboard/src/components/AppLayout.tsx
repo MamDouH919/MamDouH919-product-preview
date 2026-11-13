@@ -42,6 +42,9 @@ export function AppLayout() {
           <Button component={NavLink} to="/tenants" color="inherit">
             Stores
           </Button>
+          <Button component={NavLink} to="/price-changes" color="inherit">
+            Prices
+          </Button>
           <Button component={NavLink} to="/errors" color="inherit" sx={{ flexGrow: 1, justifyContent: 'flex-start' }}>
             Errors
           </Button>

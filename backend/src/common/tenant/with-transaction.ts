@@ -20,6 +20,21 @@ export function supportsTransactions(connection: Connection): Promise<boolean> {
   return known;
 }
 
+/** Work waiting for a transaction to commit, by the session it runs in. */
+const afterCommitHooks = new WeakMap<ClientSession, Array<() => void>>();
+
+/**
+ * Runs `fn` once the transaction `session` belongs to has committed — never
+ * if it rolls back, and once even when the transaction retries. With no
+ * session there is no transaction to wait for, so it runs now. `fn` must not
+ * throw into the caller: it is for logging and the like.
+ */
+export function afterCommit(session: ClientSession | undefined, fn: () => void): void {
+  const hooks = session ? afterCommitHooks.get(session) : undefined;
+  if (hooks) hooks.push(fn);
+  else fn();
+}
+
 /**
  * Runs `fn` as one transaction on `connection` — the request's own tenant
  * connection, never another store's: a session belongs to the client that
@@ -39,8 +54,21 @@ export async function withTransaction<T>(
       "This store's database does not support transactions. It must run as a MongoDB replica set.",
     );
   }
-  return connection.transaction(fn, {
-    readConcern: { level: 'snapshot' },
-    writeConcern: { w: 'majority' },
-  });
+  let session: ClientSession | undefined;
+  const result = await connection.transaction(
+    (s) => {
+      // A retry runs `fn` again on the same session: what the first run queued is void.
+      session = s;
+      afterCommitHooks.set(s, []);
+      return fn(s);
+    },
+    {
+      readConcern: { level: 'snapshot' },
+      writeConcern: { w: 'majority' },
+    },
+  );
+  const hooks = session ? (afterCommitHooks.get(session) ?? []) : [];
+  if (session) afterCommitHooks.delete(session);
+  for (const hook of hooks) hook();
+  return result;
 }

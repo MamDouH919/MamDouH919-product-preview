@@ -66,6 +66,69 @@ export interface TenantPatch {
   team?: boolean;
 }
 
+export type PriceKind = 'price' | 'compareAtPrice' | 'cost';
+export type PriceSource =
+  | 'product_created'
+  | 'product_edit'
+  | 'purchase'
+  | 'opening_stock'
+  | 'opening_cost'
+  | 'opening_cost_corrected';
+
+export const PRICE_KIND_LABELS: Record<PriceKind, string> = {
+  price: 'Selling price',
+  compareAtPrice: 'Price before discount',
+  cost: 'Cost',
+};
+
+export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
+  product_created: 'New product',
+  product_edit: 'Product edit',
+  purchase: 'Purchase received',
+  opening_stock: 'Opening stock',
+  opening_cost: 'Opening cost set',
+  opening_cost_corrected: 'Opening cost corrected',
+};
+
+export interface PriceChange {
+  id: string;
+  host: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  variantLabel: string | null;
+  kind: PriceKind;
+  /** In the store's currency; null when there was none before. */
+  oldValue: number | null;
+  /** Null when the price was cleared. */
+  newValue: number | null;
+  delta: number | null;
+  deltaPercent: number | null;
+  source: PriceSource;
+  userName: string | null;
+  userEmail: string | null;
+  at: string;
+}
+
+export interface PriceChangeQuery {
+  host?: string;
+  kind?: PriceKind;
+  source?: PriceSource;
+  q?: string;
+  /** ISO date-times. */
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PriceChangeSummary {
+  total: number;
+  byKind: Record<PriceKind, number>;
+  /** Different products touched. */
+  products: number;
+}
+
 export interface TenantCheck {
   ok: boolean;
   latencyMs?: number;
@@ -237,6 +300,11 @@ export const api = {
   updateError: (id: string, patch: { status?: ErrorStatus; note?: string }) =>
     request<ErrorGroup>('PATCH', `/platform/errors/${encodeURIComponent(id)}`, patch),
   deleteError: (id: string) => request<void>('DELETE', `/platform/errors/${encodeURIComponent(id)}`),
+
+  listPriceChanges: (query: PriceChangeQuery) =>
+    request<{ items: PriceChange[]; total: number }>('GET', `/platform/price-changes${qs({ ...query })}`),
+  priceChangeSummary: (days: number, host?: string) =>
+    request<PriceChangeSummary>('GET', `/platform/price-changes/summary${qs({ days, host })}`),
 
   listBackups: (h: string) => request<Backup[]>('GET', `${host(h)}/backups`),
   createBackup: (h: string) => request<Backup>('POST', `${host(h)}/backups`),
