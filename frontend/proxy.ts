@@ -100,9 +100,20 @@ export async function proxy(req: NextRequest) {
 
   // Per-tenant: an alias host permanently redirects to its canonical host.
   // Only hosts listed in CANONICAL_HOST are touched; every other tenant is unaffected.
-  const canonicalHost = CANONICAL_HOST[host.split(':')[0]];
+  const hostname = host.split(':')[0];
+  const canonicalHost = CANONICAL_HOST[hostname];
   if (canonicalHost) {
     return NextResponse.redirect(`https://${canonicalHost}${pathname}${req.nextUrl.search}`, 301);
+  }
+
+  // Every tenant: plain http permanently redirects to https, so search engines
+  // index a single version of each page (the http copy shows a generic globe
+  // instead of the site's favicon). Only when the proxy in front says the
+  // request came in over http; local development is left alone.
+  const proto = (req.headers.get('x-forwarded-proto') ?? '').split(',')[0].trim();
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');
+  if (proto === 'http' && !isLocal) {
+    return NextResponse.redirect(`https://${host}${pathname}${req.nextUrl.search}`, 301);
   }
 
   const { locale: pathLocale, rest } = splitLocale(pathname);
