@@ -36,6 +36,8 @@ export interface Tenant {
   maxWarehouses: number;
   /** The paid add-on that gives the store's dashboard users and roles pages. An alias follows its primary store. */
   team: boolean;
+  /** The add-on that lets customers pay online; the store then enters its own gateway keys. An alias follows its primary store. */
+  onlinePayments: boolean;
   /** Connection string with credentials replaced by `***`. */
   database: string;
   connected: boolean;
@@ -54,6 +56,7 @@ export interface TenantInput {
   defaultLanguage?: StoreLanguage;
   maxWarehouses?: number;
   team?: boolean;
+  onlinePayments?: boolean;
 }
 
 export interface TenantPatch {
@@ -67,6 +70,7 @@ export interface TenantPatch {
   defaultLanguage?: StoreLanguage;
   maxWarehouses?: number;
   team?: boolean;
+  onlinePayments?: boolean;
 }
 
 export type PriceKind = 'price' | 'compareAtPrice' | 'cost';

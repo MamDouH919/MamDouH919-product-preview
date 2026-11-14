@@ -259,6 +259,7 @@ export function TenantsPage() {
                         <Chip size="small" variant="outlined" label={`${t.maxWarehouses} warehouse${t.maxWarehouses === 1 ? '' : 's'}`} />
                       )}
                       {!t.aliasOf && t.team && <Chip size="small" variant="outlined" color="success" label="Users & roles" />}
+                      {!t.aliasOf && t.onlinePayments && <Chip size="small" variant="outlined" color="success" label="Online payments" />}
                       {!t.aliasOf && (
                         <Chip
                           size="small"

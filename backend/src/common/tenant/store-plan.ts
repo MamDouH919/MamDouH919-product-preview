@@ -31,6 +31,12 @@ export enum StoreModule {
    * top of whatever the plan already gives.
    */
   TEAM = 'team',
+  /**
+   * Paying for orders online through the store's own payment gateway account
+   * (Paymob, Stripe…). A paid add-on like TEAM: the platform switches it on
+   * per store (`onlinePayments`); the store then enters its own gateway keys.
+   */
+  ONLINE_PAYMENTS = 'online_payments',
 }
 
 /**

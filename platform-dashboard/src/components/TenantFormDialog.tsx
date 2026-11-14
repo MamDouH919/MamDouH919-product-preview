@@ -114,6 +114,7 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
   const [defaultLanguage, setDefaultLanguage] = useState<StoreLanguage>(tenant?.defaultLanguage ?? DEFAULT_LANGUAGE);
   const [maxWarehouses, setMaxWarehouses] = useState(String(tenant?.maxWarehouses ?? 1));
   const [team, setTeam] = useState(tenant?.team ?? false);
+  const [onlinePayments, setOnlinePayments] = useState(tenant?.onlinePayments ?? false);
   const warehousesValid = /^\d+$/.test(maxWarehouses) && Number(maxWarehouses) >= 1 && Number(maxWarehouses) <= 100;
   const create = useCreateTenant();
   const update = useUpdateTenant();
@@ -157,13 +158,13 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
           frontendUrl,
           extraFrontendUrls: extraList,
           aliasOf: aliasOf || null,
-          ...(aliasOf ? {} : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }),
+          ...(aliasOf ? {} : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team, onlinePayments }),
           ...(mongoUri.trim() ? { mongoUri: mongoUri.trim() } : {}),
         },
       });
       onSaved(`${tenant.host} updated`);
     } else {
-      await create.mutateAsync({ host, frontendUrl, ...(extraList.length ? { extraFrontendUrls: extraList } : {}), mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team }) });
+      await create.mutateAsync({ host, frontendUrl, ...(extraList.length ? { extraFrontendUrls: extraList } : {}), mongoUri: mongoUri.trim(), ...(aliasOf ? { aliasOf } : { plan, ...languageFields, maxWarehouses: Number(maxWarehouses), team, onlinePayments }) });
       onSaved(`${host} added`);
     }
     onClose();
@@ -286,6 +287,19 @@ export function TenantFormDialog({ tenant, tenants, onClose, onSaved }: Props) {
                 {team
                   ? 'The store\'s admins get Users and Roles pages to add staff and choose what each may do. Your own super admin account is never shown to them.'
                   : 'Off: the store has no Users or Roles pages, and those routes answer 404. Accounts and roles already created are kept.'}
+              </FormHelperText>
+            </FormControl>
+          )}
+          {!aliasOf && plan !== 'catalog' && (
+            <FormControl component="fieldset">
+              <FormControlLabel
+                label="Online payments (paid add-on)"
+                control={<Switch checked={onlinePayments} onChange={(e) => setOnlinePayments(e.target.checked)} />}
+              />
+              <FormHelperText sx={{ mt: -0.5 }}>
+                {onlinePayments
+                  ? 'The store gets a Payments page in its settings to choose a gateway (Paymob…) and enter its own keys, and customers can pay by card at checkout once it is set up and switched on there.'
+                  : 'Off: checkout offers cash on delivery only and the store has no Payments settings. Keys already saved are kept.'}
               </FormHelperText>
             </FormControl>
           )}

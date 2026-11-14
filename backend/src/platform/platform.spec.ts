@@ -141,6 +141,26 @@ describe('Tenant registry', () => {
     expect(tenants.hasModule('shop.test', StoreModule.ORDERS)).toBe(true);
   });
 
+  it('keeps online payments off until the platform switches them on, for the store and its aliases', async () => {
+    expect(tenants.hasModule('shop.test', StoreModule.ONLINE_PAYMENTS)).toBe(false);
+    expect((await service.list()).find((t) => t.host === 'shop.test')!.onlinePayments).toBe(false);
+
+    const view = await service.update('shop.test', { onlinePayments: true });
+    expect(view.onlinePayments).toBe(true);
+    expect(tenants.hasModule('shop.test', StoreModule.ONLINE_PAYMENTS)).toBe(true);
+    expect(tenants.hasModule('www.shop.test', StoreModule.ONLINE_PAYMENTS)).toBe(true);
+
+    // Editing something else must not switch it off.
+    await service.update('shop.test', { frontendUrl: 'http://shop.test' });
+    expect(tenants.hasModule('shop.test', StoreModule.ONLINE_PAYMENTS)).toBe(true);
+
+    // A store that sells nothing online has nothing to charge for, whatever the flag says.
+    await service.update('shop.test', { plan: StorePlan.CATALOG });
+    expect(tenants.hasModule('shop.test', StoreModule.ONLINE_PAYMENTS)).toBe(false);
+    await service.update('shop.test', { plan: StorePlan.FULL, onlinePayments: false });
+    expect(tenants.hasModule('shop.test', StoreModule.ONLINE_PAYMENTS)).toBe(false);
+  });
+
   it('publishes a store in English and Arabic until told otherwise, and changes it for it and its aliases', async () => {
     expect(tenants.getLanguages('legacy.test')).toEqual({ languages: ['en', 'ar'], defaultLanguage: 'ar' });
 

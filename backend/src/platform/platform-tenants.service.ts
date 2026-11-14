@@ -30,6 +30,8 @@ export interface TenantView {
   maxWarehouses: number;
   /** Whether the paid staff-accounts add-on (users and roles pages) is on. */
   team: boolean;
+  /** Whether the online-payments add-on is on; the store then manages its own gateway keys. */
+  onlinePayments: boolean;
   /** The connection string with any user:password replaced by `***`. */
   database: string;
   /** Whether this API instance holds an open connection to it right now. */
@@ -81,6 +83,7 @@ export class PlatformTenantsService {
       ...(dto.defaultLanguage ? { defaultLanguage: dto.defaultLanguage } : {}),
       ...(dto.maxWarehouses ? { maxWarehouses: dto.maxWarehouses } : {}),
       ...(dto.team ? { team: true } : {}),
+      ...(dto.onlinePayments ? { onlinePayments: true } : {}),
     };
     this.assertValid([...records, record], registry.uri);
 
@@ -104,6 +107,7 @@ export class PlatformTenantsService {
       defaultLanguage: dto.defaultLanguage ?? current.defaultLanguage,
       maxWarehouses: dto.maxWarehouses ?? current.maxWarehouses,
       team: dto.team ?? current.team,
+      onlinePayments: dto.onlinePayments ?? current.onlinePayments,
     };
     if (dto.extraFrontendUrls) next.extraFrontendUrls = dto.extraFrontendUrls.map(stripSlash);
     if (!next.extraFrontendUrls?.length) delete next.extraFrontendUrls;
@@ -219,6 +223,7 @@ export class PlatformTenantsService {
       ...resolveStoreLanguages(record.host, record.languages, record.defaultLanguage),
       maxWarehouses: record.maxWarehouses ?? DEFAULT_MAX_WAREHOUSES,
       team: record.team ?? false,
+      onlinePayments: record.onlinePayments ?? false,
       database: redactMongoUri(record.mongoUri),
       connected: this.tenants.isConnected(record.host),
       createdAt: record.createdAt,

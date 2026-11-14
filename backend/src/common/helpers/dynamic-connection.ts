@@ -49,6 +49,8 @@ export interface TenantConfig {
     maxWarehouses?: number;
     /** The paid staff-accounts add-on (StoreModule.TEAM). Left out means off. An alias follows its primary host. */
     team?: boolean;
+    /** The online-payments add-on (StoreModule.ONLINE_PAYMENTS). Left out means off. An alias follows its primary host. */
+    onlinePayments?: boolean;
 }
 
 /** Stores the platform hasn't given a warehouse allowance keep the one main warehouse. */
@@ -103,7 +105,7 @@ export function validateTenantMap(map: Record<string, TenantConfig>): void {
  */
 export function liveTenantMap(records: TenantRecord[]): Record<string, TenantConfig> {
     const all: Record<string, TenantConfig> = {};
-    for (const { host, mongoUri, frontendUrl, extraFrontendUrls, aliasOf, plan, languages, defaultLanguage, maxWarehouses, team } of records) {
+    for (const { host, mongoUri, frontendUrl, extraFrontendUrls, aliasOf, plan, languages, defaultLanguage, maxWarehouses, team, onlinePayments } of records) {
         all[host] = {
             mongoUri,
             frontendUrl,
@@ -111,6 +113,7 @@ export function liveTenantMap(records: TenantRecord[]): Record<string, TenantCon
             plan,
             ...(maxWarehouses ? { maxWarehouses } : {}),
             ...(team ? { team } : {}),
+            ...(onlinePayments ? { onlinePayments } : {}),
             ...(languages?.length ? { languages } : {}),
             ...(defaultLanguage ? { defaultLanguage } : {}),
             ...(aliasOf ? { aliasOf } : {}),
@@ -285,7 +288,12 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
         const own = Object.prototype.hasOwnProperty.call(tenantMap, host) ? tenantMap[host] : undefined;
         const primary = own?.aliasOf !== undefined ? tenantMap[own.aliasOf] : own;
         const planModules = PLAN_MODULES[this.getPlan(host)];
-        return primary?.team ? [...planModules, StoreModule.TEAM] : planModules;
+        const addOns = [
+            ...(primary?.team ? [StoreModule.TEAM] : []),
+            // Online payments settle orders, so a store without orders has nothing to charge for.
+            ...(primary?.onlinePayments && planModules.includes(StoreModule.ORDERS) ? [StoreModule.ONLINE_PAYMENTS] : []),
+        ];
+        return addOns.length ? [...planModules, ...addOns] : planModules;
     }
 
     hasModule(host: string, module: StoreModule): boolean {

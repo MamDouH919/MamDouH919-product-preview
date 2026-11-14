@@ -95,6 +95,13 @@ export class CreateTenantDto {
   @IsOptional()
   @IsBoolean()
   team?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Paid add-on: customers can pay orders online. The store then enters its own payment-gateway keys. Left out means off. Ignored on an alias',
+  })
+  @IsOptional()
+  @IsBoolean()
+  onlinePayments?: boolean;
 }
 
 export class UpdateTenantDto {
@@ -164,6 +171,13 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsBoolean()
   team?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Paid add-on: customers can pay orders online. The store then enters its own payment-gateway keys. Left out means off. Ignored on an alias',
+  })
+  @IsOptional()
+  @IsBoolean()
+  onlinePayments?: boolean;
 }
 
 export class SeedUserDto {
