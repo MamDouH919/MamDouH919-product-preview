@@ -19,6 +19,7 @@ export enum AccountType {
 export const ACCOUNT = {
   CASH: '1000',
   COURIER_CASH: '1100',
+  GATEWAY_BALANCE: '1150',
   RECEIVABLES: '1200',
   INVENTORY: '1300',
   GOODS_AWAITING_DELIVERY: '1310',
@@ -57,6 +58,7 @@ export interface AccountInfo {
 export const CHART: AccountInfo[] = [
   { code: ACCOUNT.CASH, name: { en: 'Cash on hand', ar: 'النقدية بالصندوق' }, type: AccountType.ASSET },
   { code: ACCOUNT.COURIER_CASH, name: { en: 'COD cash held by couriers', ar: 'نقدية التحصيل لدى المندوبين' }, type: AccountType.ASSET },
+  { code: ACCOUNT.GATEWAY_BALANCE, name: { en: 'Online payments held by the gateway', ar: 'مدفوعات أونلاين لدى بوابة الدفع' }, type: AccountType.ASSET },
   { code: ACCOUNT.RECEIVABLES, name: { en: 'Customer receivables', ar: 'مستحقات علي العملاء' }, type: AccountType.ASSET },
   { code: ACCOUNT.INVENTORY, name: { en: 'Inventory', ar: 'المخزون' }, type: AccountType.ASSET },
   { code: ACCOUNT.GOODS_AWAITING_DELIVERY, name: { en: 'Goods awaiting delivery', ar: 'بضاعة بانتظار التسليم' }, type: AccountType.ASSET },
@@ -177,6 +179,7 @@ export const SYSTEM_ACTIVITY: Partial<Record<AccountCode, CashFlowActivity>> = {
  */
 export const MANUAL_LOCKED_ACCOUNTS: AccountCode[] = [
   ACCOUNT.COURIER_CASH,
+  ACCOUNT.GATEWAY_BALANCE,
   ACCOUNT.RECEIVABLES,
   ACCOUNT.INVENTORY,
   ACCOUNT.GOODS_AWAITING_DELIVERY,

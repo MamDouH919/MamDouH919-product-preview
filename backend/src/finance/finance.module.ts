@@ -62,6 +62,6 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     tenantModelProvider(Expense.name, ExpenseSchema),
     tenantModelProvider(CourierSettlement.name, CourierSettlementSchema),
   ],
-  exports: [JournalService, FinanceReportsService],
+  exports: [JournalService, FinanceReportsService, PaymentsService],
 })
 export class FinanceModule {}

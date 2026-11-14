@@ -57,6 +57,22 @@ const TEMPLATES = {
     en: (p) => `Collection #${p.payment} for order #${p.order}`,
     ar: (p) => `تحصيل #${p.payment} للطلب #${p.order}`,
   },
+  online_payment: {
+    en: (p) => `Online payment #${p.payment} for order #${p.order}`,
+    ar: (p) => `دفع أونلاين #${p.payment} للطلب #${p.order}`,
+  },
+  online_payment_applied: {
+    en: (p) => `Online payment #${p.payment} applied to delivered order #${p.order}`,
+    ar: (p) => `تطبيق الدفع الأونلاين #${p.payment} على الطلب المُسلَّم #${p.order}`,
+  },
+  online_payment_refunded: {
+    en: (p) => `Online payment #${p.payment} refunded for cancelled order #${p.order}`,
+    ar: (p) => `رد الدفع الأونلاين #${p.payment} للطلب الملغي #${p.order}`,
+  },
+  gateway_payout: {
+    en: (p) => `Payment gateway payout #${p.payout}`,
+    ar: (p) => `تحويل من بوابة الدفع #${p.payout}`,
+  },
   write_off: {
     en: (p) => `Order #${p.order} written off: ${p.reason}`,
     ar: (p) => `إعدام مديونية الطلب #${p.order}: ${p.reason}`,

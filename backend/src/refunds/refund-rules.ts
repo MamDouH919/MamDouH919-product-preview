@@ -53,7 +53,7 @@ export interface Capacity {
 }
 
 export const isCashMethod = (method: RefundMethod) =>
-  method === RefundMethod.CASH || method === RefundMethod.COURIER_CASH;
+  method === RefundMethod.CASH || method === RefundMethod.COURIER_CASH || method === RefundMethod.GATEWAY;
 
 /**
  * The four caps of the specification, worked out from the order's amounts,

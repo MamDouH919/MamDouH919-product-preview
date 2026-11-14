@@ -37,6 +37,7 @@ import { CartModule } from './cart/cart.module';
 import { ReturnsModule } from './returns/returns.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { PlatformModule } from './platform/platform.module';
+import { OnlinePaymentsModule } from './online-payments/online-payments.module';
 import config from './config/config';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantModule } from './common/tenant/tenant.module';
@@ -106,6 +107,7 @@ import { StoreModuleGuard } from './guards/store-module.guard';
     ActivityLogModule,
     TenantModule,
     PlatformModule,
+    OnlinePaymentsModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: StoreModuleGuard }],

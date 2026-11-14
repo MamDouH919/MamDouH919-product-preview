@@ -26,6 +26,8 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 export enum PaymentMethod {
   CASH_ON_DELIVERY = 'cash_on_delivery',
+  /** Paid through the store's payment gateway before delivery. */
+  ONLINE = 'online',
 }
 
 /**

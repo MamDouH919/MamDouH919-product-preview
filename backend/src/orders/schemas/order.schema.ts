@@ -199,6 +199,10 @@ export class OrderMoney {
   @Prop({ default: 0, min: 0 })
   deliveryRefundedMinor!: number;
 
+  /** Online payments taken before delivery and still held as customer deposits. Cleared when delivery applies them. */
+  @Prop({ default: 0, min: 0 })
+  depositMinor!: number;
+
   /** What the customer owed and never paid, written off as uncollectible. */
   @Prop({ default: 0, min: 0 })
   writtenOffMinor!: number;

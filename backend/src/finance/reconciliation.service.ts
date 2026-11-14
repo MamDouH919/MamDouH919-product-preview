@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { JournalEntry } from './schemas/journal-entry.schema';
-import { CollectionStatus, Custody, Payment } from './schemas/payment.schema';
+import { CollectionStatus, Custody, GatewayRefundState, Payment } from './schemas/payment.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { Coupon } from '../coupons/schemas/coupon.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
@@ -239,6 +239,28 @@ export class ReconciliationService {
       'every costed stock movement belongs to a product or variant that still exists',
     );
 
+    // Money the online gateway holds for the store: what it took, less what went back through it.
+    const taken = payments.filter((p) => p.custody === Custody.GATEWAY).reduce((t, p) => t + p.amountMinor, 0);
+    const sentBack = payments
+      .filter((p) => p.custody === Custody.GATEWAY && p.refundState === GatewayRefundState.DONE)
+      .reduce((t, p) => t + p.amountMinor, 0);
+    const refundedThrough = refunds.filter((r) => r.method === RefundMethod.GATEWAY).reduce((t, r) => t + r.totalMinor, 0);
+    // Payouts to the bank (net of any reversed): credits to the gateway account from payout entries.
+    const paidOut = await this.entryModel
+      .aggregate<{ total: number }>([
+        { $match: { 'source.type': 'gateway_payout' } },
+        { $unwind: '$lines' },
+        { $match: { 'lines.account': ACCOUNT.GATEWAY_BALANCE } },
+        { $group: { _id: null, total: { $sum: { $subtract: ['$lines.creditMinor', '$lines.debitMinor'] } } } },
+      ])
+      .exec();
+    const heldByGateway = taken - sentBack - refundedThrough - (paidOut[0]?.total ?? 0);
+    check(
+      'Gateway balance equals online payments less what went back',
+      balances[ACCOUNT.GATEWAY_BALANCE] === heldByGateway ? [] : [`journal ${balances[ACCOUNT.GATEWAY_BALANCE]} ≠ payments ${heldByGateway}`],
+      `account ${ACCOUNT.GATEWAY_BALANCE} = online payments taken − cancelled-order refunds − gateway refunds − payouts = ${heldByGateway}`,
+    );
+
     // 12. Goods awaiting delivery equal the cost reserved by open orders.
     const open = await this.orderModel
       .aggregate<{ total: number }>([
@@ -289,9 +311,10 @@ export class ReconciliationService {
         .aggregate<{ fees: number; difference: number }>([{ $group: { _id: null, fees: { $sum: '$feesMinor' }, difference: { $sum: '$differenceMinor' } } }])
         .exec(),
       // A manual journal entry is its own document: what it posts to an expense account counts on the documents' side too.
+      // So are a payment gateway payout's fees, which have no expense record of their own.
       this.entryModel
         .aggregate<{ _id: string; net: number }>([
-          { $match: { 'source.type': 'manual' } },
+          { $match: { 'source.type': { $in: ['manual', 'gateway_payout'] } } },
           { $unwind: '$lines' },
           { $match: { 'lines.account': { $in: EXPENSE_ACCOUNTS } } },
           { $group: { _id: '$lines.account', net: { $sum: { $subtract: ['$lines.debitMinor', '$lines.creditMinor'] } } } },
@@ -307,7 +330,7 @@ export class ReconciliationService {
         const docs = (expensed.get(account) ?? 0) + (account === ACCOUNT.DELIVERY_COSTS ? fees : 0) + (manual.get(account) ?? 0);
         return balances[account] === docs ? [] : [`account ${account}: journal ${balances[account]} ≠ expenses ${docs}`];
       }),
-      'each expense account = Σ posted expenses (+ settlement fees for delivery costs, + manual journal entries)',
+      'each expense account = Σ posted expenses (+ settlement fees for delivery costs, + manual journal entries, + gateway payout fees)',
     );
     const shortages = -(settlementRows[0]?.difference ?? 0);
     check(

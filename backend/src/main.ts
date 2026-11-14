@@ -7,7 +7,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { TenantConnectionService } from './common/helpers/dynamic-connection';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Some gateways (Stripe) sign the exact bytes they send; keep them for the webhook.
+    rawBody: true,
+  });
 
   // Behind a reverse proxy, set TRUST_PROXY to the number of proxy hops (e.g. 1
   // for nginx) so req.ip is the real client and rate limits are per visitor.

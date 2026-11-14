@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes, Types } from 'mongoose';
+import { GatewayRefundState } from '../../finance/schemas/payment.schema';
 
 export enum RefundStatus {
   /** Asked for; waiting for an approver. */
@@ -22,6 +23,8 @@ export enum RefundMethod {
   COURIER_CASH = 'courier_cash',
   /** Taken off what the customer still owes — nothing is paid out. */
   CREDIT_AGAINST_RECEIVABLE = 'credit_against_receivable',
+  /** Sent back through the online payment gateway, to the card or wallet the customer paid with. */
+  GATEWAY = 'gateway',
 }
 
 export enum RefundReason {
@@ -142,6 +145,18 @@ export class Refund extends Document {
   /** For `cash`: the cash box, bank or wallet it is paid from. */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'MoneyAccount', required: false })
   moneyAccount?: Types.ObjectId;
+
+  /** For `gateway`: the online payment this sends money back to. One refund goes back through one payment. */
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Payment', required: false, index: true })
+  gatewayPayment?: Types.ObjectId;
+
+  /** For `gateway`: where the gateway's part stands. The books move when the refund is executed; the gateway is asked right after. */
+  @Prop({ type: String, enum: GatewayRefundState, required: false })
+  gatewayState?: GatewayRefundState;
+
+  /** Why the gateway could not send it back, when it could not. */
+  @Prop({ required: false })
+  gatewayNote?: string;
 
   /** The settlement that accounted for that cash. Unset until the courier settles. */
   @Prop({ type: SchemaTypes.ObjectId, ref: 'CourierSettlement', required: false })

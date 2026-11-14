@@ -35,6 +35,7 @@ import { Action } from '../roles/enums/action.enum';
 import { AuthThrottlerGuard } from '../guards/auth-throttler.guard';
 import { RequireModules } from '../decorators/store-module.decorator';
 import { StoreModule } from '../common/tenant/store-plan';
+import { apiOrigin } from '../online-payments/api-origin';
 
 type CustomerRequest = Request & { customerId?: string };
 
@@ -79,7 +80,23 @@ export class GuestOrdersController {
   @UseGuards(AuthThrottlerGuard)
   @Post()
   create(@Body() dto: CreateGuestOrderDto, @Req() req: Request) {
-    return this.ordersService.createGuest(dto, req.hostname);
+    return this.ordersService.createGuest(dto, req.hostname, apiOrigin(req));
+  }
+
+  /** Asks the gateway whether a guest's online order was paid, when its confirmation is late. */
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @Post(':id/pay/sync')
+  paySync(@Param('id') id: string, @Body() dto: GuestOrderTokenDto) {
+    return this.ordersService.syncGuest(id, dto.token);
+  }
+
+  /** Opens a payment for a guest's unpaid online order. */
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Post(':id/pay')
+  pay(@Param('id') id: string, @Body() dto: GuestOrderTokenDto, @Req() req: Request) {
+    return this.ordersService.payGuest(id, dto.token, req.hostname, apiOrigin(req));
   }
 
   // POST rather than GET so the token stays out of access logs.
@@ -114,7 +131,21 @@ export class CustomerOrdersController {
 
   @Post()
   create(@Body() dto: CreateOrderDto, @Req() req: CustomerRequest) {
-    return this.ordersService.create(req.customerId!, dto, req.hostname);
+    return this.ordersService.create(req.customerId!, dto, req.hostname, apiOrigin(req));
+  }
+
+  /** Asks the gateway whether the customer's online order was paid, when its confirmation is late. */
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @Post(':id/pay/sync')
+  paySync(@Param('id') id: string, @Req() req: CustomerRequest) {
+    return this.ordersService.syncMine(req.customerId!, id);
+  }
+
+  /** Opens a payment for the customer's unpaid online order. */
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Post(':id/pay')
+  pay(@Param('id') id: string, @Req() req: CustomerRequest) {
+    return this.ordersService.payMine(req.customerId!, id, req.hostname, apiOrigin(req));
   }
 
   @Get()

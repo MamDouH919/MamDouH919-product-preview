@@ -56,21 +56,6 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
   const inventory = new InventoryService(model('Product'), model('StockMovement'), model('StockTransfer'), model('Counter'), db, journal, warehouses);
   
   const coupons = new CouponsService(model('Coupon'), model('Order'), model('CouponUsage'));
-  const orders = new OrdersService(
-    model('Order'),
-    model('Counter'),
-    model('Product'),
-    model('Setting'),
-    db,
-    journal,
-    inventory,
-    customers as never,
-    {} as never,
-    coupons,
-    priceList as never,
-    notifications as never,
-    modules,
-  );
   const payments = new PaymentsService(
     model('Payment'),
     model('Order'),
@@ -80,6 +65,25 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     model('Courier'),
     db,
     journal,
+  );
+  const orders = new OrdersService(
+    model('Order'),
+    model('Counter'),
+    model('Product'),
+    model('Setting'),
+    db,
+    journal,
+    payments,
+    inventory,
+    customers as never,
+    {} as never,
+    coupons,
+    priceList as never,
+    notifications as never,
+    // Online payment is not under test here; orders in these suites pay on delivery.
+    {} as never,
+    {} as never,
+    modules,
   );
   const finance = new FinanceReportsService(model('JournalEntry'), model('Order'), model('Setting'), journal);
   const reconciliation = new ReconciliationService(
@@ -123,10 +127,13 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     model('Customer'),
     model('User'),
     model('Courier'),
+    model('Payment'),
     db,
     journal,
     inventory,
     { statusChanged: () => undefined } as never,
+    // Gateway refunds are tested with a stand-in that replaces this.
+    { sendRefund: async () => undefined } as never,
   );
 
   let n = 0;

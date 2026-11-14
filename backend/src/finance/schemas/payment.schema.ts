@@ -2,6 +2,17 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes, Types } from 'mongoose';
 import { PaymentMethod } from '../../orders/enums/order-status.enum';
 
+/** Where giving an online payment back to the customer stands. */
+export enum GatewayRefundState {
+  /** The order was cancelled; the money has not been sent back yet. */
+  PENDING = 'pending',
+  /** The gateway is being asked right now. A crash here leaves it so: staff must check the gateway before retrying. */
+  PROCESSING = 'processing',
+  /** The gateway refused or was unreachable; safe to retry. */
+  FAILED = 'failed',
+  DONE = 'done',
+}
+
 export enum CollectionStatus {
   /** The money was received from the customer. */
   COLLECTED = 'collected',
@@ -15,6 +26,8 @@ export enum Custody {
   STORE = 'store',
   /** A courier holds it until they hand it over (a settlement). */
   COURIER = 'courier',
+  /** An online payment: the payment gateway holds it until it pays the store out. */
+  GATEWAY = 'gateway',
 }
 
 /**
@@ -65,6 +78,30 @@ export class Payment extends Document {
   @Prop({ required: false })
   note?: string;
 
+  /** Online payments: which gateway took it, and its id for the transaction (a refund needs it). */
+  @Prop({ required: false })
+  provider?: string;
+
+  @Prop({ required: false })
+  providerTransactionId?: string;
+
+  /**
+   * True while the money sits in customer deposits because the order was not
+   * delivered yet; delivery moves it against the receivable and clears this.
+   */
+  @Prop({ default: false })
+  heldAsDeposit?: boolean;
+
+  /** Online payments given back after a cancellation. Unset while nothing is being refunded. */
+  @Prop({ type: String, enum: GatewayRefundState, required: false, index: true })
+  refundState?: GatewayRefundState;
+
+  @Prop({ required: false })
+  refundNote?: string;
+
+  @Prop({ type: Date, required: false })
+  refundedAt?: Date;
+
   @Prop({ type: Date, required: false })
   voidedAt?: Date;
 
@@ -76,3 +113,8 @@ export class Payment extends Document {
 }
 
 export const PaymentSchema = SchemaFactory.createForClass(Payment);
+// One gateway transaction books one payment, however often its webhook arrives.
+PaymentSchema.index(
+  { provider: 1, providerTransactionId: 1 },
+  { unique: true, partialFilterExpression: { providerTransactionId: { $type: 'string' } } },
+);

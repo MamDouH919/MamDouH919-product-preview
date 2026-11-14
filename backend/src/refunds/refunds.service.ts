@@ -28,6 +28,8 @@ import { Refund, RefundMethod, RefundReason, RefundStatus } from './schemas/refu
 import { CreateRefundDto, QueryRefundsDto, RefundBasisDto, UpdateRefundRulesDto } from './dto/refund.dto';
 import { User } from '../auth/schemas/user.schema';
 import { Courier } from '../couriers/schemas/courier.schema';
+import { CollectionStatus, Custody, GatewayRefundState, Payment } from '../finance/schemas/payment.schema';
+import { OnlinePaymentsService } from '../online-payments/online-payments.service';
 import {
   allowedDeliveryMinor,
   autoApproves,
@@ -55,6 +57,7 @@ const PAID_FROM: Record<RefundMethod, string> = {
   [RefundMethod.CASH]: ACCOUNT.CASH,
   [RefundMethod.COURIER_CASH]: ACCOUNT.COURIER_CASH,
   [RefundMethod.CREDIT_AGAINST_RECEIVABLE]: ACCOUNT.RECEIVABLES,
+  [RefundMethod.GATEWAY]: ACCOUNT.GATEWAY_BALANCE,
 };
 
 export interface RefundPreview {
@@ -79,6 +82,8 @@ export interface RefundPreview {
   totalRemainingMinor: number;
   cashRemainingMinor: number;
   creditRemainingMinor: number;
+  /** The most one online payment of the order can still send back — a gateway refund goes back through one payment. */
+  gatewayRemainingMinor: number;
 }
 
 /** A refund worked out and checked, ready to write. */
@@ -106,10 +111,12 @@ export class RefundsService {
     @InjectModel(Customer.name) private customerModel: Model<Customer>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Courier.name) private courierModel: Model<Courier>,
+    @InjectModel(Payment.name) private paymentModel: Model<Payment>,
     @Inject(TENANT_CONNECTION) private connection: Connection,
     private readonly journal: JournalService,
     private readonly inventory: InventoryService,
     private readonly notifications: ReturnNotificationsService,
+    private readonly onlinePayments: OnlinePaymentsService,
   ) {}
 
   // ── Asking ──────────────────────────────────────────────────────────────────
@@ -141,7 +148,36 @@ export class RefundsService {
       totalRemainingMinor: cap.totalRemainingMinor,
       cashRemainingMinor: cap.cashRemainingMinor,
       creditRemainingMinor: cap.creditRemainingMinor,
+      gatewayRemainingMinor: Math.max(0, ...(await this.gatewayRoom(order._id as Types.ObjectId)).map((r) => r.roomMinor)),
     };
+  }
+
+  /**
+   * What each online payment of an order can still send back through the
+   * gateway: its amount less the gateway refunds already asked for or paid
+   * against it. `except` leaves one refund out — the one being checked.
+   */
+  private async gatewayRoom(orderId: Types.ObjectId, session?: ClientSession, except?: Types.ObjectId) {
+    const payments = await this.paymentModel
+      .find({ order: orderId, custody: Custody.GATEWAY, status: CollectionStatus.COLLECTED, refundState: { $exists: false } })
+      .session(session ?? null)
+      .lean()
+      .exec();
+    const refunds = await this.refundModel
+      .find({
+        order: orderId,
+        method: RefundMethod.GATEWAY,
+        status: { $in: [...OPEN, RefundStatus.EXECUTED] },
+        ...(except ? { _id: { $ne: except } } : {}),
+      })
+      .session(session ?? null)
+      .lean()
+      .exec();
+    return payments.map((p) => ({
+      payment: p._id as Types.ObjectId,
+      roomMinor:
+        p.amountMinor - refunds.filter((r) => String(r.gatewayPayment) === String(p._id)).reduce((t, r) => t + r.totalMinor, 0),
+    }));
   }
 
   /**
@@ -161,6 +197,15 @@ export class RefundsService {
         courier = found._id as Types.ObjectId;
       }
       const planned = await this.plan(dto, session);
+      // The online payment it goes back through: the smallest one with room for all of it.
+      let gatewayPayment: Types.ObjectId | undefined;
+      if (dto.method === RefundMethod.GATEWAY) {
+        const rooms = (await this.gatewayRoom(planned.order._id as Types.ObjectId, session)).filter((r) => r.roomMinor >= planned.totalMinor);
+        if (!rooms.length) {
+          throw new ConflictException('No single online payment of this order has that much left to send back through the gateway. Refund a smaller amount, or pay the rest another way');
+        }
+        gatewayPayment = rooms.sort((a, b) => a.roomMinor - b.roomMinor)[0].payment;
+      }
       const moneyAccount = dto.method === RefundMethod.CASH ? await this.journal.moneyAccount(dto.moneyAccountId, session) : undefined;
       const auto = autoApproves(planned.rules, planned.totalMinor, planned.beyondPolicy);
       const at = new Date();
@@ -182,6 +227,8 @@ export class RefundsService {
             method: dto.method,
             courier,
             moneyAccount,
+            gatewayPayment,
+            gatewayState: gatewayPayment ? GatewayRefundState.PENDING : undefined,
             reason: dto.reason,
             note: dto.note || undefined,
             status: auto ? RefundStatus.APPROVED : RefundStatus.REQUESTED,
@@ -265,6 +312,14 @@ export class RefundsService {
         .lean()
         .exec();
       this.assertWithin(capacity(amounts, order.money ?? {}, paid as unknown as CountedRefund[]), claimed);
+      if (claimed.method === RefundMethod.GATEWAY) {
+        const room = (await this.gatewayRoom(order._id as Types.ObjectId, session, claimed._id as Types.ObjectId)).find(
+          (r) => String(r.payment) === String(claimed.gatewayPayment),
+        );
+        if (!room || room.roomMinor < claimed.totalMinor) {
+          throw new ConflictException('The online payment this refund goes back through no longer has that much to send back');
+        }
+      }
 
       // Back on the shelf first: only lines the sale took stock for, of
       // products still tracking it, each at its share of what the line cost.
@@ -347,7 +402,47 @@ export class RefundsService {
     });
 
     this.notifyReturn(refund, host);
+    // The books say it went back; now the gateway is asked to do it. A failure is kept on the refund for a retry.
+    if (refund.method === RefundMethod.GATEWAY) return this.sendToGateway(String(refund._id));
     return refund;
+  }
+
+  /**
+   * Asks the gateway to send an executed refund back to the customer. Claimed
+   * first so two clicks can't send it twice. If it fails the refund stays
+   * executed, marked failed with the reason, and can be tried again; check the
+   * gateway's own dashboard first when the failure was a timeout.
+   */
+  async sendToGateway(id: string): Promise<Refund> {
+    const claimed = await this.refundModel
+      .findOneAndUpdate(
+        {
+          _id: this.oid(id, 'Refund not found'),
+          method: RefundMethod.GATEWAY,
+          status: RefundStatus.EXECUTED,
+          gatewayState: { $in: [GatewayRefundState.PENDING, GatewayRefundState.FAILED] },
+        },
+        { $set: { gatewayState: GatewayRefundState.PROCESSING }, $unset: { gatewayNote: 1 } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+    if (!claimed) throw new ConflictException('This refund has nothing waiting to be sent through the gateway');
+
+    try {
+      await this.onlinePayments.sendRefund(String(claimed.gatewayPayment), claimed.totalMinor);
+    } catch (error) {
+      this.logger.warn(`Refund #${claimed.refundNumber}: the gateway did not send it back — ${(error as Error).message}`);
+      return (await this.refundModel
+        .findByIdAndUpdate(
+          claimed._id,
+          { $set: { gatewayState: GatewayRefundState.FAILED, gatewayNote: (error as Error).message.slice(0, 300) } },
+          { returnDocument: 'after' },
+        )
+        .exec())!;
+    }
+    return (await this.refundModel
+      .findByIdAndUpdate(claimed._id, { $set: { gatewayState: GatewayRefundState.DONE } }, { returnDocument: 'after' })
+      .exec())!;
   }
 
   /**
@@ -360,6 +455,10 @@ export class RefundsService {
   async reverse(id: string, reason: string, userId: string | undefined): Promise<Refund> {
     return withTransaction(this.connection, async (session) => {
       const at = new Date();
+      const sent = await this.refundModel
+        .exists({ _id: this.oid(id, 'Refund not found'), method: RefundMethod.GATEWAY, gatewayState: { $in: [GatewayRefundState.DONE, GatewayRefundState.PROCESSING] } })
+        .session(session);
+      if (sent) throw new ConflictException('This refund was sent back through the gateway (or is being sent) and can\'t be reversed');
       const settled = await this.refundModel.exists({ _id: this.oid(id, 'Refund not found'), settlement: { $exists: true } }).session(session);
       if (settled) throw new ConflictException('This refund was already settled with the courier and can\'t be reversed');
       const refund = await this.refundModel

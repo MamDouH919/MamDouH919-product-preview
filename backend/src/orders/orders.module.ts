@@ -22,6 +22,9 @@ import { CustomerAuthGuard } from '../guards/customer-auth.guard';
 import { PriceListModule } from '../price-list/price-list.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 import { FinanceModule } from '../finance/finance.module';
+import { OnlinePaymentsModule } from '../online-payments/online-payments.module';
+import { OnlineOrderExpiryWorker } from './online-order-expiry.worker';
+import { OnlineOrderExpiryScheduler } from './online-order-expiry.scheduler';
 
 @Module({
   imports: [
@@ -33,6 +36,7 @@ import { FinanceModule } from '../finance/finance.module';
     PriceListModule,
     MailModule,
     FinanceModule,
+    OnlinePaymentsModule,
   ],
   // Order matters: `/orders/quote`, `/orders/guest` and `/orders/me` must
   // register before `GET /orders/:id`, or "me" would be read as an order id.
@@ -47,6 +51,8 @@ import { FinanceModule } from '../finance/finance.module';
     OrdersService,
     OrderNotificationsService,
     CustomerAuthGuard,
+    OnlineOrderExpiryWorker,
+    OnlineOrderExpiryScheduler,
     tenantModelProvider(Order.name, OrderSchema),
     tenantModelProvider(Counter.name, CounterSchema),
     tenantModelProvider(Product.name, ProductSchema),

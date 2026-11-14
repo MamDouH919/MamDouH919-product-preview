@@ -17,6 +17,7 @@ import { withTransaction } from '../common/tenant/with-transaction';
 import { DEFAULT_CURRENCY, formatMinor, MoneyError } from '../common/money/money';
 import { safeTimeZone, zonedDayRange } from '../common/helpers/time-zone';
 import { JournalService } from '../finance/journal.service';
+import { PaymentsService } from '../finance/payments.service';
 import { ACCOUNT } from '../finance/accounts';
 import { orderAmounts, outstandingOf, paymentStatusFor, priceOrder, priceToMinor, toMajor } from '../finance/order-money';
 import * as bcrypt from 'bcrypt';
@@ -51,6 +52,8 @@ import {
   QueryOrdersDto,
 } from './dto/order.dto';
 import { memo } from '../finance/journal-memo';
+import { OnlinePaymentsService } from '../online-payments/online-payments.service';
+import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 
 /** Why a basket line cannot be bought as it stands. */
 export type QuoteIssue = 'unavailable' | 'no_price' | 'insufficient_stock';
@@ -134,6 +137,9 @@ interface ResolvedLine extends QuoteLine {
   tracksStock: boolean;
 }
 
+/** An order as the client gets it back from checkout; online orders carry where to pay. */
+export type OrderWithPayment = Order | (Record<string, unknown> & { paymentUrl?: string; paymentFailed?: boolean });
+
 const ORDER_COUNTER = 'order';
 /** Order numbers start here so the first order isn't "#1". */
 const ORDER_NUMBER_BASE = 1000;
@@ -149,12 +155,15 @@ export class OrdersService {
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
     @Inject(TENANT_CONNECTION) private connection: Connection,
     private readonly journal: JournalService,
+    private readonly payments: PaymentsService,
     private readonly inventoryService: InventoryService,
     private readonly customersService: CustomersService,
     private readonly customerAuthService: CustomerAuthService,
     private readonly couponsService: CouponsService,
     private readonly priceListService: PriceListService,
     private readonly notifications: OrderNotificationsService,
+    private readonly onlinePayments: OnlinePaymentsService,
+    private readonly tenants: TenantConnectionService,
     @Inject(STORE_MODULES) private readonly modules: readonly StoreModule[],
   ) {}
 
@@ -218,7 +227,7 @@ export class OrdersService {
 
   // ── Placing an order ────────────────────────────────────────────────────────
 
-  async create(customerId: string, dto: CreateOrderDto, host: string): Promise<Order> {
+  async create(customerId: string, dto: CreateOrderDto, host: string, apiOrigin?: string): Promise<OrderWithPayment> {
     const customer = await this.customersService.getProfile(customerId);
     // The customer guard only checks the token, which stays valid after an
     // admin blocks the account — so check here too.
@@ -228,7 +237,8 @@ export class OrdersService {
 
     const address = await this.customersService.getAddress(customerId, dto.addressId);
 
-    return this.place(customer, address, dto, host);
+    const order = await this.place(customer, address, dto, host);
+    return this.withPayment(order, host, apiOrigin, dto.locale, `/account/orders/${order._id}`);
   }
 
   /**
@@ -240,7 +250,8 @@ export class OrdersService {
   async createGuest(
     dto: CreateGuestOrderDto,
     host: string,
-  ): Promise<{ order: Order; token: string; account: GuestAccountStatus }> {
+    apiOrigin?: string,
+  ): Promise<{ order: OrderWithPayment; token: string; account: GuestAccountStatus }> {
     // Checked before a customer record exists, so a refused area leaves nothing behind.
     const { subZoneId, ...rest } = dto.shippingAddress;
     const address: AddressFields = {
@@ -271,7 +282,80 @@ export class OrdersService {
       throw error;
     }
 
-    return { order, token, account: this.accountStatus(customer, order) };
+    return {
+      order: await this.withPayment(order, host, apiOrigin, dto.locale, `/orders/${order._id}`, token),
+      token,
+      account: this.accountStatus(customer, order),
+    };
+  }
+
+  /**
+   * Opens a payment for an online order, for the customer who has it unpaid
+   * (a failed card, a closed tab). Their own order only.
+   */
+  async payMine(customerId: string, orderId: string, host: string, apiOrigin: string): Promise<{ paymentUrl: string }> {
+    const order = await this.findMine(customerId, orderId);
+    return this.onlinePayments.startCheckout(order, {
+      apiOrigin,
+      returnUrl: this.returnUrl(host, order.locale, `/account/orders/${order._id}`),
+    });
+  }
+
+  /**
+   * Asks the gateway what became of the order's checkout, for a customer
+   * whose confirmation is late. The order is read again afterwards by the page.
+   */
+  async syncMine(customerId: string, orderId: string): Promise<{ ok: true }> {
+    await this.onlinePayments.syncOrder(await this.findMine(customerId, orderId));
+    return { ok: true };
+  }
+
+  async syncGuest(orderId: string, token: string): Promise<{ ok: true }> {
+    await this.onlinePayments.syncOrder(await this.findByGuestToken(orderId, token));
+    return { ok: true };
+  }
+
+  /** The same, for a guest order, with the token it was issued. */
+  async payGuest(orderId: string, token: string, host: string, apiOrigin: string): Promise<{ paymentUrl: string }> {
+    const order = await this.findByGuestToken(orderId, token);
+    return this.onlinePayments.startCheckout(order, {
+      apiOrigin,
+      returnUrl: this.returnUrl(host, order.locale, `/orders/${order._id}`, token),
+    });
+  }
+
+  /**
+   * An online order leaves checkout with the address to pay at. If the gateway
+   * can't be reached the order still stands (unpaid), and the customer is told
+   * to pay from the order page — it is not thrown away over a payment hiccup.
+   */
+  private async withPayment(
+    order: Order,
+    host: string,
+    apiOrigin: string | undefined,
+    locale: string | undefined,
+    path: string,
+    token?: string,
+  ): Promise<OrderWithPayment> {
+    if (order.paymentMethod !== PaymentMethod.ONLINE || !apiOrigin) return order;
+    try {
+      const { paymentUrl } = await this.onlinePayments.startCheckout(order, {
+        apiOrigin,
+        returnUrl: this.returnUrl(host, locale ?? order.locale, path, token),
+      });
+      return Object.assign(order.toObject(), { paymentUrl });
+    } catch (error) {
+      this.logger.warn(`Order #${order.orderNumber}: payment could not be opened: ${(error as Error).message}`);
+      return Object.assign(order.toObject(), { paymentFailed: true });
+    }
+  }
+
+  /** Where the gateway sends the customer back to. The page there must read the order, not trust the URL. */
+  private returnUrl(host: string, locale: string | undefined, path: string, token?: string): string {
+    const base = this.tenants.getFrontendUrl(host) ?? '';
+    const lang = locale || this.tenants.getLanguages(host).defaultLanguage;
+    const query = new URLSearchParams({ payment: 'return', ...(token ? { token } : {}) });
+    return `${base}/${lang}${path}?${query}`;
   }
 
   /**
@@ -414,6 +498,9 @@ export class OrdersService {
     guest?: { guestToken: string; canClaimAccount: boolean },
   ): Promise<Order> {
     const customerId = (customer._id as Types.ObjectId).toString();
+
+    // Refused before anything is reserved: a store without a working gateway can't take online payment.
+    if (dto.paymentMethod === PaymentMethod.ONLINE) await this.onlinePayments.assertAvailable();
 
     const lines = await this.resolveLines(dto.items);
     const preorderEnabled = await this.takesPreorders();
@@ -644,6 +731,35 @@ export class OrdersService {
     return updated;
   }
 
+  /**
+   * Calls off an online order nobody paid for, putting its stock and coupon use
+   * back. Re-checked against the database first: the customer may have paid, the
+   * store may have taken the order, or a new checkout may have just been opened,
+   * in which case it is left alone. Returns whether it was cancelled.
+   */
+  async expireUnpaidOnline(orderId: string, host: string, idleSince: Date): Promise<boolean> {
+    const order = await this.orderModel.findById(orderId).populate('customer', 'email').exec();
+    if (
+      !order ||
+      order.paymentMethod !== PaymentMethod.ONLINE ||
+      order.status !== OrderStatus.PENDING ||
+      (order.money?.collectedMinor ?? 0) > 0 ||
+      (await this.onlinePayments.hasAttemptSince(order._id as Types.ObjectId, idleSince))
+    ) {
+      return false;
+    }
+    try {
+      const updated = await this.transition(order, OrderStatus.CANCELLED, { note: 'Online payment was not completed in time' });
+      const customer = order.customer as unknown as { email?: string } | undefined;
+      await this.notifyStatus(updated, host, customer?.email, { note: 'Online payment was not completed in time' });
+      return true;
+    } catch (error) {
+      // Someone moved it first (a paid notice, an admin): nothing left to expire.
+      if (error instanceof ConflictException || error instanceof BadRequestException) return false;
+      throw error;
+    }
+  }
+
   private async notifyStatus(
     order: Order,
     host: string,
@@ -682,7 +798,7 @@ export class OrdersService {
       throw new BadRequestException(`An order cannot go from ${from} to ${to}.`);
     }
 
-    return withTransaction(this.connection, async (session) => {
+    const moved = await withTransaction(this.connection, async (session) => {
       if (to === OrderStatus.SHIPPED && order.preorder) await this.assertPreordersArrived(order, session);
       const at = new Date();
       const updated = await this.orderModel
@@ -721,10 +837,20 @@ export class OrdersService {
         await this.restock(updated, change.by, session);
         // A cancelled order no longer counts against the coupon's limits.
         if (updated.coupon) await this.couponsService.release(updated.coupon, updated.customer, session);
+        // What the customer paid online is to go back to them (below, once this has committed).
+        await this.payments.markGatewayRefundsPending(updated._id as Types.ObjectId, session);
       }
 
       return (await this.orderModel.findById(updated._id).session(session).exec())!;
     });
+
+    // The gateway is asked only after the cancellation is safely recorded. If it
+    // can't be reached the cancellation stands and the payment is left marked
+    // "failed", for staff to retry from the order page.
+    if (to === OrderStatus.CANCELLED && moved.paymentMethod === PaymentMethod.ONLINE) {
+      await this.onlinePayments.refundCancelled(moved._id as Types.ObjectId);
+    }
+    return (await this.orderModel.findById(moved._id).exec())!;
   }
 
   /**
@@ -778,6 +904,9 @@ export class OrdersService {
         [`items.${i}.discountMinor`, line.discountMinor],
       ]),
     );
+    // What the customer paid online before delivery now settles the receivable just posted.
+    await this.payments.applyDeposits(order, order.deliveredAt!, userId, session);
+
     await this.orderModel
       .updateOne(
         { _id: order._id },

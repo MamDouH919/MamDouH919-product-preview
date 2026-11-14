@@ -7,7 +7,7 @@ import { formatMinor, MoneyError, parseMoney } from '../common/money/money';
 import { Order } from '../orders/schemas/order.schema';
 import { Counter } from '../orders/schemas/counter.schema';
 import { OrderStatus, PaymentMethod } from '../orders/enums/order-status.enum';
-import { CollectionStatus, Custody, Payment } from './schemas/payment.schema';
+import { CollectionStatus, Custody, GatewayRefundState, Payment } from './schemas/payment.schema';
 import { JournalEntry } from './schemas/journal-entry.schema';
 import { Refund } from '../refunds/schemas/refund.schema';
 import { Courier } from '../couriers/schemas/courier.schema';
@@ -82,6 +82,9 @@ export class PaymentsService {
       }
 
       const order = await this.findOrder(orderId, session);
+      if (order.paymentMethod === PaymentMethod.ONLINE) {
+        throw new BadRequestException('This order is paid online; the gateway reports its payments, they are not recorded by hand');
+      }
       if (order.status !== OrderStatus.DELIVERED || !order.bookedAt) {
         throw new BadRequestException(
           order.status === OrderStatus.DELIVERED
@@ -152,6 +155,188 @@ export class PaymentsService {
   }
 
   /**
+   * Books money the payment gateway confirmed for an order. Unlike a cash
+   * collection it can arrive before delivery: then the order owes nothing
+   * yet, so the money is held as a customer deposit until delivery turns it
+   * into a settled receivable (`applyDeposits`). After delivery it settles
+   * the receivable directly. Stores without the books just keep the payment
+   * and the order's paid status.
+   *
+   * Runs inside the caller's transaction (the webhook's), so the payment, its
+   * entry and the order's totals land together or not at all.
+   */
+  async recordGatewayPayment(
+    orderId: string,
+    input: { amountMinor: number; provider: string; transactionId: string; keepsBooks: boolean },
+    session: ClientSession,
+  ): Promise<Payment> {
+    const order = await this.findOrder(orderId, session);
+    const { totalMinor } = orderAmounts(order);
+    const collected = order.money?.collectedMinor ?? 0;
+    const owed = order.bookedAt ? outstandingOf(totalMinor, order.money) : totalMinor - collected;
+    if (input.amountMinor > owed) {
+      throw new ConflictException(`Order #${order.orderNumber} only has ${formatMinor(owed)} left to pay`);
+    }
+
+    const now = new Date();
+    const deposit = input.keepsBooks && !order.bookedAt;
+    const [payment] = await this.paymentModel.create(
+      [
+        {
+          paymentNumber: await this.nextNumber(session),
+          order: order._id,
+          orderNumber: order.orderNumber,
+          customer: order.customer,
+          method: PaymentMethod.ONLINE,
+          amountMinor: input.amountMinor,
+          status: CollectionStatus.COLLECTED,
+          custody: Custody.GATEWAY,
+          collectedAt: now,
+          provider: input.provider,
+          providerTransactionId: input.transactionId,
+          heldAsDeposit: deposit,
+        },
+      ],
+      { session },
+    );
+
+    if (input.keepsBooks) {
+      await this.journal.post(
+        {
+          date: now,
+          source: { type: 'payment', id: payment._id as Types.ObjectId, number: payment.paymentNumber, event: 'collected' },
+          lines: [
+            { account: ACCOUNT.GATEWAY_BALANCE, debitMinor: input.amountMinor, order: order._id as Types.ObjectId },
+            {
+              account: deposit ? ACCOUNT.CUSTOMER_DEPOSITS : ACCOUNT.RECEIVABLES,
+              creditMinor: input.amountMinor,
+              order: order._id as Types.ObjectId,
+              customer: order.customer,
+            },
+          ],
+          memo: memo('online_payment', { payment: payment.paymentNumber, order: order.orderNumber }),
+        },
+        session,
+      );
+    }
+
+    const money = { ...moneyOf(order), collectedMinor: collected + input.amountMinor };
+    await this.orderModel
+      .updateOne(
+        { _id: order._id },
+        {
+          $set: { 'money.collectedMinor': money.collectedMinor, paymentStatus: paymentStatusFor(totalMinor, money) },
+          ...(deposit ? { $inc: { 'money.depositMinor': input.amountMinor } } : {}),
+        },
+        { session },
+      )
+      .exec();
+    return payment;
+  }
+
+  /**
+   * A cancelled order's online payments are to go back to the customer: marks
+   * them so, in the cancellation's own transaction. The money stays booked as
+   * the customer's deposit until the gateway has actually sent it back.
+   */
+  async markGatewayRefundsPending(orderId: Types.ObjectId, session: ClientSession): Promise<number> {
+    const result = await this.paymentModel
+      .updateMany(
+        { order: orderId, custody: Custody.GATEWAY, status: CollectionStatus.COLLECTED, refundState: { $exists: false } },
+        { $set: { refundState: GatewayRefundState.PENDING } },
+        { session },
+      )
+      .exec();
+    return result.modifiedCount;
+  }
+
+  /**
+   * The gateway has sent the money back: the books let go of it (the deposit,
+   * or the receivable it settled, against the gateway balance) and the order
+   * shows refunded. Runs once per payment — it only acts on one being processed.
+   */
+  async finishGatewayRefund(paymentId: Types.ObjectId, session: ClientSession): Promise<void> {
+    const now = new Date();
+    const payment = await this.paymentModel
+      .findOneAndUpdate(
+        { _id: paymentId, refundState: GatewayRefundState.PROCESSING },
+        { $set: { refundState: GatewayRefundState.DONE, refundedAt: now, heldAsDeposit: false }, $unset: { refundNote: 1 } },
+        { returnDocument: 'before', session },
+      )
+      .exec();
+    if (!payment) throw new ConflictException('This refund is not being processed');
+
+    const order = await this.findOrder(String(payment.order), session);
+    if (payment.heldAsDeposit) {
+      await this.journal.post(
+        {
+          date: now,
+          source: { type: 'payment', id: payment._id as Types.ObjectId, number: payment.paymentNumber, event: 'refunded' },
+          lines: [
+            { account: ACCOUNT.CUSTOMER_DEPOSITS, debitMinor: payment.amountMinor, order: order._id as Types.ObjectId, customer: order.customer },
+            { account: ACCOUNT.GATEWAY_BALANCE, creditMinor: payment.amountMinor, order: order._id as Types.ObjectId },
+          ],
+          memo: memo('online_payment_refunded', { payment: payment.paymentNumber, order: order.orderNumber }),
+        },
+        session,
+      );
+    }
+
+    const { totalMinor } = orderAmounts(order);
+    const money = {
+      ...moneyOf(order),
+      collectedMinor: Math.max(0, (order.money?.collectedMinor ?? 0) - payment.amountMinor),
+      refundedMinor: (order.money?.refundedMinor ?? 0) + payment.amountMinor,
+    };
+    await this.orderModel
+      .updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            'money.collectedMinor': money.collectedMinor,
+            'money.refundedMinor': money.refundedMinor,
+            paymentStatus: paymentStatusFor(totalMinor, money),
+          },
+          ...(payment.heldAsDeposit ? { $inc: { 'money.depositMinor': -payment.amountMinor } } : {}),
+        },
+        { session },
+      )
+      .exec();
+  }
+
+  /**
+   * Delivery turns the deposits an order holds into a settled receivable:
+   * the sale was just booked as owed, and what the customer paid up front now
+   * pays it. Called in the delivery's own transaction, right after the sale
+   * is posted.
+   */
+  async applyDeposits(order: Order, date: Date, userId: string | undefined, session: ClientSession): Promise<void> {
+    if (!(order.money?.depositMinor > 0)) return;
+    const held = await this.paymentModel
+      .find({ order: order._id, heldAsDeposit: true, status: CollectionStatus.COLLECTED })
+      .session(session)
+      .exec();
+    for (const payment of held) {
+      await this.journal.post(
+        {
+          date,
+          source: { type: 'payment', id: payment._id as Types.ObjectId, number: payment.paymentNumber, event: 'applied' },
+          lines: [
+            { account: ACCOUNT.CUSTOMER_DEPOSITS, debitMinor: payment.amountMinor, order: order._id as Types.ObjectId, customer: order.customer },
+            { account: ACCOUNT.RECEIVABLES, creditMinor: payment.amountMinor, order: order._id as Types.ObjectId, customer: order.customer },
+          ],
+          memo: memo('online_payment_applied', { payment: payment.paymentNumber, order: order.orderNumber }),
+          createdBy: userId,
+        },
+        session,
+      );
+      payment.heldAsDeposit = false;
+      await payment.save({ session });
+    }
+    await this.orderModel.updateOne({ _id: order._id }, { $set: { 'money.depositMinor': 0 } }, { session }).exec();
+  }
+
+  /**
    * Undoes a collection recorded by mistake. The payment stays, marked voided,
    * and a reversing entry dated now puts the receivable back — the original
    * entry is never touched, so a closed period keeps the figures it had.
@@ -182,6 +367,9 @@ export class PaymentsService {
         throw new ConflictException('This collection is already voided');
       }
 
+      if (payment.custody === Custody.GATEWAY) {
+        throw new ConflictException(`Payment #${payment.paymentNumber} came from the payment gateway and can't be voided; refund it instead`);
+      }
       // Cash a courier has already handed over is accounted for in that settlement.
       if (payment.settlement) {
         throw new ConflictException(`Collection #${payment.paymentNumber} was already settled with the courier and can't be voided`);

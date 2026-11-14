@@ -128,7 +128,7 @@ Compare the server's `backend/.env` with the list below and add anything missing
 
 | Variable | Needed? | Notes |
 |---|---|---|
-| `ENCRYPTION_KEY` | Recommended | Encrypts each store's SMTP password. If it is not set, `JWT_SECRET` is used. **If stores already saved SMTP passwords, setting a new key makes those passwords unreadable**, and you must enter them again in each store's settings. |
+| `ENCRYPTION_KEY` | Recommended | Encrypts each store's SMTP password **and payment-gateway keys**. If it is not set, `JWT_SECRET` is used. **If stores already saved SMTP passwords, setting a new key makes those passwords unreadable**, and you must enter them again in each store's settings. |
 | `TRUST_PROXY=1` | Yes, behind nginx | Gives rate limits the real client IP. |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Optional | Saves images to Cloudflare R2. If any of them is missing, images are saved in `./uploads` as before. |
 | `TENANT_MAP` | Yes, in production | Must contain every store host. |
@@ -278,3 +278,30 @@ pm2 status
 pm2 logs api               # or: pm2 logs web
 pm2 restart api --update-env
 ```
+
+
+## Online payments (Paymob, later Stripe)
+
+A paid add-on, off for every store until the platform dashboard switches **Online payments** on for it.
+After that the store's own admin opens **Settings → Payments**, picks the gateway and enters its keys
+(secrets are encrypted with `ENCRYPTION_KEY`, so keep that key stable). Customers then see "Pay online" at checkout.
+
+- The API must be reachable over **public https** on the store's API host: the gateway reports each payment to
+  `https://<api host>/online-payments/webhook/<gateway>`. The address is sent with every payment, so there is nothing to
+  register in the gateway's dashboard. A proxy must forward the `Host` header unchanged (it is how the API finds the store).
+- Test with the gateway's **test keys** first; Settings → Payments has a "Test keys" button.
+- Money lands in the gateway account, not the store's bank: the books hold it in "Online payments held by the gateway"
+  (1150) until it is paid out. Recording the payout and the gateway's fees is manual for now.
+- Adding a gateway: implement `PaymentProvider` (`backend/src/online-payments/providers/`), add it to `GatewayId` and
+  `providers/index.ts`. The settings form, checkout, webhook and accounting need no change.
+- Unpaid online orders: a job cancels an online order still pending with no payment and no checkout opened for
+  `ONLINE_ORDER_EXPIRY_MINUTES` (default 30, never below 5), putting its stock back. It runs every
+  `ONLINE_ORDER_EXPIRY_INTERVAL_MINUTES` (default 5; `0` turns it off). A payment that arrives afterwards is refunded
+  automatically.
+- Refunds of delivered online orders go back through the gateway (refund method "gateway"). The books move when the
+  refund is paid out; if the gateway then fails, the refund stays *failed* with the reason and can be sent again or
+  reversed. Check the gateway dashboard before retrying after a timeout. Paymob's refund call was tried in its
+  sandbox and worked; try one small real payment and refund before telling a store to rely on it.
+- A late or lost payment notice: if the store also enters Paymob's **API key** (Settings → Payments, optional), the
+  order page asks Paymob directly after a few seconds and settles the order if it was paid. Without the key the
+  order waits for the notice, as before.

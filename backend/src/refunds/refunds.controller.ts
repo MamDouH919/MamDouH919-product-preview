@@ -84,6 +84,12 @@ export class RefundsController {
     return this.refunds.execute(id, req.userId, req.hostname);
   }
 
+  @Permissions([{ resource: Resource.REFUNDS, actions: [Action.EXECUTE] }])
+  @Post('refunds/:id/gateway-retry')
+  retryGateway(@Param('id') id: string) {
+    return this.refunds.sendToGateway(id);
+  }
+
   @Permissions([{ resource: Resource.REFUNDS, actions: [Action.APPROVE] }])
   @Post('refunds/:id/reverse')
   reverse(@Param('id') id: string, @Body() dto: ReverseRefundDto, @Req() req: AdminRequest) {

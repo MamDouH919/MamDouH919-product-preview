@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { FinanceModule } from '../finance/finance.module';
+import { OnlinePaymentsModule } from '../online-payments/online-payments.module';
+import { Payment, PaymentSchema } from '../finance/schemas/payment.schema';
 import { ReturnsModule } from '../returns/returns.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 import { Refund, RefundSchema } from './schemas/refund.schema';
@@ -16,7 +18,7 @@ import { RefundsService } from './refunds.service';
 import { RefundsController } from './refunds.controller';
 
 @Module({
-  imports: [AuthModule, InventoryModule, FinanceModule, ReturnsModule],
+  imports: [AuthModule, InventoryModule, FinanceModule, ReturnsModule, OnlinePaymentsModule],
   controllers: [RefundsController],
   providers: [
     RefundsService,
@@ -30,6 +32,8 @@ import { RefundsController } from './refunds.controller';
     tenantModelProvider(User.name, UserSchema),
     // Read-only here: the courier who pays a courier_cash refund.
     tenantModelProvider(Courier.name, CourierSchema),
+    // Read-only here: the online payments a gateway refund goes back through.
+    tenantModelProvider(Payment.name, PaymentSchema),
   ],
 })
 export class RefundsModule {}

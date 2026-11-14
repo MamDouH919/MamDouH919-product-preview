@@ -40,6 +40,9 @@ import { ReturnRequest, ReturnRequestSchema } from '../../returns/schemas/return
 import { ActivityLog, ActivityLogSchema } from '../../activity-log/schemas/activity-log.schema';
 import { Review, ReviewSchema } from '../../reviews/schemas/review.schema';
 import { MailSetting, MailSettingSchema } from '../../mail/schemas/mail-setting.schema';
+import { PaymentGatewaySetting, PaymentGatewaySettingSchema } from '../../online-payments/schemas/payment-gateway-setting.schema';
+import { PaymentAttempt, PaymentAttemptSchema } from '../../online-payments/schemas/payment-attempt.schema';
+import { GatewayPayout, GatewayPayoutSchema } from '../../online-payments/schemas/gateway-payout.schema';
 import {
   CustomerRefreshToken,
   CustomerRefreshTokenSchema,
@@ -91,6 +94,9 @@ export const tenantSchemas: { name: string; schema: Schema }[] = [
   { name: MoneyTransfer.name, schema: MoneyTransferSchema },
   { name: Page.name, schema: PageSchema },
   { name: MailSetting.name, schema: MailSettingSchema },
+  { name: PaymentGatewaySetting.name, schema: PaymentGatewaySettingSchema },
+  { name: PaymentAttempt.name, schema: PaymentAttemptSchema },
+  { name: GatewayPayout.name, schema: GatewayPayoutSchema },
   { name: Zone.name, schema: ZoneSchema },
   { name: SubZone.name, schema: SubZoneSchema },
   { name: DeliveryPrice.name, schema: DeliveryPriceSchema },
