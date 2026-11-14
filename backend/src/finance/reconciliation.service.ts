@@ -222,6 +222,23 @@ export class ReconciliationService {
       'inventoryValueMinor = Σ movement valueMinor, per product or variant',
     );
 
+    // Stock value that no product or variant carries any more — a deleted product, or units left on a
+    // product that has variants — is in the books but nowhere on the shelf.
+    const poolKeys = new Set(pools.map((pool) => `${pool.product}:${pool.variantId ?? ''}`));
+    const names = new Map(products.map((p) => [String(p._id), p.name?.en ?? p.name?.ar ?? String(p._id)]));
+    check(
+      'No stock value is stranded outside a product',
+      moved
+        .filter((m) => m.value !== 0 && !poolKeys.has(`${m._id.product}:${m._id.variantId ?? ''}`))
+        .map((m) => {
+          const name = names.get(String(m._id.product));
+          return name
+            ? `${name}: ${m.value} sits on the product itself, which now has variants`
+            : `product ${m._id.product} (deleted): ${m.value} is still in the books`;
+        }),
+      'every costed stock movement belongs to a product or variant that still exists',
+    );
+
     // 12. Goods awaiting delivery equal the cost reserved by open orders.
     const open = await this.orderModel
       .aggregate<{ total: number }>([

@@ -56,6 +56,25 @@ describe('Chart of accounts, manual journal and statements', () => {
     await store.payments.recordCollection(String(order._id), { amount: '345', custody: Custody.STORE });
   };
 
+  describe('stock value that no product carries', () => {
+    const stranded = async () =>
+      (await store.reconciliation.run()).checks.find((c) => c.name === 'No stock value is stranded outside a product')!;
+
+    it('is clean while every costed unit sits on a product', async () => {
+      await store.product(150, 10, 90);
+      expect((await stranded()).ok).toBe(true);
+    });
+
+    it('names a product deleted while its stock was still in the books', async () => {
+      const id = await store.product(150, 10, 90);
+      await db.model('Product').deleteOne({ _id: id });
+      const check = await stranded();
+      expect(check.ok).toBe(false);
+      expect(check.offenders[0]).toContain('deleted');
+      expect(check.offenders[0]).toContain('90000');
+    });
+  });
+
   describe('chart of accounts', () => {
     it('lists the built-in accounts by category and adds the store’s own, numbered by type', async () => {
       const chart = await store.chart.list();

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
-import { Product } from './schemas/product.schema';
+import { Product, totalUnits } from './schemas/product.schema';
 import { DeletedProduct } from './schemas/deleted-product.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
@@ -15,7 +15,8 @@ import { MovementType } from '../inventory/enums/movement-type.enum';
 import { withTransaction } from '../common/tenant/with-transaction';
 import { buildSlug } from '../common/helpers/slug';
 import { parseMoney } from '../common/money/money';
-import { STORE_HOST } from '../common/tenant/tenant.module';
+import { STORE_HOST, STORE_MODULES } from '../common/tenant/tenant.module';
+import { StoreModule } from '../common/tenant/store-plan';
 import { PriceChangeRecorder } from '../common/tenant/price-change-recorder';
 import { diffProductPrices } from './price-diff';
 
@@ -51,6 +52,20 @@ function openingValue(line: OpeningLine): number | undefined {
   }
 }
 
+/**
+ * What a product still holds: units on the shelf and the value the books carry
+ * for them — on the product itself and on each of its variants. Nothing here
+ * means it can leave the catalogue or change shape without stranding money.
+ */
+export function stockHeld(product: Pick<Product, 'trackStock' | 'stock' | 'stocks' | 'inventoryValueMinor' | 'variants'>) {
+  if (!product.trackStock) return { units: 0, valueMinor: 0 };
+  const parts = [product, ...(product.variants ?? [])];
+  return {
+    units: parts.reduce((t, part) => t + totalUnits(part), 0),
+    valueMinor: parts.reduce((t, part) => t + (part.inventoryValueMinor ?? 0), 0),
+  };
+}
+
 function totalOpening(split: { quantity: number }[] | undefined, fallback?: number): number {
   return split?.length ? split.reduce((sum, s) => sum + s.quantity, 0) : (fallback ?? 0);
 }
@@ -65,7 +80,14 @@ export class ProductsService {
     // Where price changes are reported for the platform to follow. Optional so a service built by hand (tests, scripts) still works.
     @Optional() @Inject(STORE_HOST) private readonly storeHost?: string,
     @Optional() private readonly priceLog?: PriceChangeRecorder,
+    // What the store's plan has. Stock is only guarded where the plan keeps stock books (unknown: guarded).
+    @Optional() @Inject(STORE_MODULES) private readonly modules?: readonly StoreModule[],
   ) {}
+
+  /** The stock guards apply only where there is stock to write off: a store without the inventory module has no stock take to do it with. */
+  private get guardsStock(): boolean {
+    return !this.modules || this.modules.includes(StoreModule.INVENTORY);
+  }
 
   async create(
     createProductDto: CreateProductDto,
@@ -442,6 +464,17 @@ export class ProductsService {
     delete (updateProductDto as { ratingAverage?: number }).ratingAverage;
     delete (updateProductDto as { ratingCount?: number }).ratingCount;
 
+    // Once a product has variants its stock lives on them. Units already on the product itself would be
+    // left behind: not sellable, not counted, their value stranded in the books.
+    if (this.guardsStock && updateProductDto.variants?.length && !existing.variants?.length) {
+      const held = stockHeld(existing);
+      if (held.units !== 0 || held.valueMinor !== 0) {
+        throw new ConflictException(
+          `This product already holds ${held.units} unit(s) of stock. Write it off with a stock take (count 0) before adding variants, then give each variant its own opening stock.`,
+        );
+      }
+    }
+
     let addedVariants: ProductVariantDto[] = [];
     if (updateProductDto.variants) {
       const { merged, added } = this.mergeVariantStock(existing, updateProductDto.variants);
@@ -551,6 +584,14 @@ export class ProductsService {
     if (open) {
       throw new ConflictException(
         'This product is on an order that is not finished yet, so it cannot be deleted. Finish or cancel the order first.',
+      );
+    }
+
+    // Deleting would leave the units' value in the books with nothing in the catalogue to carry it.
+    const held = stockHeld(product);
+    if (this.guardsStock && (held.units !== 0 || held.valueMinor !== 0)) {
+      throw new ConflictException(
+        `This product still holds ${held.units} unit(s) of stock, so it cannot be deleted: the books would keep their value for a product that no longer exists. Sell the stock or write it off with a stock take (count 0) first, or hide the product instead.`,
       );
     }
 

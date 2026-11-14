@@ -91,13 +91,12 @@ const ProductsPage = () => {
       queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
     },
     onError: (error: any) => {
-      // 409: the product has orders or stock history and can only be turned off.
+      // 409: an unfinished order, or stock still on the shelf. The server says which.
+      const message = error?.response?.data?.message;
       toast.error(
-        t(
-          error?.response?.status === 409
-            ? "productHasHistory"
-            : "somethingWentWrong",
-        ),
+        error?.response?.status === 409
+          ? (typeof message === "string" ? message : t("productHasHistory"))
+          : t("somethingWentWrong"),
       );
     },
   });
