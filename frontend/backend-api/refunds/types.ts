@@ -2,8 +2,11 @@ export type RefundStatus = "requested" | "approved" | "rejected" | "executed" | 
 export const REFUND_STATUSES: RefundStatus[] = ["requested", "approved", "executed", "rejected", "reversed"];
 
 /** How the money goes back. */
-export type RefundMethod = "cash" | "courier_cash" | "credit_against_receivable";
-export const REFUND_METHODS: RefundMethod[] = ["cash", "courier_cash", "credit_against_receivable"];
+export type RefundMethod = "cash" | "courier_cash" | "credit_against_receivable" | "gateway";
+export const REFUND_METHODS: RefundMethod[] = ["cash", "courier_cash", "credit_against_receivable", "gateway"];
+
+/** Where the online gateway's part of a `gateway` refund stands. */
+export type GatewayRefundState = "pending" | "processing" | "failed" | "done";
 
 export type RefundReason =
   | "damaged"
@@ -48,6 +51,8 @@ export type Refund = {
   approvedBy?: { _id: string; name: string } | string;
   executedBy?: { _id: string; name: string } | string;
   executedAt?: string;
+  gatewayState?: GatewayRefundState;
+  gatewayNote?: string;
   history: { status: RefundStatus; by?: { name: string } | string; at: string; note?: string }[];
   createdAt: string;
 };
@@ -95,6 +100,8 @@ export type RefundPreview = {
   totalRemainingMinor: number;
   cashRemainingMinor: number;
   creditRemainingMinor: number;
+  /** The most one online payment can still send back through the gateway. */
+  gatewayRemainingMinor: number;
 };
 
 export type CreateRefundPayload = RefundBasis & {

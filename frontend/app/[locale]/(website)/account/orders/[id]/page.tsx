@@ -30,6 +30,8 @@ import ShippingAddressBlock from "@/features/Order/ShippingAddressBlock";
 import StatusTimeline from "@/features/Order/StatusTimeline";
 import { formatDateTime, localized } from "@/features/Order/format";
 import MyOrderReturns from "@/features/Return/MyOrderReturns";
+import OnlinePaymentPanel from "@/features/Order/OnlinePaymentPanel";
+import { payMyOrder, syncMyOrderPayment } from "@/backend-api/payments/mutations";
 
 const OrderDetail = ({ id }: { id: string }) => {
   const { t, i18n } = useTranslation();
@@ -37,12 +39,13 @@ const OrderDetail = ({ id }: { id: string }) => {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const justPlaced = searchParams.get("placed") === "1";
+  const returning = searchParams.get("payment") === "return";
   const fallbackCurrency = useCurrency();
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reason, setReason] = useState("");
 
-  const { data: order, isLoading, isError } = useMyOrderQuery(id);
+  const { data: order, isLoading, isError, refetch } = useMyOrderQuery(id);
 
   const cancelMutation = useMutation({
     mutationFn: cancelMyOrder,
@@ -90,6 +93,8 @@ const OrderDetail = ({ id }: { id: string }) => {
           {t("orderPlacedBody", { number: order.orderNumber })}
         </Alert>
       )}
+
+      <OnlinePaymentPanel order={order} returning={returning} pay={() => payMyOrder(order._id)} sync={() => syncMyOrderPayment(order._id)} refresh={refetch} />
 
       <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: 3 }}>
         <CustomLink href="/account/orders" style={{ textDecoration: "none" }}>

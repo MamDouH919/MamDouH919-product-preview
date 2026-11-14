@@ -27,6 +27,12 @@ export const recordCollection = async ({
 export const writeOffBalance = async ({ orderId, amount, reason }: { orderId: string; amount?: string; reason: string }) =>
   (await api.post(`/finance/orders/${orderId}/write-off`, { amount, reason })).data;
 
+/** Asks the payment gateway again to send an online payment back (the first try failed). */
+export const retryGatewayRefund = async (paymentId: string): Promise<{ refunded: true }> => {
+  const response = await api.post(`/online-payments/payments/${paymentId}/refund`);
+  return response.data;
+};
+
 export const voidCollection = async ({ paymentId, reason }: { paymentId: string; reason: string }): Promise<Payment> => {
   const response = await api.post(`/finance/payments/${paymentId}/void`, { reason });
   return response.data;

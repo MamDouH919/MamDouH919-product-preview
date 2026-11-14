@@ -2,7 +2,7 @@
 export type OrderPaymentStatus = "unpaid" | "partially_paid" | "paid" | "partially_refunded" | "refunded" | "written_off" | "not_tracked";
 
 /** Who holds collected cash: the store, or a courier until they hand it over. */
-export type Custody = "store" | "courier";
+export type Custody = "store" | "courier" | "gateway";
 
 export type Payment = {
   _id: string;
@@ -17,6 +17,9 @@ export type Payment = {
   note?: string;
   voidedAt?: string;
   voidReason?: string;
+  /** Online payments only: where giving the money back after a cancellation stands. */
+  refundState?: "pending" | "processing" | "failed" | "done";
+  refundNote?: string;
 };
 
 export type OrderFinance = {

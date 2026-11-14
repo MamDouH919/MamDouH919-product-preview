@@ -4,7 +4,7 @@ import { splitLocale } from "@/lib/locales";
 export type StorePlan = "catalog" | "orders" | "full";
 
 /** The parts of the system a plan switches on. Products and the website are always on. */
-export type StoreModule = "orders" | "inventory" | "finance" | "team";
+export type StoreModule = "orders" | "inventory" | "finance" | "team" | "online_payments";
 
 /**
  * What a store gets when its settings haven't said otherwise — the API's default plan.
@@ -45,6 +45,7 @@ const ROUTE_MODULES: [string, StoreModule[]][] = [
     ["/admin/books", ["finance"]],
     ["/admin/users", ["team"]],
     ["/admin/roles", ["team"]],
+    ["/admin/settings/payments", ["online_payments"]],
 ];
 
 /** The modules a path needs. Takes it with or without the leading locale ("/ar/admin/orders" or "/admin/orders"). */

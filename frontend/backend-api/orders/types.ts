@@ -23,7 +23,7 @@ export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
   cancelled: [],
 };
 
-export type PaymentMethod = "cash_on_delivery";
+export type PaymentMethod = "cash_on_delivery" | "online";
 
 export type OrderItemInput = {
   productId: string;
@@ -117,6 +117,10 @@ export type Order = {
   refundedTotal?: number;
   currency?: LocalizedField;
   paymentMethod: PaymentMethod;
+  /** Only on the answer to placing an order paid online: where to send the customer to pay. */
+  paymentUrl?: string;
+  /** The order was placed but the payment page could not be opened; it can be paid from the order page. */
+  paymentFailed?: boolean;
   /** What has been paid — separate from `status`: delivered is not paid. */
   paymentStatus?: OrderPaymentStatus;
   /** Exact amount in minor units (piastres); absent on orders placed before the books. */

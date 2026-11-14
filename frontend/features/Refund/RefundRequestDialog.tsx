@@ -87,7 +87,13 @@ const RefundRequestDialog = ({
   const beyondPolicy = !!preview && deliveryOk && toMinor(delivery) > preview.deliverySuggestedMinor;
   const needsApproval = !!preview && (beyondPolicy || totalMinor > preview.rules.autoApproveUpToMinor);
   const methodRoom = (m: RefundMethod) =>
-    !preview ? 0 : m === "credit_against_receivable" ? preview.creditRemainingMinor : preview.cashRemainingMinor;
+    !preview
+      ? 0
+      : m === "credit_against_receivable"
+        ? preview.creditRemainingMinor
+        : m === "gateway"
+          ? Math.min(preview.gatewayRemainingMinor, preview.cashRemainingMinor)
+          : preview.cashRemainingMinor;
   const valid = productOk && deliveryOk && totalMinor > 0 && totalMinor <= methodRoom(method) && (!beyondPolicy || !!note.trim()) && (method !== "courier_cash" || !!courierId);
 
   const mutation = useMutation({

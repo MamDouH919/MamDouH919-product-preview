@@ -20,7 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import { ORDER_FINANCE_QUERY_KEY, useOrderFinanceQuery } from "@/backend-api/finance/hooks";
-import { recordCollection, voidCollection, writeOffBalance } from "@/backend-api/finance/mutations";
+import { recordCollection, retryGatewayRefund, voidCollection, writeOffBalance } from "@/backend-api/finance/mutations";
 import { useCouriersQuery } from "@/backend-api/couriers/api";
 import MoneyAccountSelect from "@/features/Finance/MoneyAccountSelect";
 import { Custody, OrderPaymentStatus } from "@/backend-api/finance/types";
@@ -44,7 +44,7 @@ const AMOUNT = /^\d+(\.\d{1,2})?$/;
  * been collected and by whom, and what is still owed. Cash is recorded here
  * after delivery; a mistaken entry is voided, never edited.
  */
-const OrderPaymentPanel = ({ orderId, currency }: { orderId: string; currency: string }) => {
+const OrderPaymentPanel = ({ orderId, currency, online = false }: { orderId: string; currency: string; online?: boolean }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const queryClient = useQueryClient();
@@ -89,6 +89,19 @@ const OrderPaymentPanel = ({ orderId, currency }: { orderId: string; currency: s
     onError: failed,
   });
 
+  const retryRefund = useMutation({
+    mutationFn: retryGatewayRefund,
+    onSuccess: () => {
+      refresh();
+      toast.success(t("paymentRefunded"));
+    },
+    onError: (error: any) => {
+      // The failure is saved on the payment; show it there.
+      refresh();
+      failed(error);
+    },
+  });
+
   const voidMutation = useMutation({
     mutationFn: voidCollection,
     onSuccess: () => {
@@ -103,7 +116,9 @@ const OrderPaymentPanel = ({ orderId, currency }: { orderId: string; currency: s
   // No permission to see the books (or nothing to show yet): leave the panel out.
   if (isError || !finance) return null;
 
-  const owed = finance.outstandingMinor;
+  // An online order may be paid before it is delivered, when the books don't count it as owed yet.
+  const showMoney = finance.booked || (online && (finance.collectedMinor > 0 || finance.refundedMinor > 0));
+  const owed = finance.booked ? finance.outstandingMinor : online ? finance.totalMinor - finance.collectedMinor : 0;
   const value = amount ?? (owed > 0 ? minorToInput(owed) : "");
   const valid = AMOUNT.test(value) && Number(value) > 0 && (custody === "store" || !!courierId);
 
@@ -116,7 +131,7 @@ const OrderPaymentPanel = ({ orderId, currency }: { orderId: string; currency: s
         <Chip size="small" color={STATUS_COLOR[finance.paymentStatus]} label={t(`paymentStatus.${finance.paymentStatus}`)} />
       </Stack>
 
-      {!finance.booked ? (
+      {!showMoney ? (
         <Typography variant="body2" color="text.secondary">
           {finance.paymentStatus === "not_tracked" ? t("paymentNotTracked") : t("paymentAfterDelivery")}
         </Typography>
@@ -137,7 +152,8 @@ const OrderPaymentPanel = ({ orderId, currency }: { orderId: string; currency: s
         </Stack>
       )}
 
-      {finance.booked && owed > 0 && (
+      {/* Online money is reported by the gateway, never typed in; cash is recorded by hand. */}
+      {finance.booked && !online && owed > 0 && (
         <>
           <Divider sx={{ my: 2 }} />
           <Stack spacing={1.5}>
@@ -206,8 +222,19 @@ const OrderPaymentPanel = ({ orderId, currency }: { orderId: string; currency: s
                     {formatDateTime(p.collectedAt, lang)}
                     {p.status === "voided" && p.voidReason ? ` · ${t("voided")}: ${p.voidReason}` : ""}
                   </Typography>
+                  {p.refundState && (
+                    <Typography variant="caption" display="block" color={p.refundState === "failed" ? "error" : "text.secondary"}>
+                      {t(`gatewayRefund.${p.refundState}`)}
+                      {p.refundState === "failed" && p.refundNote ? `: ${p.refundNote}` : ""}
+                    </Typography>
+                  )}
                 </Box>
-                {p.status === "collected" && (
+                {p.refundState && ["pending", "failed"].includes(p.refundState) && (
+                  <Button size="small" disabled={retryRefund.isPending} onClick={() => retryRefund.mutate(p._id)}>
+                    {t("gatewayRefund.retry")}
+                  </Button>
+                )}
+                {p.status === "collected" && p.custody !== "gateway" && (
                   <Button size="small" color="error" onClick={() => setVoiding(p._id)}>
                     {t("void")}
                   </Button>

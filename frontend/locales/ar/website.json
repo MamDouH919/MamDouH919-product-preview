@@ -488,7 +488,8 @@
         "cancelled": "إلغاء الطلب"
     },
     "paymentMethods": {
-        "cash_on_delivery": "الدفع عند الاستلام"
+        "cash_on_delivery": "الدفع عند الاستلام",
+        "online": "دفع أونلاين"
     },
     "quickLinks": "روابط سريعة",
     "shopByCategory": "تسوق حسب الفئة",
@@ -753,6 +754,53 @@
     "guestCustomer": "زائر",
     "guestCustomerHint": "طلب بدون حساب ولم يفعّل حسابه بعد",
     "generalSettings": "عام",
+    "paymentRefunded": "تم رد الدفع للعميل.",
+    "payoutsTitle": "التحويلات إلى البنك",
+    "payoutsDescription": "ما حوّلته بوابة الدفع إلى حسابك البنكي، والرسوم التي خصمتها. سجّل كل تحويل حتى لا تظهر الأموال في الدفاتر كأنها ما زالت لدى البوابة.",
+    "recordPayout": "تسجيل تحويل",
+    "heldByGateway": "تُظهر الدفاتر أن {{amount}} ما زالت لدى البوابة.",
+    "noPayouts": "لا توجد تحويلات مسجّلة بعد.",
+    "payoutNumber": "تحويل رقم {{number}}",
+    "payoutAmounts": "أفرجت البوابة عن {{gross}} · الرسوم {{fee}} · وصل للبنك {{net}}",
+    "payoutReversedChip": "معكوس",
+    "payoutDate": "تاريخ وصوله للبنك",
+    "payoutGross": "المبلغ الذي أفرجت عنه البوابة",
+    "payoutGrossHint": "قبل خصم رسوم البوابة، كما في تقرير التسوية.",
+    "payoutFee": "الرسوم المخصومة",
+    "payoutFeeHint": "اتركه فارغًا إن لم تكن هناك رسوم.",
+    "payoutLandedIn": "وصل إلى",
+    "payoutReference": "رقم تسوية البوابة (اختياري)",
+    "payoutNet": "يصل إلى البنك {{amount}}.",
+    "payoutRecorded": "تم تسجيل التحويل",
+    "payoutReversed": "تم عكس التحويل",
+    "payoutReverseConfirm": "عكس التحويل رقم {{number}}؟",
+    "gatewayRefund": {
+        "pending": "الطلب ملغي — رد الفلوس للعميل في الانتظار",
+        "processing": "الرد جارٍ — راجع بوابة الدفع قبل المحاولة تاني",
+        "failed": "فشل رد الفلوس",
+        "done": "تم رد الفلوس للعميل",
+        "retry": "رد الفلوس تاني"
+    },
+    "paymentSettings": "المدفوعات",
+    "paymentSettingsDescription": "استقبل مدفوعات الكروت والمحافظ عند الدفع بحساب بوابة الدفع الخاص بك. الفلوس بتروح لك مباشرة.",
+    "paymentOnlineEnabled": "إتاحة الدفع الأونلاين عند إتمام الطلب",
+    "paymentNotActive": "غير مفعّل",
+    "paymentGateway": "بوابة الدفع",
+    "paymentSecretSaved": "محفوظ — اتركه فارغًا للإبقاء عليه",
+    "paymentWebhookNote": "نتائج الدفع بتوصل للمتجر على {{url}} (بتتبعت مع كل عملية دفع، مفيش حاجة تضبطها في البوابة). جرّب وضع الاختبار في البوابة الأول.",
+    "paymentMissing": "لسه ناقص: {{fields}}",
+    "paymentTestKeys": "اختبار المفاتيح",
+    "paymentKeysWork": "البوابة قبلت المفاتيح دي.",
+    "payOnline": "ادفع أونلاين",
+    "payOnlineHint": "ادفع الآن بالكارت أو المحفظة من صفحة دفع آمنة.",
+    "payNow": "ادفع الآن",
+    "paymentPaid": "مدفوع أونلاين",
+    "paymentAwaiting": "في انتظار الدفع",
+    "paymentAwaitingBody": "طلبك محفوظ لكن لسه مدفعتش. أكمل الدفع لتأكيده.",
+    "paymentChecking": "جارٍ تأكيد الدفع…",
+    "paymentConfirmed": "تم استلام الدفع. شكرًا!",
+    "paymentNotConfirmed": "لسه ما وصلناش الدفع. لو اتخصم منك، هيظهر هنا خلال لحظات.",
+    "paymentOpenFailed": "ماقدرناش نفتح صفحة الدفع. طلبك محفوظ — تقدر تدفع من صفحته.",
     "mailSettings": "البريد الإلكتروني",
     "mailSettingsDescription": "أرسل رسائل الطلبات والحسابات والتواصل من بريدك الخاص.",
     "mailEnabled": "إرسال الرسائل",
@@ -1056,7 +1104,8 @@
     "collectedBy": "حصّله",
     "custody": {
         "store": "موظف المتجر",
-        "courier": "المندوب (يسلّمه لاحقًا)"
+        "courier": "المندوب (يسلّمه لاحقًا)",
+        "gateway": "أونلاين (لدى بوابة الدفع)"
     },
     "recordCollection": "تسجيل التحصيل",
     "collectionRecorded": "تم تسجيل التحصيل",
@@ -1084,7 +1133,8 @@
     "refundMethod": {
         "cash": "نقدًا من المتجر",
         "courier_cash": "نقدًا عن طريق المندوب",
-        "credit_against_receivable": "خصم من المبلغ المستحق"
+        "credit_against_receivable": "خصم من المبلغ المستحق",
+        "gateway": "إلى بطاقة أو محفظة العميل (أونلاين)"
     },
     "refundStatus": {
         "requested": "بانتظار الموافقة",
@@ -1117,21 +1167,31 @@
         "approve": "اعتماد",
         "reject": "رفض",
         "execute": "صرف",
-        "reverse": "عكس"
+        "reverse": "عكس",
+        "retry": "إعادة الإرسال"
     },
     "refundConfirm": {
         "approve": "اعتماد الاسترداد رقم {{number}}؟",
         "reject": "رفض الاسترداد رقم {{number}}؟",
         "execute": "صرف الاسترداد رقم {{number}}؟",
-        "reverse": "عكس الاسترداد رقم {{number}}؟"
+        "reverse": "عكس الاسترداد رقم {{number}}؟",
+        "retry": "إعادة إرسال الاسترداد رقم {{number}}؟"
     },
     "refundExecuteHint": "يعود مبلغ {{amount}} إلى العميل بطريقة: {{method}}. يُسجَّل في الدفاتر اليوم ولا يُلغى إلا بعكسه.",
     "refundDone": {
         "approve": "تم اعتماد الاسترداد",
         "reject": "تم رفض الاسترداد",
         "execute": "تم صرف الاسترداد",
-        "reverse": "تم عكس الاسترداد"
+        "reverse": "تم عكس الاسترداد",
+        "retry": "تم إرسال الاسترداد للبوابة"
     },
+    "gatewayRefundState": {
+        "pending": "تم التسجيل — لم ترسله بوابة الدفع بعد",
+        "processing": "جارٍ الإرسال عبر البوابة — راجع لوحة البوابة قبل المحاولة مرة أخرى",
+        "failed": "تعذّر على البوابة إرجاع المبلغ",
+        "done": "تم إرجاع المبلغ عبر البوابة"
+    },
+    "refundRetryHint": "سيُطلب من بوابة الدفع مرة أخرى إرجاع {{amount}} إلى العميل ({{method}}). إذا انتهت مهلة المحاولة السابقة فراجع لوحة البوابة أولًا حتى لا يُرسل المبلغ مرتين.",
     "refundOutsideBooks": "تم تسليم هذا الطلب قبل بدء الدفاتر، لذا لا يمكن استرداده هنا. سجّل الاسترداد خارج النظام.",
     "returnOutsideSystem": "خطتك لا تشمل الحسابات والمخزون، لذا يتم استرداد المبلغ وإرجاع المنتجات للمخزون خارج النظام. وافق على المرتجع بعد الاتفاق عليه، أو ارفضه.",
     "creditedAgainstBalance": "مخصوم من الرصيد",

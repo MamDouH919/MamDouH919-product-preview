@@ -485,7 +485,8 @@
         "cancelled": "Cancel order"
     },
     "paymentMethods": {
-        "cash_on_delivery": "Cash on delivery"
+        "cash_on_delivery": "Cash on delivery",
+        "online": "Online payment"
     },
     "quickLinks": "Quick Links",
     "shopByCategory": "Shop by Category",
@@ -754,6 +755,53 @@
     "guestCustomer": "Guest",
     "guestCustomerHint": "Checked out without an account and hasn't activated one yet",
     "generalSettings": "General",
+    "paymentRefunded": "The payment was sent back to the customer.",
+    "payoutsTitle": "Payouts to the bank",
+    "payoutsDescription": "What the payment gateway sent to your bank, and the fees it kept. Record each one so the books stop showing that money as held by the gateway.",
+    "recordPayout": "Record a payout",
+    "heldByGateway": "The books show {{amount}} still held by the gateway.",
+    "noPayouts": "No payouts recorded yet.",
+    "payoutNumber": "Payout #{{number}}",
+    "payoutAmounts": "Gateway released {{gross}} · fees {{fee}} · reached the bank {{net}}",
+    "payoutReversedChip": "Reversed",
+    "payoutDate": "Date it reached the bank",
+    "payoutGross": "Amount the gateway released",
+    "payoutGrossHint": "Before the gateway's fees, as in its settlement report.",
+    "payoutFee": "Fees it kept",
+    "payoutFeeHint": "Leave empty if none.",
+    "payoutLandedIn": "Landed in",
+    "payoutReference": "Gateway settlement number (optional)",
+    "payoutNet": "{{amount}} reaches the bank.",
+    "payoutRecorded": "Payout recorded",
+    "payoutReversed": "Payout reversed",
+    "payoutReverseConfirm": "Reverse payout #{{number}}?",
+    "gatewayRefund": {
+        "pending": "Cancelled — refund to the customer is waiting",
+        "processing": "Refund in progress — check the payment gateway before trying again",
+        "failed": "Refund failed",
+        "done": "Refunded to the customer",
+        "retry": "Refund again"
+    },
+    "paymentSettings": "Payments",
+    "paymentSettingsDescription": "Take card and wallet payments at checkout with your own payment-gateway account. Money goes to you; we never hold it.",
+    "paymentOnlineEnabled": "Offer online payment at checkout",
+    "paymentNotActive": "Not active",
+    "paymentGateway": "Payment gateway",
+    "paymentSecretSaved": "Saved — leave empty to keep it",
+    "paymentWebhookNote": "Payment results reach the store at {{url}} (sent with every payment, nothing to set up in the gateway). Use your own gateway's test mode first.",
+    "paymentMissing": "Still needed: {{fields}}",
+    "paymentTestKeys": "Test keys",
+    "paymentKeysWork": "The gateway accepted these keys.",
+    "payOnline": "Pay online",
+    "payOnlineHint": "Pay now by card or wallet through our secure payment page.",
+    "payNow": "Pay now",
+    "paymentPaid": "Paid online",
+    "paymentAwaiting": "Waiting for payment",
+    "paymentAwaitingBody": "Your order is saved but not paid yet. Complete the payment to confirm it.",
+    "paymentChecking": "Confirming your payment…",
+    "paymentConfirmed": "Payment received. Thank you!",
+    "paymentNotConfirmed": "We haven't received the payment yet. If you were charged, it will show here shortly.",
+    "paymentOpenFailed": "We couldn't open the payment page. Your order is saved — you can pay from its page.",
     "mailSettings": "Email",
     "mailSettingsDescription": "Send order, account and contact emails from your own mailbox.",
     "mailEnabled": "Send emails",
@@ -1062,7 +1110,8 @@
     "collectedBy": "Collected by",
     "custody": {
         "store": "Store staff",
-        "courier": "Courier (to hand over)"
+        "courier": "Courier (to hand over)",
+        "gateway": "Online (held by the payment gateway)"
     },
     "recordCollection": "Record collection",
     "collectionRecorded": "Collection recorded",
@@ -1090,7 +1139,8 @@
     "refundMethod": {
         "cash": "Cash from the store",
         "courier_cash": "Cash by the courier",
-        "credit_against_receivable": "Credit against what is owed"
+        "credit_against_receivable": "Credit against what is owed",
+        "gateway": "Back to the customer's card or wallet (online)"
     },
     "refundStatus": {
         "requested": "Waiting for approval",
@@ -1123,21 +1173,31 @@
         "approve": "Approve",
         "reject": "Reject",
         "execute": "Pay out",
-        "reverse": "Reverse"
+        "reverse": "Reverse",
+        "retry": "Send again"
     },
     "refundConfirm": {
         "approve": "Approve refund #{{number}}?",
         "reject": "Reject refund #{{number}}?",
         "execute": "Pay out refund #{{number}}?",
-        "reverse": "Reverse refund #{{number}}?"
+        "reverse": "Reverse refund #{{number}}?",
+        "retry": "Send refund #{{number}} again?"
     },
     "refundExecuteHint": "{{amount}} goes back to the customer as: {{method}}. This is posted to the books today and can only be undone by reversing it.",
     "refundDone": {
         "approve": "Refund approved",
         "reject": "Refund rejected",
         "execute": "Refund paid out",
-        "reverse": "Refund reversed"
+        "reverse": "Refund reversed",
+        "retry": "Refund sent to the gateway"
     },
+    "gatewayRefundState": {
+        "pending": "Recorded — the payment gateway has not sent it yet",
+        "processing": "Sending through the gateway — check the gateway dashboard before trying again",
+        "failed": "The gateway could not send it back",
+        "done": "Sent back through the gateway"
+    },
+    "refundRetryHint": "Asks the payment gateway again to send {{amount}} back to the customer ({{method}}). If the last attempt timed out, check the gateway dashboard first so it is not sent twice.",
     "refundOutsideBooks": "This order was delivered before the books started, so it can't be refunded here. Record the refund outside the system.",
     "returnOutsideSystem": "Your plan doesn't include accounting or stock, so refunds and restocking for this return happen outside the system. Approve it once it's agreed, or reject it.",
     "creditedAgainstBalance": "Credited against balance",

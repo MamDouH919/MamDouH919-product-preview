@@ -18,7 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import { REFUNDS_QUERY_KEY, useRefundsQuery } from "@/backend-api/refunds/hooks";
-import { approveRefund, executeRefund, rejectRefund, reverseRefund } from "@/backend-api/refunds/mutations";
+import { approveRefund, executeRefund, rejectRefund, retryGatewayRefund, reverseRefund } from "@/backend-api/refunds/mutations";
 import { Refund } from "@/backend-api/refunds/types";
 import { ORDER_FINANCE_QUERY_KEY } from "@/backend-api/finance/hooks";
 import { ORDERS_QUERY_KEY } from "@/backend-api/orders/hooks";
@@ -26,7 +26,7 @@ import { RETURNS_QUERY_KEY } from "@/backend-api/returns/hooks";
 import { formatDateTime, formatMinorMoney } from "@/features/Order/format";
 import RefundStatusChip from "./RefundStatusChip";
 
-type Action = "approve" | "reject" | "execute" | "reverse";
+type Action = "approve" | "reject" | "execute" | "reverse" | "retry";
 
 const name = (who?: { name: string } | string) => (typeof who === "object" ? who?.name : undefined);
 
@@ -60,6 +60,7 @@ const RefundsCard = ({
       if (action === "approve") return approveRefund({ id: refund._id, note });
       if (action === "reject") return rejectRefund({ id: refund._id, note });
       if (action === "execute") return executeRefund(refund._id);
+      if (action === "retry") return retryGatewayRefund(refund._id);
       return reverseRefund({ id: refund._id, reason: text.trim() });
     },
     onSuccess: (_, { action }) => {
@@ -86,7 +87,13 @@ const RefundsCard = ({
       : refund.status === "approved"
         ? ["execute", "reject"]
         : refund.status === "executed"
-          ? ["reverse"]
+          ? refund.method === "gateway"
+            ? refund.gatewayState === "pending" || refund.gatewayState === "failed"
+              ? ["retry", "reverse"]
+              : refund.gatewayState === "done" || refund.gatewayState === "processing"
+                ? []
+                : ["reverse"]
+          : ["reverse"]
           : [];
 
   return (
@@ -115,6 +122,12 @@ const RefundsCard = ({
               {name(refund.requestedBy) ? ` · ${t("requestedByName", { name: name(refund.requestedBy) })}` : ""}
               {refund.autoApproved ? ` · ${t("autoApproved")}` : name(refund.approvedBy) ? ` · ${t("approvedByName", { name: name(refund.approvedBy) })}` : ""}
             </Typography>
+            {refund.method === "gateway" && refund.status === "executed" && refund.gatewayState && (
+              <Typography variant="caption" color={refund.gatewayState === "failed" ? "error" : "text.secondary"} display="block">
+                {t(`gatewayRefundState.${refund.gatewayState}`)}
+                {refund.gatewayState === "failed" && refund.gatewayNote ? ` — ${refund.gatewayNote}` : ""}
+              </Typography>
+            )}
             {refund.note && (
               <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }} display="block">
                 “{refund.note}”
@@ -126,7 +139,7 @@ const RefundsCard = ({
                   <Button
                     key={a}
                     size="small"
-                    variant={a === "execute" || a === "approve" ? "contained" : "outlined"}
+                    variant={a === "execute" || a === "approve" || a === "retry" ? "contained" : "outlined"}
                     color={a === "reject" || a === "reverse" ? "error" : "primary"}
                     onClick={() => {
                       setText("");
@@ -145,15 +158,15 @@ const RefundsCard = ({
       <Dialog open={!!pending} onClose={() => setPending(null)} fullWidth maxWidth="xs">
         <DialogTitle>{pending && t(`refundConfirm.${pending.action}`, { number: pending.refund.refundNumber })}</DialogTitle>
         <DialogContent>
-          {pending?.action === "execute" && (
+          {(pending?.action === "execute" || pending?.action === "retry") && (
             <Typography variant="body2" color="text.secondary">
-              {t("refundExecuteHint", {
+              {t(pending.action === "retry" ? "refundRetryHint" : "refundExecuteHint", {
                 amount: formatMinorMoney(pending.refund.totalMinor, currency),
                 method: t(`refundMethod.${pending.refund.method}`),
               })}
             </Typography>
           )}
-          {pending && pending.action !== "execute" && (
+          {pending && pending.action !== "execute" && pending.action !== "retry" && (
             <TextField
               fullWidth
               size="small"

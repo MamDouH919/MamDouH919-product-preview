@@ -243,7 +243,7 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
-          {keepsBooks && <OrderPaymentPanel orderId={order._id} currency={currency} />}
+          {keepsBooks && <OrderPaymentPanel orderId={order._id} currency={currency} online={order.paymentMethod === "online"} />}
 
           {keepsBooks && order.bookedAt && (
             <RefundsCard

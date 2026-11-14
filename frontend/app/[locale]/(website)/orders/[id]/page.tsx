@@ -32,6 +32,8 @@ import OrderLines from "@/features/Order/OrderLines";
 import ShippingAddressBlock from "@/features/Order/ShippingAddressBlock";
 import StatusTimeline from "@/features/Order/StatusTimeline";
 import { formatDateTime, localized } from "@/features/Order/format";
+import OnlinePaymentPanel from "@/features/Order/OnlinePaymentPanel";
+import { payGuestOrder, syncGuestOrderPayment } from "@/backend-api/payments/mutations";
 
 type PasswordValues = { password: string; confirmPassword: string };
 
@@ -158,9 +160,10 @@ const GuestOrderDetail = ({ id }: { id: string }) => {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const justPlaced = searchParams.get("placed") === "1";
+  const returning = searchParams.get("payment") === "return";
   const fallbackCurrency = useCurrency();
 
-  const { data: order, isLoading, isError } = useGuestOrderQuery(id, token);
+  const { data: order, isLoading, isError, refetch } = useGuestOrderQuery(id, token);
 
   if (isLoading) {
     return (
@@ -196,6 +199,8 @@ const GuestOrderDetail = ({ id }: { id: string }) => {
             {t("orderPlacedBody", { number: order.orderNumber })} {t("confirmationEmailSent")}
           </Alert>
         )}
+
+        <OnlinePaymentPanel order={order} returning={returning} pay={() => payGuestOrder({ id: order._id, token })} sync={() => syncGuestOrderPayment({ id: order._id, token })} refresh={refetch} />
 
         <CreateAccountPanel order={order} token={token} />
 

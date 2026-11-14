@@ -30,12 +30,14 @@ import { DELIVERY_AREAS_QUERY_KEY } from "@/backend-api/price-list/hooks";
 import { MY_ORDERS_QUERY_KEY, QUOTE_QUERY_KEY, useQuoteQuery } from "@/backend-api/orders/hooks";
 import PolicyLinks from "@/components/PolicyLinks";
 import { placeGuestOrder, placeOrder } from "@/backend-api/orders/mutations";
-import { CreateGuestOrderPayload } from "@/backend-api/orders/types";
+import { CreateGuestOrderPayload, Order, PaymentMethod } from "@/backend-api/orders/types";
 import { useCurrency } from "@/Hooks/useCurrency";
 import AddressFormDialog from "@/features/Customer/AddressFormDialog";
 import OrderLines from "@/features/Order/OrderLines";
 import { formatAddress, localized } from "@/features/Order/format";
 import GuestDetails, { EMPTY_GUEST_DETAILS, GuestDetailsValues } from "@/features/Checkout/GuestDetails";
+import { useOnlinePaymentAvailableQuery } from "@/backend-api/payments/hooks";
+import CreditCardOutlined from "@mui/icons-material/CreditCardOutlined";
 
 const CheckoutPage = () => {
   const { t, i18n } = useTranslation();
@@ -50,6 +52,10 @@ const CheckoutPage = () => {
 
   const [pickedAddressId, setAddressId] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [payWith, setPayWith] = useState<PaymentMethod>("cash_on_delivery");
+  const { data: onlineAvailable } = useOnlinePaymentAvailableQuery();
+  // Falls back to cash when online payment is switched off after the shopper picked it.
+  const paymentMethod: PaymentMethod = onlineAvailable ? payWith : "cash_on_delivery";
   const [dialogOpen, setDialogOpen] = useState(false);
   // The saved address being edited from here, or null when adding one.
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -83,9 +89,15 @@ const CheckoutPage = () => {
 
   const currency = localized(quote?.currency, lang) || fallbackCurrency;
 
-  const onPlaced = (href: string) => {
+  const onPlaced = (href: string, order?: Order) => {
     placed.current = true;
     dispatch(clearCart());
+    // Paid online: the order is saved; the shopper pays on the gateway's page and is sent back to `href`.
+    if (order?.paymentUrl) {
+      window.location.href = order.paymentUrl;
+      return;
+    }
+    if (order?.paymentFailed) toast.error(t("paymentOpenFailed"));
     router.replace(href);
   };
 
@@ -120,7 +132,7 @@ const CheckoutPage = () => {
     mutationFn: placeOrder,
     onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: [MY_ORDERS_QUERY_KEY] });
-      onPlaced(`/${lang}/account/orders/${order._id}?placed=1`);
+      onPlaced(`/${lang}/account/orders/${order._id}?placed=1`, order);
     },
     onError: onOrderError,
   });
@@ -129,7 +141,7 @@ const CheckoutPage = () => {
   const guestMutation = useMutation({
     mutationFn: placeGuestOrder,
     onSuccess: ({ order, token }) =>
-      onPlaced(`/${lang}/orders/${order._id}?token=${encodeURIComponent(token)}&placed=1`),
+      onPlaced(`/${lang}/orders/${order._id}?token=${encodeURIComponent(token)}&placed=1`, order),
     onError: onOrderError,
   });
 
@@ -149,7 +161,7 @@ const CheckoutPage = () => {
         building: optional(address.building),
         notes: optional(address.notes),
       },
-      paymentMethod: "cash_on_delivery",
+      paymentMethod,
       notes: notes.trim() || undefined,
       couponCode: quote?.coupon?.code,
       locale: lang,
@@ -169,7 +181,7 @@ const CheckoutPage = () => {
     orderMutation.mutate({
       items: inputs,
       addressId,
-      paymentMethod: "cash_on_delivery",
+      paymentMethod,
       notes: notes.trim() || undefined,
       // Only a code the quote accepted; a refused one is ignored, not sent.
       couponCode: quote?.coupon?.code,
@@ -286,17 +298,47 @@ const CheckoutPage = () => {
             <Typography variant="subtitle1" fontWeight={700} mb={2}>
               {t("paymentMethod")}
             </Typography>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <LocalShippingOutlined color="primary" />
-              <Box>
-                <Typography variant="body2" fontWeight={600}>
-                  {t("paymentMethods.cash_on_delivery")}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {t("cashOnDeliveryHint")}
-                </Typography>
-              </Box>
-            </Stack>
+            <RadioGroup value={paymentMethod} onChange={(e) => setPayWith(e.target.value as PaymentMethod)}>
+              <Stack spacing={1.5}>
+                {([
+                  { value: "cash_on_delivery", icon: <LocalShippingOutlined color="primary" />, label: t("paymentMethods.cash_on_delivery"), hint: t("cashOnDeliveryHint") },
+                  ...(onlineAvailable
+                    ? [{ value: "online", icon: <CreditCardOutlined color="primary" />, label: t("payOnline"), hint: t("payOnlineHint") }]
+                    : []),
+                ] as const).map((option) => (
+                  <Paper
+                    key={option.value}
+                    variant="outlined"
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      borderColor: option.value === paymentMethod ? "primary.main" : "divider",
+                      borderWidth: option.value === paymentMethod ? 2 : 1,
+                    }}
+                  >
+                    <FormControlLabel
+                      value={option.value}
+                      control={<Radio />}
+                      sx={{ width: "100%", m: 0 }}
+                      label={
+                        <Stack direction="row" spacing={1.5} alignItems="center" py={0.5}>
+                          {option.icon}
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>
+                              {option.label}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.hint}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      }
+                    />
+                  </Paper>
+                ))}
+              </Stack>
+            </RadioGroup>
           </Paper>
 
           {/* Notes */}
