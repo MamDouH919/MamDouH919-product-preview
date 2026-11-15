@@ -1,20 +1,23 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { Connection, Model, Types } from 'mongoose';
-import { STORE_MODULES, TENANT_CONNECTION } from '../common/tenant/tenant.module';
+import { STORE_HOST, STORE_MODULES, TENANT_CONNECTION } from '../common/tenant/tenant.module';
 import { StoreModule } from '../common/tenant/store-plan';
 import { withTransaction } from '../common/tenant/with-transaction';
 import { Order } from '../orders/schemas/order.schema';
 import { GatewayRefundState, Payment } from '../finance/schemas/payment.schema';
 import { OrderStatus, PaymentMethod } from '../orders/enums/order-status.enum';
 import { Customer } from '../customers/schemas/customer.schema';
+import { Setting } from '../settings/schemas/setting.schema';
+import { OrderNotificationsService } from '../orders/order-notifications.service';
 import { PaymentsService } from '../finance/payments.service';
 import { orderAmounts } from '../finance/order-money';
 import { AttemptStatus, PaymentAttempt } from './schemas/payment-attempt.schema';
 import { GatewaySettingsService } from './gateway-settings.service';
 import { getProvider } from './providers';
 import { WebhookEvent, WebhookRequest } from './providers/payment-provider';
+import type { ResolveOutcome } from './dto/gateway-resolve.dto';
 
 export interface CheckoutContext {
   /** The API's public origin as this request reached it — the gateway calls back on the same host, which picks the store. */
@@ -36,7 +39,35 @@ export class OnlinePaymentsService {
     @Inject(STORE_MODULES) private readonly modules: readonly StoreModule[],
     private readonly gateway: GatewaySettingsService,
     private readonly payments: PaymentsService,
+    // Emails to the customer. Optional so a service built by hand (tests, scripts) still works without mail.
+    @Optional() private readonly notifications?: OrderNotificationsService,
+    @Optional() @Inject(STORE_HOST) private readonly host?: string,
+    @Optional() @InjectModel(Setting.name) private settingModel?: Model<Setting>,
   ) {}
+
+  /** Tells the customer an online payment went back to them. Best effort: a mail failure never undoes a refund. */
+  async notifyRefunded(orderId: Types.ObjectId | string, amountMinor: number): Promise<void> {
+    await this.mailCustomer(orderId, 'paymentRefunded', amountMinor);
+  }
+
+  private async mailCustomer(orderId: Types.ObjectId | string, kind: 'paymentReceived' | 'paymentRefunded', amountMinor: number): Promise<void> {
+    if (!this.notifications || !this.host) return;
+    try {
+      const order = await this.orderModel.findById(orderId).exec();
+      if (!order) return;
+      const [customer, settings] = await Promise.all([
+        this.customerModel.findById(order.customer).select('email').lean().exec(),
+        this.settingModel?.findOne().select('siteTitle currency').lean().exec(),
+      ]);
+      this.notifications[kind](
+        order,
+        { host: this.host, customerEmail: customer?.email, storeName: settings?.siteTitle, currency: order.currency ?? settings?.currency },
+        amountMinor,
+      );
+    } catch (error) {
+      this.logger.warn(`Order ${orderId}: payment email not sent — ${(error as Error).message}`);
+    }
+  }
 
   /** Whether a customer may choose online payment right now. */
   async isAvailable(): Promise<boolean> {
@@ -169,6 +200,8 @@ export class OnlinePaymentsService {
     const keepsBooks = this.modules.includes(StoreModule.FINANCE);
     // Set when the money arrived for an order that was cancelled meanwhile: it goes straight back.
     let returnToCustomer = false;
+    // Set when the payment was booked, to tell the customer once the transaction has committed.
+    let settled: { order: Types.ObjectId; amountMinor: number } | undefined;
     await withTransaction(this.connection, async (session) => {
       // Claim the attempt first: the second of two simultaneous notices finds nothing to claim.
       const claimed = await this.attemptModel
@@ -203,8 +236,10 @@ export class OnlinePaymentsService {
         { amountMinor: event.amountMinor, provider: known.id, transactionId: event.transactionId, keepsBooks },
         session,
       );
+      settled = { order: order!._id as Types.ObjectId, amountMinor: event.amountMinor };
     });
 
+    if (settled) await this.mailCustomer(settled.order, 'paymentReceived', settled.amountMinor);
     if (returnToCustomer) await this.returnLatePayment(attempt._id as Types.ObjectId, found, event.transactionId, event.amountMinor);
   }
 
@@ -217,9 +252,10 @@ export class OnlinePaymentsService {
   ): Promise<void> {
     try {
       await gateway.provider.refund(gateway.credentials, { transactionId, amountMinor });
-      await this.attemptModel
-        .updateOne({ _id: attemptId }, { status: AttemptStatus.REFUNDED, note: 'Order was cancelled; refunded automatically' })
+      const attempt = await this.attemptModel
+        .findOneAndUpdate({ _id: attemptId }, { status: AttemptStatus.REFUNDED, note: 'Order was cancelled; refunded automatically' }, { returnDocument: 'after' })
         .exec();
+      if (attempt) await this.notifyRefunded(attempt.order, amountMinor);
     } catch (error) {
       // Stays NEEDS_REVIEW with the reason on it; staff can refund from the gateway's dashboard.
       this.logger.error(`Automatic refund of ${transactionId} failed: ${(error as Error).message}`);
@@ -273,11 +309,35 @@ export class OnlinePaymentsService {
 
     try {
       await withTransaction(this.connection, (session) => this.payments.finishGatewayRefund(claimed._id as Types.ObjectId, session));
+      await this.notifyRefunded(claimed.order, claimed.amountMinor);
     } catch (error) {
       // The customer has their money; our books don't know yet. Needs a person.
       this.logger.error(`Payment ${claimed._id} was refunded at the gateway but not recorded: ${(error as Error).message}`);
       throw error;
     }
+  }
+
+  /**
+   * A refund left "in progress" (the server stopped between asking the gateway and
+   * noting the answer) is settled by a person who looked at the gateway's dashboard:
+   * `sent` lets the books go of the money as if the gateway had answered; `not_sent`
+   * marks it failed so it can be tried again. Only acts on one still in progress.
+   */
+  async resolveStuckPayment(paymentId: Types.ObjectId | string, outcome: ResolveOutcome, note?: string): Promise<void> {
+    const payment = await this.paymentModel.findOne({ _id: paymentId, custody: 'gateway', refundState: GatewayRefundState.PROCESSING }).exec();
+    if (!payment) throw new ConflictException('This payment has no refund in progress');
+
+    if (outcome === 'not_sent') {
+      const reason = note?.trim() ? `Checked at the gateway, not sent: ${note.trim()}` : 'Checked at the gateway: the refund was not sent';
+      const result = await this.paymentModel
+        .updateOne({ _id: payment._id, refundState: GatewayRefundState.PROCESSING }, { $set: { refundState: GatewayRefundState.FAILED, refundNote: reason.slice(0, 300) } })
+        .exec();
+      if (!result.modifiedCount) throw new ConflictException('This payment has no refund in progress');
+      return;
+    }
+
+    await withTransaction(this.connection, (session) => this.payments.finishGatewayRefund(payment._id as Types.ObjectId, session));
+    await this.notifyRefunded(payment.order, payment.amountMinor);
   }
 
   /**

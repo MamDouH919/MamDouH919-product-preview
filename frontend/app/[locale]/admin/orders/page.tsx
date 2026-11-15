@@ -21,8 +21,10 @@ import {
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { useOrdersQuery } from "@/backend-api/orders/hooks";
+import { useOnlinePaymentAvailableQuery } from "@/backend-api/payments/hooks";
 import { ORDER_STATUSES, Order, OrderFilters, OrderStatus } from "@/backend-api/orders/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import OrderStatusChip from "@/features/Order/OrderStatusChip";
 import { formatDateTime, formatMoney, localized } from "@/features/Order/format";
@@ -46,6 +48,7 @@ const OrdersPage = () => {
   }, [search]);
 
   const { data, isLoading } = useOrdersQuery(filters);
+  const { data: onlineAvailable } = useOnlinePaymentAvailableQuery();
 
   // Everything matching the current filters, not just this page.
   const exportMutation = useMutation({
@@ -126,6 +129,21 @@ const OrdersPage = () => {
           </Typography>
         ),
       },
+      ...(onlineAvailable
+        ? [
+            {
+              id: "paymentMethod",
+              header: t("paymentMethod"),
+              render: (row: Order) => (
+                <Chip
+                  size="small"
+                  color={row.paymentMethod === "online" ? "info" : "default"}
+                  label={t(`paymentMethods.${row.paymentMethod ?? "cash_on_delivery"}`)}
+                />
+              ),
+            },
+          ]
+        : []),
       {
         id: "status",
         header: t("status"),
@@ -146,74 +164,76 @@ const OrdersPage = () => {
         ),
       },
     ],
-    [t, lang, router, fallbackCurrency]
+    [t, lang, router, fallbackCurrency, onlineAvailable]
   );
 
   return (
-    <Stack spacing={2} height="100%">
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        <TextField
-          size="small"
-          label={t("search")}
-          placeholder={t("orderSearchPlaceholder")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 260 }}
-        />
-        <TextField
-          select
-          size="small"
-          label={t("status")}
-          value={filters.status ?? ""}
-          onChange={(e) =>
-            setFilters((prev) => ({
-              ...prev,
-              status: (e.target.value || undefined) as OrderStatus | undefined,
-              page: 1,
-            }))
-          }
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">{t("all")}</MenuItem>
-          {ORDER_STATUSES.map((status) => (
-            <MenuItem key={status} value={status}>
-              {t(`orderStatus.${status}`)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <Box flex={1} />
+    <FilterLayout
+      activeCount={[filters.status, filters.search].filter(Boolean).length}
+      filters={
+        <>
+          <TextField
+            size="small"
+            label={t("search")}
+            placeholder={t("orderSearchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <TextField
+            select
+            size="small"
+            label={t("status")}
+            value={filters.status ?? ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                status: (e.target.value || undefined) as OrderStatus | undefined,
+                page: 1,
+              }))
+            }
+          >
+            <MenuItem value="">{t("all")}</MenuItem>
+            {ORDER_STATUSES.map((status) => (
+              <MenuItem key={status} value={status}>
+                {t(`orderStatus.${status}`)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </>
+      }
+      actions={
         <Button
           startIcon={<FileDownloadOutlined />}
           disabled={exportMutation.isPending || !data?.total}
           onClick={() => exportMutation.mutate()}
-          sx={{ alignSelf: "center" }}
         >
           {t("exportCsv")}
         </Button>
-      </Stack>
-
-      <Box flex={1} minHeight={0}>
-        <SimpleTable
-          columns={columns}
-          data={data?.data ?? []}
-          borderRadius={0}
-          height="100%"
-          loading={isLoading}
+      }
+    >
+      <Stack flex={1} minHeight={0}>
+        <Box flex={1} minHeight={0}>
+          <SimpleTable
+            columns={columns}
+            data={data?.data ?? []}
+            borderRadius={0}
+            height="100%"
+            loading={isLoading}
+          />
+        </Box>
+        <TablePagination
+          component="div"
+          count={data?.total ?? 0}
+          page={(filters.page ?? 1) - 1}
+          onPageChange={(_, page) => setFilters((prev) => ({ ...prev, page: page + 1 }))}
+          rowsPerPage={filters.limit ?? 25}
+          onRowsPerPageChange={(e) =>
+            setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))
+          }
+          rowsPerPageOptions={[25, 50, 100]}
         />
-      </Box>
-
-      <TablePagination
-        component="div"
-        count={data?.total ?? 0}
-        page={(filters.page ?? 1) - 1}
-        onPageChange={(_, page) => setFilters((prev) => ({ ...prev, page: page + 1 }))}
-        rowsPerPage={filters.limit ?? 25}
-        onRowsPerPageChange={(e) =>
-          setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))
-        }
-        rowsPerPageOptions={[25, 50, 100]}
-      />
-    </Stack>
+      </Stack>
+    </FilterLayout>
   );
 };
 

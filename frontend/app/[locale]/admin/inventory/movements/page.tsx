@@ -25,6 +25,7 @@ import {
   StockMovement,
 } from "@/backend-api/inventory/types";
 import { useProductsQuery } from "@/backend-api/products/hooks";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { warehouseName } from "@/features/Inventory/warehouseName";
 
@@ -131,7 +132,10 @@ const StockMovementsPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+      <FilterLayout
+        activeCount={[filters.productId, filters.type, filters.from, filters.to].filter(Boolean).length}
+        filters={
+          <>
         <TextField
           select
           size="small"
@@ -182,8 +186,10 @@ const StockMovementsPage = () => {
           value={filters.to ?? ""}
           onChange={(e) => setFilter({ to: e.target.value || undefined })}
         />
-      </Stack>
-
+          </>
+        }
+      >
+        <Stack flex={1} minHeight={0}>
       <Box flex={1} minHeight={0}>
         <SimpleTable
           columns={columns}
@@ -205,6 +211,8 @@ const StockMovementsPage = () => {
         }
         rowsPerPageOptions={[25, 50, 100]}
       />
+        </Stack>
+      </FilterLayout>
     </Stack>
   );
 };

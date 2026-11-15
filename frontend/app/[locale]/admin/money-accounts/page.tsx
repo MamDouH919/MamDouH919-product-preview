@@ -100,7 +100,7 @@ const MoneyAccountsPage = () => {
         <Button variant="contained" onClick={() => setEditing("new")}>{t("newMoneyAccount")}</Button>
       </Stack>
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
       {editing && <AccountDialog key={editing === "new" ? "new" : editing._id} account={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
       {transferring > 0 && <TransferDialog key={transferring} accounts={active} onClose={() => setTransferring(0)} />}

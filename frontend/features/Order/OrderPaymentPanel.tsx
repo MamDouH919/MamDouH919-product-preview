@@ -20,7 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import { ORDER_FINANCE_QUERY_KEY, useOrderFinanceQuery } from "@/backend-api/finance/hooks";
-import { recordCollection, retryGatewayRefund, voidCollection, writeOffBalance } from "@/backend-api/finance/mutations";
+import { GatewayOutcome, recordCollection, resolveGatewayPaymentRefund, retryGatewayRefund, voidCollection, writeOffBalance } from "@/backend-api/finance/mutations";
 import { useCouriersQuery } from "@/backend-api/couriers/api";
 import MoneyAccountSelect from "@/features/Finance/MoneyAccountSelect";
 import { Custody, OrderPaymentStatus } from "@/backend-api/finance/types";
@@ -100,6 +100,15 @@ const OrderPaymentPanel = ({ orderId, currency, online = false }: { orderId: str
       refresh();
       failed(error);
     },
+  });
+
+  const resolveRefund = useMutation({
+    mutationFn: resolveGatewayPaymentRefund,
+    onSuccess: (_, { outcome }) => {
+      refresh();
+      toast.success(t(outcome === "sent" ? "paymentRefunded" : "gatewayRefund.markedNotSent"));
+    },
+    onError: failed,
   });
 
   const voidMutation = useMutation({
@@ -233,6 +242,24 @@ const OrderPaymentPanel = ({ orderId, currency, online = false }: { orderId: str
                   <Button size="small" disabled={retryRefund.isPending} onClick={() => retryRefund.mutate(p._id)}>
                     {t("gatewayRefund.retry")}
                   </Button>
+                )}
+                {p.refundState === "processing" && (
+                  <Stack direction="row" spacing={0.5}>
+                    {(["sent", "not_sent"] as GatewayOutcome[]).map((outcome) => (
+                      <Button
+                        key={outcome}
+                        size="small"
+                        disabled={resolveRefund.isPending}
+                        onClick={() => {
+                          if (window.confirm(t(outcome === "sent" ? "gatewayRefund.confirmSentText" : "gatewayRefund.confirmNotSentText"))) {
+                            resolveRefund.mutate({ paymentId: p._id, outcome });
+                          }
+                        }}
+                      >
+                        {t(outcome === "sent" ? "gatewayRefund.confirmSent" : "gatewayRefund.confirmNotSent")}
+                      </Button>
+                    ))}
+                  </Stack>
                 )}
                 {p.status === "collected" && p.custody !== "gateway" && (
                   <Button size="small" color="error" onClick={() => setVoiding(p._id)}>

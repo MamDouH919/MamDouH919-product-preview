@@ -19,7 +19,7 @@ import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import Image from "next/image";
 import {
-  useProductsQuery,
+  useProductsPageQuery,
   PRODUCTS_QUERY_KEY,
 } from "@/backend-api/products/hooks";
 import { deleteProduct, updateProduct } from "@/backend-api/products/mutations";
@@ -67,8 +67,16 @@ const ProductsPage = () => {
   // Cost (and so profit and margin) comes from the inventory ledger.
   const { has } = useStoreModules();
   const tracksInventory = has("inventory");
+  const takesOrders = has("orders");
 
-  const { data: products, isLoading } = useProductsQuery();
+  const [page, setPage] = useState(0);
+  const [limit, setLimit] = useState(25);
+  const { data, isLoading } = useProductsPageQuery({ page: page + 1, limit });
+  const products = data?.data;
+
+  // A delete can empty the last page; step back rather than show "no products".
+  const lastPage = Math.max(0, Math.ceil((data?.total ?? 0) / limit) - 1);
+  if (data && page > lastPage) setPage(lastPage);
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => {
@@ -260,18 +268,23 @@ const ProductsPage = () => {
           />
         ),
       },
-      {
-        id: "whatsappClicks",
-        header: t("whatsappClicks"),
-        render: (row: Product) => (
-          <Chip
-            label={row.whatsappClicks ?? 0}
-            size="small"
-            variant="outlined"
-            color="success"
-          />
-        ),
-      },
+      // WhatsApp is how a catalog-only store gets enquiries; a store taking orders doesn't need it.
+      ...(takesOrders
+        ? []
+        : [
+            {
+              id: "whatsappClicks",
+              header: t("whatsappClicks"),
+              render: (row: Product) => (
+                <Chip
+                  label={row.whatsappClicks ?? 0}
+                  size="small"
+                  variant="outlined"
+                  color="success"
+                />
+              ),
+            },
+          ]),
       {
         id: "isActive",
         header: t("active"),
@@ -314,7 +327,7 @@ const ProductsPage = () => {
         ),
       },
     ],
-    [can, t, lang, currency, tracksInventory, toggleActiveMutation, deleteMutation],
+    [can, t, lang, currency, tracksInventory, takesOrders, toggleActiveMutation, deleteMutation],
   );
 
   return (
@@ -343,6 +356,16 @@ const ProductsPage = () => {
           borderRadius={0}
           height="100%"
           loading={isLoading}
+          pagination={{
+            count: data?.total ?? 0,
+            page,
+            rowsPerPage: limit,
+            onPageChange: setPage,
+            onRowsPerPageChange: (n) => {
+              setLimit(n);
+              setPage(0);
+            },
+          }}
         />
       </Box>
       <ProductCsvDialog

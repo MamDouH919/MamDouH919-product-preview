@@ -119,7 +119,7 @@ const SubscribersPage = () => {
         </Button>
       </Stack>
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={rows} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={rows} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
     </Stack>
   );

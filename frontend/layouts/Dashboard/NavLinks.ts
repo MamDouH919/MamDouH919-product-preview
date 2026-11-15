@@ -62,7 +62,7 @@ export const useLinksList = () => {
             primary: t("navStock"),
             icon: Warehouse,
             children: [
-                { primary: t("inventory"), pathname: "/admin/inventory" },
+                { primary: t("inventory"), pathname: "/admin/inventory", exact: true },
                 { primary: t("warehouses"), pathname: "/admin/inventory/warehouses" },
                 { primary: t("stockTransfers"), pathname: "/admin/inventory/transfers" },
                 { primary: t("purchases"), pathname: "/admin/purchases" },

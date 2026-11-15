@@ -9,6 +9,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import { useReturnsQuery } from "@/backend-api/returns/hooks";
 import { RETURN_STATUSES, ReturnFilters, ReturnRequest, ReturnStatus } from "@/backend-api/returns/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import ReturnStatusChip from "@/features/Return/ReturnStatusChip";
 import { formatDateTime, formatMoney } from "@/features/Order/format";
@@ -108,6 +109,10 @@ const ReturnsPage = () => {
         <Tab value="all" label={t("all")} />
       </Tabs>
 
+      <FilterLayout
+        activeCount={search ? 1 : 0}
+        filters={
+          <>
       <TextField
         size="small"
         label={t("search")}
@@ -116,7 +121,10 @@ const ReturnsPage = () => {
         onChange={(e) => setSearch(e.target.value)}
         sx={{ maxWidth: 280 }}
       />
-
+          </>
+        }
+      >
+        <Stack flex={1} minHeight={0}>
       <Box flex={1} minHeight={0}>
         <SimpleTable columns={columns} data={data?.data ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
@@ -130,6 +138,8 @@ const ReturnsPage = () => {
         onRowsPerPageChange={(e) => setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))}
         rowsPerPageOptions={[25, 50, 100]}
       />
+        </Stack>
+      </FilterLayout>
     </Stack>
   );
 };

@@ -25,6 +25,7 @@ import {
 } from "@/backend-api/customers/hooks";
 import { setCustomerActive } from "@/backend-api/customers/mutations";
 import { Customer, CustomerFilters } from "@/backend-api/customers/types";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 
 const CustomersPage = () => {
@@ -135,7 +136,10 @@ const CustomersPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" spacing={2}>
+      <FilterLayout
+        activeCount={search ? 1 : 0}
+        filters={
+          <>
         <TextField
           size="small"
           label={t("search")}
@@ -143,8 +147,10 @@ const CustomersPage = () => {
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 260 }}
         />
-      </Stack>
-
+          </>
+        }
+      >
+        <Stack flex={1} minHeight={0}>
       <Box flex={1} minHeight={0}>
         <SimpleTable
           columns={columns}
@@ -166,6 +172,8 @@ const CustomersPage = () => {
         }
         rowsPerPageOptions={[25, 50, 100]}
       />
+        </Stack>
+      </FilterLayout>
     </Stack>
   );
 };

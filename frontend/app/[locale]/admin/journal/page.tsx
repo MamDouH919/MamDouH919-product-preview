@@ -8,6 +8,7 @@ import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { JournalEntry, JournalFilters, useJournalQuery } from "@/backend-api/accounting/api";
 import { useCurrency } from "@/Hooks/useCurrency";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatMinorMoney } from "@/features/Order/format";
 import AccountSelect from "@/features/Accounting/AccountSelect";
@@ -88,20 +89,27 @@ const JournalPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
+      <FilterLayout
+        activeCount={[filters.from, filters.to, filters.source, filters.account, search].filter(Boolean).length}
+        filters={
+          <>
         <TextField size="small" type="date" label={t("from")} value={filters.from ?? ""} onChange={(e) => patch({ from: e.target.value || undefined })} slotProps={{ inputLabel: { shrink: true } }} />
         <TextField size="small" type="date" label={t("to")} value={filters.to ?? ""} onChange={(e) => patch({ to: e.target.value || undefined })} slotProps={{ inputLabel: { shrink: true } }} />
         <TextField select size="small" label={t("source")} value={filters.source ?? ""} onChange={(e) => patch({ source: e.target.value || undefined })} sx={{ minWidth: 180 }}>
           <MenuItem value="">{t("all")}</MenuItem>
           {SOURCES.map((s) => <MenuItem key={s} value={s}>{t(`accounting.sourceTypes.${s}`)}</MenuItem>)}
         </TextField>
-        <Box minWidth={240}>
+        <Box>
           <AccountSelect value={filters.account ?? ""} onChange={(account) => patch({ account: account || undefined })} />
         </Box>
         <TextField size="small" label={t("search")} placeholder={t("accounting.searchEntries")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <Box flex={1} />
+          </>
+        }
+        actions={
         <Button variant="contained" onClick={() => setCreating((n) => n + 1)}>{t("accounting.newEntry")}</Button>
-      </Stack>
+        }
+      >
+        <Stack flex={1} minHeight={0}>
       <Box flex={1} minHeight={0}>
         <SimpleTable columns={columns} data={data?.rows ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
@@ -114,6 +122,8 @@ const JournalPage = () => {
         onRowsPerPageChange={(e) => patch({ limit: parseInt(e.target.value, 10) })}
         rowsPerPageOptions={[25, 50, 100]}
       />
+        </Stack>
+      </FilterLayout>
       {creating > 0 && <ManualEntryDialog key={creating} onClose={() => setCreating(0)} onPosted={(entry) => setViewing(entry._id)} />}
       {viewing && (
         <JournalEntryDialog

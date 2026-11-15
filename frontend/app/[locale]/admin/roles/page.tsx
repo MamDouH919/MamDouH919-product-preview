@@ -135,7 +135,7 @@ const RolesPage = () => {
       </Stack>
 
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
 
       {formOpen && <RoleFormDialog role={editing} readOnly={editing?.builtIn} onClose={() => setFormOpen(false)} />}

@@ -19,6 +19,11 @@ export const approveReturn = async ({ id, note }: { id: string; note?: string })
   return response.data;
 };
 
+export const receiveReturn = async ({ id, note }: { id: string; note?: string }): Promise<ReturnRequest> => {
+  const response = await api.patch(`/returns/${id}/receive`, { note });
+  return response.data;
+};
+
 export const rejectReturn = async ({ id, note }: { id: string; note?: string }): Promise<ReturnRequest> => {
   const response = await api.patch(`/returns/${id}/reject`, { note });
   return response.data;

@@ -1,6 +1,7 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   fetchProducts,
+  fetchProductsPage,
   fetchProductById,
   fetchProductBySlug,
   fetchProductsByIds,
@@ -15,6 +16,15 @@ export const useProductsQuery = (params?: { categoryId?: string; subCategoryId?:
   return useQuery({
     queryKey: [PRODUCTS_QUERY_KEY, params],
     queryFn: () => fetchProducts(params),
+  });
+};
+
+/** One page of the dashboard list; the previous page stays on screen while the next loads. */
+export const useProductsPageQuery = (params: { page: number; limit: number }) => {
+  return useQuery({
+    queryKey: [PRODUCTS_QUERY_KEY, "admin", params],
+    queryFn: () => fetchProductsPage(params),
+    placeholderData: keepPreviousData,
   });
 };
 

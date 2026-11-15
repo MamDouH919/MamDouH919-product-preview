@@ -23,7 +23,7 @@ import { ProductsService, productImageStorage } from './products.service';
 import { discardUploads, toProductDto } from './product-body';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { SearchProductsDto } from './dto/search-products.dto';
+import { ListProductsDto, SearchProductsDto } from './dto/search-products.dto';
 import { AuthenticationGuard } from '../guards/authentication.guard';
 import { AuthorizationGuard } from '../guards/authorization.guard';
 import { Permissions } from '../decorators/permissions.decorator';
@@ -58,6 +58,14 @@ export class ProductsController {
     if (subCategoryId) return this.productsService.findBySubCategory(subCategoryId);
     if (categoryId) return this.productsService.findByCategory(categoryId);
     return this.productsService.findAll();
+  }
+
+  /** Declared before `:id`, which would otherwise read "admin" as a product id. */
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  @Permissions([{ resource: Resource.PRODUCTS, actions: [Action.READ] }])
+  @Get('admin')
+  findPage(@Query() query: ListProductsDto) {
+    return this.productsService.findPage(query);
   }
 
   @Get('active')

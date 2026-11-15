@@ -11,6 +11,8 @@ import { PaymentAttempt, PaymentAttemptSchema } from './schemas/payment-attempt.
 import { GatewayPayout, GatewayPayoutSchema } from './schemas/gateway-payout.schema';
 import { Counter, CounterSchema } from '../orders/schemas/counter.schema';
 import { GatewayPayoutsService } from './gateway-payouts.service';
+import { MailModule } from '../mail/mail.module';
+import { OrderNotificationsService } from '../orders/order-notifications.service';
 import { GatewaySettingsService } from './gateway-settings.service';
 import { OnlinePaymentsService } from './online-payments.service';
 import {
@@ -22,12 +24,13 @@ import {
 } from './online-payments.controller';
 
 @Module({
-  imports: [AuthModule, FinanceModule],
+  imports: [AuthModule, FinanceModule, MailModule],
   controllers: [OnlinePaymentsPublicController, OnlinePaymentsWebhookController, GatewaySettingsController, GatewayRefundsController, GatewayPayoutsController],
   providers: [
     GatewaySettingsService,
     OnlinePaymentsService,
     GatewayPayoutsService,
+    OrderNotificationsService,
     tenantModelProvider(GatewayPayout.name, GatewayPayoutSchema),
     tenantModelProvider(Counter.name, CounterSchema),
     tenantModelProvider(PaymentGatewaySetting.name, PaymentGatewaySettingSchema),

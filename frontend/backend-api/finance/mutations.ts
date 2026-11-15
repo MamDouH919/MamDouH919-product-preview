@@ -33,6 +33,12 @@ export const retryGatewayRefund = async (paymentId: string): Promise<{ refunded:
   return response.data;
 };
 
+export type GatewayOutcome = "sent" | "not_sent";
+
+/** Settles a refund stuck "in progress" after someone checked the gateway: it did go back, or it did not. */
+export const resolveGatewayPaymentRefund = async ({ paymentId, outcome, note }: { paymentId: string; outcome: GatewayOutcome; note?: string }) =>
+  (await api.post(`/online-payments/payments/${paymentId}/refund-resolve`, { outcome, note })).data;
+
 export const voidCollection = async ({ paymentId, reason }: { paymentId: string; reason: string }): Promise<Payment> => {
   const response = await api.post(`/finance/payments/${paymentId}/void`, { reason });
   return response.data;

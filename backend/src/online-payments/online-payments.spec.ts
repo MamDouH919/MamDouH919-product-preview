@@ -201,7 +201,7 @@ describe('Online payments', () => {
 
     beforeEach(() => {
       send = jest.fn().mockResolvedValue(undefined);
-      (store.refunds as any).onlinePayments = { sendRefund: send };
+      (store.refunds as any).onlinePayments = { sendRefund: send, notifyRefunded: async () => undefined };
     });
 
     /** Delivered, and paid online in `parts` (default one payment of 345.00). */
@@ -247,6 +247,39 @@ describe('Online payments', () => {
       await expect(store.refunds.sendToGateway(String(refund._id))).rejects.toThrow(ConflictException);
       expect(send).toHaveBeenCalledTimes(2);
       await reconciled();
+    });
+
+    describe('stuck in progress', () => {
+      const stuck = async () => {
+        const id = await delivered();
+        const refund = await ask(id);
+        await store.refunds.execute(String(refund._id), alice, 'shop.test');
+        await db.model('Refund').updateOne({ _id: refund._id }, { $set: { gatewayState: GatewayRefundState.PROCESSING } });
+        return String(refund._id);
+      };
+
+      it('is settled as sent: marked done and the customer told, and no longer open to a second settling', async () => {
+        const id = await stuck();
+        const told = jest.fn().mockResolvedValue(undefined);
+        (store.refunds as any).onlinePayments = { sendRefund: send, notifyRefunded: told };
+        await expect(store.refunds.sendToGateway(id)).rejects.toThrow(ConflictException);
+
+        expect((await store.refunds.resolveGateway(id, 'sent')).gatewayState).toBe(GatewayRefundState.DONE);
+        expect(told).toHaveBeenCalledTimes(1);
+        expect(send).toHaveBeenCalledTimes(1);
+        await expect(store.refunds.resolveGateway(id, 'not_sent')).rejects.toThrow(ConflictException);
+      });
+
+      it('is settled as not sent: failed with the reason, then it can be sent again or reversed', async () => {
+        const id = await stuck();
+
+        const failed = await store.refunds.resolveGateway(id, 'not_sent', 'nothing in Paymob');
+        expect(failed.gatewayState).toBe(GatewayRefundState.FAILED);
+        expect(failed.gatewayNote).toContain('nothing in Paymob');
+
+        expect((await store.refunds.sendToGateway(id)).gatewayState).toBe(GatewayRefundState.DONE);
+        expect(send).toHaveBeenCalledTimes(2);
+      });
     });
 
     it('can still be reversed while the gateway has not sent it, but not after', async () => {
@@ -364,6 +397,7 @@ describe('Online payments', () => {
     let event: WebhookEvent;
     const provider = { id: 'paymob', parseWebhook: () => event };
     const gateway = { forWebhook: async () => ({ provider, credentials: {} }) };
+    const mailer = { paymentReceived: jest.fn(), paymentRefunded: jest.fn() };
     const service = () =>
       new OnlinePaymentsService(
         db.model('Order') as never,
@@ -374,7 +408,14 @@ describe('Online payments', () => {
         modules,
         gateway as never,
         store.payments,
+        mailer as never,
+        'shop.test',
+        db.model('Setting') as never,
       );
+    beforeEach(() => {
+      mailer.paymentReceived.mockReset();
+      mailer.paymentRefunded.mockReset();
+    });
     const attempt = async (orderId: string, amountMinor = 34500) =>
       db.model('PaymentAttempt').create({ order: orderId, provider: 'paymob', reference: `ref-${orderId}`, amountMinor, currencyCode: 'EGP' }) as Promise<any>;
     const paid = (orderId: string, over: { amountMinor?: number; currencyCode?: string; transactionId?: string } = {}): WebhookEvent => ({
@@ -442,6 +483,23 @@ describe('Online payments', () => {
       });
     });
 
+    it('tells the customer once the payment is booked, however often the notice repeats, and never for one that books nothing', async () => {
+      const id = await onlineOrder();
+      await attempt(id);
+      event = paid(id);
+      await send();
+      await send();
+      expect(mailer.paymentReceived).toHaveBeenCalledTimes(1);
+      expect(mailer.paymentReceived.mock.calls[0][2]).toBe(34500);
+
+      mailer.paymentReceived.mockReset();
+      const other = await onlineOrder();
+      await attempt(other);
+      event = paid(other, { amountMinor: 100 });
+      await send();
+      expect(mailer.paymentReceived).not.toHaveBeenCalled();
+    });
+
     it('books nothing and flags it when the amount is not what was asked', async () => {
       const id = await onlineOrder();
       await attempt(id);
@@ -488,9 +546,12 @@ describe('Online payments', () => {
     const provider = { id: 'paymob', refund, parseWebhook: jest.fn() as jest.Mock };
     const gateway = { forWebhook: async () => ({ provider, credentials: {} }) };
     let online: OnlinePaymentsService;
+    const mailer = { paymentReceived: jest.fn(), paymentRefunded: jest.fn() };
 
     beforeEach(() => {
       refund.mockReset().mockResolvedValue(undefined);
+      mailer.paymentReceived.mockReset();
+      mailer.paymentRefunded.mockReset();
       online = new OnlinePaymentsService(
         db.model('Order') as never,
         db.model('PaymentAttempt') as never,
@@ -500,6 +561,9 @@ describe('Online payments', () => {
         modules,
         gateway as never,
         store.payments,
+        mailer as never,
+        'shop.test',
+        db.model('Setting') as never,
       );
       // Cancelling asks this service to send the money back.
       (store.orders as any).onlinePayments = online;
@@ -507,6 +571,18 @@ describe('Online payments', () => {
 
     const cancel = (id: string) => store.orders.updateStatus(id, OrderStatus.CANCELLED, 'changed my mind', undefined, 'shop.test');
     const paymentOf = (id: string) => db.model('Payment').findOne({ order: id }).lean().exec() as Promise<any>;
+
+    it('tells the customer when the money is on its way back, and says nothing if the gateway failed', async () => {
+      const id = await onlineOrder();
+      await pay(id, 34500, 'tx-77');
+      refund.mockRejectedValueOnce(new Error('down'));
+      await cancel(id);
+      expect(mailer.paymentRefunded).not.toHaveBeenCalled();
+
+      await online.refundPayment((await paymentOf(id))._id);
+      expect(mailer.paymentRefunded).toHaveBeenCalledTimes(1);
+      expect(mailer.paymentRefunded.mock.calls[0][2]).toBe(34500);
+    });
 
     it('sends the money back through the gateway and lets the books go of it', async () => {
       const id = await onlineOrder();
@@ -544,6 +620,53 @@ describe('Online payments', () => {
       expect(await paymentOf(id)).toMatchObject({ refundState: GatewayRefundState.DONE });
       expect(await balances()).toMatchObject({ [ACCOUNT.GATEWAY_BALANCE]: 0, [ACCOUNT.CUSTOMER_DEPOSITS]: 0 });
       await reconciled();
+    });
+
+    describe('a refund stuck in progress', () => {
+      /** The server stopped after asking the gateway: the payment is left "processing". */
+      const stuck = async () => {
+        const id = await onlineOrder();
+        await pay(id, 34500, 'tx-80');
+        refund.mockRejectedValueOnce(new Error('down'));
+        await cancel(id);
+        await db.model('Payment').updateOne({ order: id }, { $set: { refundState: GatewayRefundState.PROCESSING }, $unset: { refundNote: 1 } });
+        return id;
+      };
+
+      it('is settled as sent: the books let go of the money and the customer is told, once', async () => {
+        const id = await stuck();
+        await expect(online.refundPayment((await paymentOf(id))._id)).rejects.toThrow(ConflictException);
+
+        await online.resolveStuckPayment((await paymentOf(id))._id, 'sent');
+
+        expect(await paymentOf(id)).toMatchObject({ refundState: GatewayRefundState.DONE, heldAsDeposit: false });
+        expect(await balances()).toMatchObject({ [ACCOUNT.GATEWAY_BALANCE]: 0, [ACCOUNT.CUSTOMER_DEPOSITS]: 0 });
+        expect(mailer.paymentRefunded).toHaveBeenCalledTimes(1);
+        await expect(online.resolveStuckPayment((await paymentOf(id))._id, 'sent')).rejects.toThrow(ConflictException);
+        await reconciled();
+      });
+
+      it('is settled as not sent: it fails with the reason, and can be sent again', async () => {
+        const id = await stuck();
+
+        await online.resolveStuckPayment((await paymentOf(id))._id, 'not_sent', 'not in the dashboard');
+
+        expect(await paymentOf(id)).toMatchObject({ refundState: GatewayRefundState.FAILED });
+        expect((await paymentOf(id)).refundNote).toContain('not in the dashboard');
+        expect(mailer.paymentRefunded).not.toHaveBeenCalled();
+        expect(await balances()).toMatchObject({ [ACCOUNT.CUSTOMER_DEPOSITS]: 34500 });
+
+        await online.refundPayment((await paymentOf(id))._id);
+        expect(await paymentOf(id)).toMatchObject({ refundState: GatewayRefundState.DONE });
+        await reconciled();
+      });
+
+      it('only settles one that is actually in progress', async () => {
+        const id = await onlineOrder();
+        await pay(id, 34500, 'tx-81');
+        await cancel(id);
+        await expect(online.resolveStuckPayment((await paymentOf(id))._id, 'not_sent')).rejects.toThrow(ConflictException);
+      });
     });
 
     it('never refunds the same payment twice', async () => {

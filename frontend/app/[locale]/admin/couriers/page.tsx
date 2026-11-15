@@ -81,7 +81,7 @@ const CouriersPage = () => {
         {t("newCourier")}
       </Button>
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={couriers ?? []} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={couriers ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
       {editing && (
         <CourierDialog

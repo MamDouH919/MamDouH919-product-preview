@@ -7,6 +7,8 @@ export enum ReturnStatus {
   REQUESTED = 'requested',
   /** Accepted — the customer can send the items back. */
   APPROVED = 'approved',
+  /** The items are back with the store; the refund is the next step. */
+  RECEIVED = 'received',
   /** Turned down. Final. */
   REJECTED = 'rejected',
   /** Money given back (and, line by line, stock put back). Final. */
@@ -24,7 +26,8 @@ export enum ReturnReason {
 /** Where a return may go next. Refunding straight from a request is allowed — the store's call. */
 export const RETURN_TRANSITIONS: Record<ReturnStatus, ReturnStatus[]> = {
   [ReturnStatus.REQUESTED]: [ReturnStatus.APPROVED, ReturnStatus.REJECTED, ReturnStatus.REFUNDED],
-  [ReturnStatus.APPROVED]: [ReturnStatus.REFUNDED, ReturnStatus.REJECTED],
+  [ReturnStatus.APPROVED]: [ReturnStatus.RECEIVED, ReturnStatus.REFUNDED, ReturnStatus.REJECTED],
+  [ReturnStatus.RECEIVED]: [ReturnStatus.REFUNDED, ReturnStatus.REJECTED],
   [ReturnStatus.REJECTED]: [],
   [ReturnStatus.REFUNDED]: [],
 };

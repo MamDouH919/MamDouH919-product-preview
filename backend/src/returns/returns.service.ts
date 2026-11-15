@@ -149,6 +149,11 @@ export class ReturnsService {
     return this.transition(id, ReturnStatus.APPROVED, { note, userId, host });
   }
 
+  /** The items arrived back. From here the store refunds what it actually got. */
+  async receive(id: string, note: string | undefined, userId: string | undefined, host: string) {
+    return this.transition(id, ReturnStatus.RECEIVED, { note, userId, host });
+  }
+
   async reject(id: string, note: string | undefined, userId: string | undefined, host: string) {
     return this.transition(id, ReturnStatus.REJECTED, { note, userId, host });
   }

@@ -84,3 +84,21 @@ export class SearchProductsDto {
   @Max(60)
   limit?: number;
 }
+
+/** The dashboard's product list: everything, active or not, one page at a time. */
+export class ListProductsDto {
+  @ApiProperty({ required: false, default: 1 })
+  @IsOptional()
+  @Transform(toNumber)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiProperty({ required: false, default: 25 })
+  @IsOptional()
+  @Transform(toNumber)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+}

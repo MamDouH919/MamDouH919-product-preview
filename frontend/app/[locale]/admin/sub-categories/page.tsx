@@ -156,7 +156,7 @@ const SubCategoriesPage = () => {
   );
 
   return (
-    <SimpleTable
+    <SimpleTable clientPagination
       columns={columns}
       data={subCategories ?? []}
       borderRadius={0}

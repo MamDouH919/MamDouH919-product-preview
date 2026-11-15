@@ -7,7 +7,7 @@ import { Order } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { CreateProductDto, ProductVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { ProductSort, SearchProductsDto } from './dto/search-products.dto';
+import { ListProductsDto, ProductSort, SearchProductsDto } from './dto/search-products.dto';
 import { compressImage, toPublicPath, deleteFile } from '../common/helpers/compress-image';
 import { tenantImageStorage } from '../common/helpers/upload-storage';
 import { InventoryService } from '../inventory/inventory.service';
@@ -186,6 +186,30 @@ export class ProductsService {
       .populate('subCategory', 'name slug')
       .sort({ order: 1, createdAt: -1 })
       .exec();
+  }
+
+  /** The dashboard list: every product, active or not, one page at a time. */
+  async findPage(query: ListProductsDto): Promise<{
+    data: Product[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    // Coerced here as well: the controller is handed the raw query strings.
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number(query.limit) || 25));
+    const [data, total] = await Promise.all([
+      this.productModel
+        .find()
+        .populate('category', 'name slug')
+        .populate('subCategory', 'name slug')
+        .sort({ order: 1, createdAt: -1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .exec(),
+      this.productModel.countDocuments().exec(),
+    ]);
+    return { data, total, page, limit };
   }
 
   async findActive(): Promise<Product[]> {

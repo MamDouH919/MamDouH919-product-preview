@@ -133,7 +133,7 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     inventory,
     { statusChanged: () => undefined } as never,
     // Gateway refunds are tested with a stand-in that replaces this.
-    { sendRefund: async () => undefined } as never,
+    { sendRefund: async () => undefined, notifyRefunded: async () => undefined } as never,
   );
 
   let n = 0;

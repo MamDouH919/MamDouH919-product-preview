@@ -14,6 +14,7 @@ import { OnlinePaymentsService } from './online-payments.service';
 import { TestGatewayDto, UpdateGatewaySettingsDto } from './dto/gateway-settings.dto';
 import { apiOrigin } from './api-origin';
 import { GatewayPayoutsService } from './gateway-payouts.service';
+import { ResolveGatewayRefundDto } from './dto/gateway-resolve.dto';
 import { RecordPayoutDto, ReversePayoutDto } from './dto/gateway-payout.dto';
 
 type AdminRequest = Request & { userId?: string };
@@ -102,6 +103,16 @@ export class GatewayRefundsController {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Payment not found');
     await this.payments.refundPayment(id);
     return { refunded: true };
+  }
+
+  /** Settles a refund stuck "in progress" once someone has looked at the gateway. */
+  @Permissions([{ resource: Resource.ORDERS, actions: [Action.UPDATE] }])
+  @HttpCode(200)
+  @Post(':id/refund-resolve')
+  async resolve(@Param('id') id: string, @Body() dto: ResolveGatewayRefundDto) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Payment not found');
+    await this.payments.resolveStuckPayment(id, dto.outcome, dto.note);
+    return { resolved: true };
   }
 }
 

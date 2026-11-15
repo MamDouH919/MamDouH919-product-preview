@@ -86,3 +86,11 @@ export type ProductSearchResponse = {
   page: number;
   limit: number;
 };
+
+/** The dashboard's product list: every product, active or not, one page at a time. */
+export type ProductPage = {
+  data: Product[];
+  total: number;
+  page: number;
+  limit: number;
+};

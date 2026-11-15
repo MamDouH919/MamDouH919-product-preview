@@ -111,7 +111,7 @@ const ContactMessagesPage = () => {
   );
 
   return (
-    <SimpleTable
+    <SimpleTable clientPagination
       columns={columns}
       data={messages ?? []}
       borderRadius={0}

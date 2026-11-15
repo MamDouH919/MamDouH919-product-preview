@@ -26,6 +26,11 @@ export const retryGatewayRefund = async (id: string): Promise<Refund> => {
   return response.data;
 };
 
+export const resolveGatewayRefund = async ({ id, outcome, note }: { id: string; outcome: "sent" | "not_sent"; note?: string }): Promise<Refund> => {
+  const response = await api.post(`/finance/refunds/${id}/gateway-resolve`, { outcome, note });
+  return response.data;
+};
+
 export const reverseRefund = async ({ id, reason }: { id: string; reason: string }): Promise<Refund> => {
   const response = await api.post(`/finance/refunds/${id}/reverse`, { reason });
   return response.data;

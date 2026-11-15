@@ -23,7 +23,7 @@ import {
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { RETURNS_QUERY_KEY, useReturnQuery } from "@/backend-api/returns/hooks";
-import { approveReturn, rejectReturn } from "@/backend-api/returns/mutations";
+import { approveReturn, receiveReturn, rejectReturn } from "@/backend-api/returns/mutations";
 import { REFUNDS_QUERY_KEY, useRefundsQuery } from "@/backend-api/refunds/hooks";
 import RefundRequestDialog from "@/features/Refund/RefundRequestDialog";
 import RefundsCard from "@/features/Refund/RefundsCard";
@@ -35,7 +35,7 @@ import ReturnStatusChip from "@/features/Return/ReturnStatusChip";
 import { formatDateTime, formatMoney, localized } from "@/features/Order/format";
 import { getBackendUri } from "@/utils/helperFunctions";
 
-type Decision = "approve" | "reject";
+type Decision = "approve" | "receive" | "reject";
 
 const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = use(params);
@@ -85,9 +85,11 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const mutation = useMutation({
     mutationFn: async (kind: Decision) => {
       const trimmed = note.trim() || undefined;
-      return kind === "approve" ? approveReturn({ id, note: trimmed }) : rejectReturn({ id, note: trimmed });
+      if (kind === "approve") return approveReturn({ id, note: trimmed });
+      if (kind === "receive") return receiveReturn({ id, note: trimmed });
+      return rejectReturn({ id, note: trimmed });
     },
-    onSuccess: (_, kind) => done(t(kind === "approve" ? "returnApproved" : "returnRejected")),
+    onSuccess: (_, kind) => done(t(kind === "approve" ? "returnApproved" : kind === "receive" ? "returnReceived" : "returnRejected")),
     onError,
   });
 
@@ -102,7 +104,7 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
   const currency = localized(ret.orderSummary?.currency, lang) || fallbackCurrency;
   const customer = typeof ret.customer === "object" ? ret.customer : undefined;
-  const open = ret.status === "requested" || ret.status === "approved";
+  const open = ret.status === "requested" || ret.status === "approved" || ret.status === "received";
   // A return is settled by one refund; while one is open or paid, there's nothing more to ask for.
   const hasRefund = (refunds?.data ?? []).some((r) => ["requested", "approved", "executed"].includes(r.status));
   // Refunds live in the books, so only orders delivered after they started can be refunded here.
@@ -185,8 +187,14 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
                     {t("approve")}
                   </Button>
                 )}
+                {ret.status === "approved" && (
+                  <Button variant="contained" onClick={() => openDialog("receive")}>
+                    {t("markReceived")}
+                  </Button>
+                )}
                 {canRefund && (
-                  <Button variant="contained" onClick={() => setRefundDialog((n) => n + 1)}>
+                  // The refund is the main step once the items are back; before that it's an early option.
+                  <Button variant={ret.status === "received" ? "contained" : "outlined"} onClick={() => setRefundDialog((n) => n + 1)}>
                     {t("requestRefund")}
                   </Button>
                 )}
@@ -254,7 +262,7 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
       <Dialog open={!!decision} onClose={() => setDecision(null)} fullWidth maxWidth="sm">
         <DialogTitle>
-          {decision === "approve" ? t("approveReturn") : t("rejectReturn")}
+          {decision === "approve" ? t("approveReturn") : decision === "receive" ? t("receiveReturn") : t("rejectReturn")}
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} pt={1}>

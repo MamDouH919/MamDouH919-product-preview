@@ -7,6 +7,7 @@ import { ReturnStatus } from "@/backend-api/returns/types";
 const COLORS: Record<ReturnStatus, ChipProps["color"]> = {
   requested: "warning",
   approved: "info",
+  received: "primary",
   rejected: "default",
   refunded: "success",
 };

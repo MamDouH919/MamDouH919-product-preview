@@ -150,7 +150,7 @@ const CategoriesPage = () => {
   );
 
   return (
-    <SimpleTable
+    <SimpleTable clientPagination
       columns={columns}
       data={categories ?? []}
       borderRadius={0}

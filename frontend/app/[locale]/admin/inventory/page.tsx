@@ -33,6 +33,7 @@ import { warehouseName } from "@/features/Inventory/warehouseName";
 import { InventoryFilters, StockLevel } from "@/backend-api/inventory/types";
 import { useCategoriesQuery } from "@/backend-api/categories/hooks";
 import { getBackendUri } from "@/utils/helperFunctions";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import AdjustStockDialog from "@/features/Inventory/AdjustStockDialog";
 import ProductMovementsDialog from "@/features/Inventory/ProductMovementsDialog";
@@ -162,7 +163,12 @@ const InventoryPage = () => {
       {
         id: "sku",
         header: t("sku"),
-        render: (row: StockLevel) => row.sku ?? "—",
+        render: (row: StockLevel) => (
+          // Cells are capped at 200px; long SKUs must wrap inside that box instead of spilling into the next column.
+          <Box dir="ltr" sx={{ maxWidth: 200, overflowWrap: "anywhere", textAlign: "start" }}>
+            {row.sku ?? "—"}
+          </Box>
+        ),
       },
       ...(multi
         ? warehouses.map((w) => ({
@@ -324,7 +330,10 @@ const InventoryPage = () => {
         />
       </Stack>
 
-      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+      <FilterLayout
+        activeCount={[search, filters.status !== "all" && filters.status, filters.categoryId, filters.warehouseId].filter(Boolean).length}
+        filters={
+          <>
         <TextField
           size="small"
           label={t("search")}
@@ -384,15 +393,18 @@ const InventoryPage = () => {
             ))}
           </TextField>
         )}
-        {multi && (
-          <Button variant="outlined" onClick={() => setTransferring(Date.now())}>
-            {t("newTransfer")}
-          </Button>
-        )}
-      </Stack>
-
+          </>
+        }
+        actions={
+          multi ? (
+            <Button variant="outlined" onClick={() => setTransferring(Date.now())}>
+              {t("newTransfer")}
+            </Button>
+          ) : undefined
+        }
+      >
       <Box flex={1} minHeight={0}>
-        <SimpleTable
+        <SimpleTable clientPagination
           columns={columns}
           data={rows}
           borderRadius={0}
@@ -400,6 +412,7 @@ const InventoryPage = () => {
           loading={isLoading}
         />
       </Box>
+      </FilterLayout>
 
       <AdjustStockDialog row={selected} onClose={() => setSelected(null)} />
       <ProductMovementsDialog row={historyRow} onClose={() => setHistoryRow(null)} />

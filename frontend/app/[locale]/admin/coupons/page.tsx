@@ -201,7 +201,7 @@ const CouponsPage = () => {
       </Stack>
 
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
 
       {formOpen && <CouponFormDialog open coupon={editing} onClose={() => setFormOpen(false)} />}

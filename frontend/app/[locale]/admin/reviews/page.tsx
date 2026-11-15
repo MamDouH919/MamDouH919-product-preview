@@ -34,6 +34,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import { REVIEWS_QUERY_KEY, useReviewsQuery } from "@/backend-api/reviews/hooks";
 import { deleteReview, replyToReview, setReviewStatus } from "@/backend-api/reviews/mutations";
 import { AdminReview, REVIEW_STATUSES, ReviewFilters, ReviewStatus } from "@/backend-api/reviews/types";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatDateTime, localized } from "@/features/Order/format";
 import { getBackendUri } from "@/utils/helperFunctions";
@@ -242,7 +243,10 @@ const ReviewsPage = () => {
         <Tab value="all" label={t("all")} />
       </Tabs>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+      <FilterLayout
+        activeCount={[search, filters.rating].filter(Boolean).length}
+        filters={
+          <>
         <TextField
           size="small"
           label={t("search")}
@@ -267,8 +271,10 @@ const ReviewsPage = () => {
             </MenuItem>
           ))}
         </TextField>
-      </Stack>
-
+          </>
+        }
+      >
+        <Stack flex={1} minHeight={0}>
       <Box flex={1} minHeight={0}>
         <SimpleTable
           columns={columns}
@@ -290,6 +296,8 @@ const ReviewsPage = () => {
         }
         rowsPerPageOptions={[25, 50, 100]}
       />
+        </Stack>
+      </FilterLayout>
 
       <Dialog open={!!replying} onClose={() => setReplying(null)} fullWidth maxWidth="sm">
         <DialogTitle>{t("replyToReview")}</DialogTitle>

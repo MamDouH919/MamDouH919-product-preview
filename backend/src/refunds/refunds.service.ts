@@ -1,3 +1,4 @@
+import type { ResolveOutcome } from '../online-payments/dto/gateway-resolve.dto';
 import {
   BadRequestException,
   ConflictException,
@@ -440,9 +441,39 @@ export class RefundsService {
         )
         .exec())!;
     }
+    await this.onlinePayments.notifyRefunded(claimed.order, claimed.totalMinor);
     return (await this.refundModel
       .findByIdAndUpdate(claimed._id, { $set: { gatewayState: GatewayRefundState.DONE } }, { returnDocument: 'after' })
       .exec())!;
+  }
+
+  /**
+   * A gateway refund left "in progress" (the server stopped between asking the gateway
+   * and noting its answer) is settled by someone who checked the gateway's dashboard.
+   * `sent`: it did go back, so it is marked done and the customer told. `not_sent`: it
+   * did not, so it is marked failed and can be sent again or reversed. Only acts on
+   * one still in progress, so two people can't settle it twice.
+   */
+  async resolveGateway(id: string, outcome: ResolveOutcome, note?: string): Promise<Refund> {
+    const sent = outcome === 'sent';
+    const trimmed = note?.trim();
+    const claimed = await this.refundModel
+      .findOneAndUpdate(
+        { _id: this.oid(id, 'Refund not found'), method: RefundMethod.GATEWAY, status: RefundStatus.EXECUTED, gatewayState: GatewayRefundState.PROCESSING },
+        sent
+          ? { $set: { gatewayState: GatewayRefundState.DONE }, $unset: { gatewayNote: 1 } }
+          : {
+              $set: {
+                gatewayState: GatewayRefundState.FAILED,
+                gatewayNote: (trimmed ? `Checked at the gateway, not sent: ${trimmed}` : 'Checked at the gateway: the refund was not sent').slice(0, 300),
+              },
+            },
+        { returnDocument: 'after' },
+      )
+      .exec();
+    if (!claimed) throw new ConflictException('This refund is not waiting on the gateway');
+    if (sent) await this.onlinePayments.notifyRefunded(claimed.order, claimed.totalMinor);
+    return claimed;
   }
 
   /**
@@ -483,13 +514,16 @@ export class RefundsService {
       await this.applyToOrder(order, orderAmounts(order).totalMinor, refund, -1, session);
 
       if (refund.returnRequest) {
+        // Back to where it was: received if the items had arrived, otherwise approved.
+        const before = await this.returnModel.findById(refund.returnRequest).select('history').session(session).lean().exec();
+        const back = before?.history?.some((h) => h.status === ReturnStatus.RECEIVED) ? ReturnStatus.RECEIVED : ReturnStatus.APPROVED;
         await this.returnModel
           .updateOne(
             { _id: refund.returnRequest, status: ReturnStatus.REFUNDED },
             {
-              $set: { status: ReturnStatus.APPROVED },
+              $set: { status: back },
               $unset: { refundAmount: 1 },
-              $push: { history: { status: ReturnStatus.APPROVED, by: this.userOid(userId), at, note: `Refund #${refund.refundNumber} reversed: ${reason}` } },
+              $push: { history: { status: back, by: this.userOid(userId), at, note: `Refund #${refund.refundNumber} reversed: ${reason}` } },
             },
             { session },
           )
@@ -602,10 +636,20 @@ export class RefundsService {
     }
 
     let ret: ReturnRequest | undefined;
+    if (!basis.returnId) {
+      // Goods are on their way back: that refund belongs to the return, so it can't be paid twice on the side.
+      const pending = await this.returnModel
+        .findOne({ order: order._id, status: { $in: [ReturnStatus.REQUESTED, ReturnStatus.APPROVED, ReturnStatus.RECEIVED] } })
+        .select('returnNumber')
+        .session(session ?? null)
+        .lean()
+        .exec();
+      if (pending) throw new ConflictException(`Return #${pending.returnNumber} is still open on this order; refund it from the return`);
+    }
     if (basis.returnId) {
       ret = (await this.returnModel.findOne({ _id: this.oid(basis.returnId, 'Return not found'), order: order._id }).session(session ?? null).exec()) ?? undefined;
       if (!ret) throw new NotFoundException('Return not found on this order');
-      if (![ReturnStatus.REQUESTED, ReturnStatus.APPROVED].includes(ret.status)) {
+      if (![ReturnStatus.REQUESTED, ReturnStatus.APPROVED, ReturnStatus.RECEIVED].includes(ret.status)) {
         throw new ConflictException(`A ${ret.status} return can't be refunded`);
       }
       const other = await this.refundModel
@@ -765,7 +809,7 @@ export class RefundsService {
   /** Marks the refund's return as refunded, with what went back on the shelf. */
   private async settleReturn(refund: Refund, restocked: Record<string, boolean>, userId: string | undefined, at: Date, session: ClientSession) {
     const ret = await this.returnModel.findById(refund.returnRequest).session(session).exec();
-    if (!ret || ![ReturnStatus.REQUESTED, ReturnStatus.APPROVED].includes(ret.status)) {
+    if (!ret || ![ReturnStatus.REQUESTED, ReturnStatus.APPROVED, ReturnStatus.RECEIVED].includes(ret.status)) {
       throw new ConflictException('The return this refund settles was closed meanwhile; reload it');
     }
     const itemFlags = Object.fromEntries(

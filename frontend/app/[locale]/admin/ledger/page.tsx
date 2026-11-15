@@ -9,6 +9,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import { CASH_ACCOUNT, downloadAccountStatementCsv, useAccountStatementQuery } from "@/backend-api/accounting/api";
 import { useMoneyAccountsQuery } from "@/backend-api/money-accounts/api";
 import { useCurrency } from "@/Hooks/useCurrency";
+import FilterLayout from "@/components/FilterLayout";
 import TableLoading from "@/components/Table/TableLoading";
 import { formatMinorMoney } from "@/features/Order/format";
 import { toastError } from "@/features/Purchasing/shared";
@@ -77,8 +78,11 @@ const LedgerPage = () => {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
-        <Box minWidth={280}>
+      <FilterLayout
+        activeCount={[code, moneyAccount, range.from, range.to].filter(Boolean).length}
+        filters={
+          <>
+        <Box>
           <AccountSelect value={code} onChange={(account) => go({ account })} />
         </Box>
         {code === CASH_ACCOUNT && (moneyAccounts?.length ?? 0) > 1 && (
@@ -89,9 +93,15 @@ const LedgerPage = () => {
         )}
         <TextField size="small" type="date" label={t("from")} value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
         <TextField size="small" type="date" label={t("to")} value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
-        <Box flex={1} />
+          </>
+        }
+        actions={
+          <>
         {code && <Button variant="outlined" onClick={download} disabled={downloading || !data}>{t("downloadCsv")}</Button>}
-      </Stack>
+          </>
+        }
+      >
+        <Stack spacing={2} flex={1} minHeight={0} sx={{ overflow: "auto" }}>
 
       {!code && <Alert severity="info">{t("accounting.pickAccountFirst")}</Alert>}
       {code && isError && <Alert severity="error">{t("somethingWentWrong")}</Alert>}
@@ -170,6 +180,8 @@ const LedgerPage = () => {
           </Paper>
         </>
       )}
+        </Stack>
+      </FilterLayout>
       {viewing && <JournalEntryDialog key={viewing} id={viewing} onClose={() => setViewing(null)} onOpenEntry={setViewing} onOpenAccount={(c) => { setViewing(null); go({ account: c }); }} />}
     </Stack>
   );

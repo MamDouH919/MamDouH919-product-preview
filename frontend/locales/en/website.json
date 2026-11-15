@@ -780,7 +780,12 @@
         "processing": "Refund in progress — check the payment gateway before trying again",
         "failed": "Refund failed",
         "done": "Refunded to the customer",
-        "retry": "Refund again"
+        "retry": "Refund again",
+        "confirmSent": "It was refunded",
+        "confirmNotSent": "It was not refunded",
+        "confirmSentText": "Confirm only if the payment gateway dashboard shows this payment as refunded. The books will let go of the money and the customer will be told.",
+        "confirmNotSentText": "Confirm only if the payment gateway dashboard shows no refund for this payment. You can then try again.",
+        "markedNotSent": "Marked as not refunded, it can be tried again"
     },
     "paymentSettings": "Payments",
     "paymentSettingsDescription": "Take card and wallet payments at checkout with your own payment-gateway account. Money goes to you; we never hold it.",
@@ -986,6 +991,8 @@
     "invoiceThanks": "Thank you for your order!",
     "printOrSavePdf": "Print / Save as PDF",
     "returns": "Returns",
+    "refundFromReturn": "Refund from return #{{number}}",
+    "refundWithoutReturn": "Refund without a return",
     "createReturn": "Create return",
     "return": "Return",
     "returnNumber": "Return #{{number}}",
@@ -1005,6 +1012,7 @@
     "returnStatus": {
         "requested": "Requested",
         "approved": "Approved",
+        "received": "Received",
         "rejected": "Rejected",
         "refunded": "Refunded"
     },
@@ -1012,6 +1020,9 @@
     "returnSearchPlaceholder": "Return or order number",
     "returnApproved": "Return approved",
     "returnRejected": "Return rejected",
+    "returnReceived": "Return marked as received",
+    "markReceived": "Mark as received",
+    "receiveReturn": "Mark return as received",
     "refundRecorded": "Refund recorded",
     "openedByStore": "Opened by the store",
     "openedByCustomer": "Requested by the customer",
@@ -1121,7 +1132,6 @@
     "voidCollectionTitle": "Void this collection?",
     "voidCollectionHint": "The amount goes back to what the customer owes. The record stays, marked voided, with your reason.",
     "requestRefund": "Request refund",
-    "refundOrder": "Refund",
     "refunds": "Refunds",
     "refundNumber": "Refund #{{number}}",
     "note": "Note",
@@ -1174,14 +1184,18 @@
         "reject": "Reject",
         "execute": "Pay out",
         "reverse": "Reverse",
-        "retry": "Send again"
+        "retry": "Send again",
+        "sent": "It was sent",
+        "notSent": "It was not sent"
     },
     "refundConfirm": {
         "approve": "Approve refund #{{number}}?",
         "reject": "Reject refund #{{number}}?",
         "execute": "Pay out refund #{{number}}?",
         "reverse": "Reverse refund #{{number}}?",
-        "retry": "Send refund #{{number}} again?"
+        "retry": "Send refund #{{number}} again?",
+        "sent": "Did refund #{{number}} reach the customer?",
+        "notSent": "Did refund #{{number}} not go through?"
     },
     "refundExecuteHint": "{{amount}} goes back to the customer as: {{method}}. This is posted to the books today and can only be undone by reversing it.",
     "refundDone": {
@@ -1189,7 +1203,9 @@
         "reject": "Refund rejected",
         "execute": "Refund paid out",
         "reverse": "Refund reversed",
-        "retry": "Refund sent to the gateway"
+        "retry": "Refund sent to the gateway",
+        "sent": "Marked as sent back to the customer",
+        "notSent": "Marked as not sent, it can be sent again"
     },
     "gatewayRefundState": {
         "pending": "Recorded — the payment gateway has not sent it yet",
@@ -1197,6 +1213,8 @@
         "failed": "The gateway could not send it back",
         "done": "Sent back through the gateway"
     },
+    "refundSentHint": "Only confirm this after you saw in the payment gateway dashboard that {{amount}} was refunded. The customer is told the money is on its way.",
+    "refundNotSentHint": "Only confirm this after you checked the payment gateway dashboard and found no refund of {{amount}}. You can then send it again or reverse it.",
     "refundRetryHint": "Asks the payment gateway again to send {{amount}} back to the customer ({{method}}). If the last attempt timed out, check the gateway dashboard first so it is not sent twice.",
     "refundOutsideBooks": "This order was delivered before the books started, so it can't be refunded here. Record the refund outside the system.",
     "returnOutsideSystem": "Your plan doesn't include accounting or stock, so refunds and restocking for this return happen outside the system. Approve it once it's agreed, or reject it.",

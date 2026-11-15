@@ -87,7 +87,7 @@ const SuppliersPage = () => {
         {t("newSupplier")}
       </Button>
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={suppliers ?? []} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={suppliers ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
       {editing && <SupplierDialog key={editing.key} open supplier={editing.supplier} onClose={() => setEditing(null)} />}
       <PaySupplierDialog key={paying?._id ?? "none"} supplier={paying} onClose={() => setPaying(null)} />

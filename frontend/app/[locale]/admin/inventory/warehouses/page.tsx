@@ -162,7 +162,7 @@ const WarehousesPage = () => {
       {max === 1 && <Alert severity="info">{t("warehouseLimitOne")}</Alert>}
 
       <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={warehouses.map((w) => ({ ...w, id: w._id }))} borderRadius={0} height="100%" loading={isLoading} />
+        <SimpleTable clientPagination columns={columns} data={warehouses.map((w) => ({ ...w, id: w._id }))} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
 
       {editing && <WarehouseDialog key={editing.key} warehouse={editing.warehouse} onClose={() => setEditing(null)} />}

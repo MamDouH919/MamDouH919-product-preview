@@ -1,8 +1,8 @@
 import { LocalizedField } from "../globalTypes";
 import { OrderStatus } from "../orders/types";
 
-export type ReturnStatus = "requested" | "approved" | "rejected" | "refunded";
-export const RETURN_STATUSES: ReturnStatus[] = ["requested", "approved", "rejected", "refunded"];
+export type ReturnStatus = "requested" | "approved" | "received" | "rejected" | "refunded";
+export const RETURN_STATUSES: ReturnStatus[] = ["requested", "approved", "received", "rejected", "refunded"];
 
 export type ReturnReason = "damaged" | "wrong_item" | "not_as_described" | "changed_mind" | "other";
 export const RETURN_REASONS: ReturnReason[] = ["damaged", "wrong_item", "not_as_described", "changed_mind", "other"];

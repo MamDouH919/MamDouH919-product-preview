@@ -1,3 +1,4 @@
+import { ResolveGatewayRefundDto } from '../online-payments/dto/gateway-resolve.dto';
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthenticationGuard } from '../guards/authentication.guard';
@@ -88,6 +89,12 @@ export class RefundsController {
   @Post('refunds/:id/gateway-retry')
   retryGateway(@Param('id') id: string) {
     return this.refunds.sendToGateway(id);
+  }
+
+  @Permissions([{ resource: Resource.REFUNDS, actions: [Action.APPROVE] }])
+  @Post('refunds/:id/gateway-resolve')
+  resolveGateway(@Param('id') id: string, @Body() dto: ResolveGatewayRefundDto) {
+    return this.refunds.resolveGateway(id, dto.outcome, dto.note);
   }
 
   @Permissions([{ resource: Resource.REFUNDS, actions: [Action.APPROVE] }])

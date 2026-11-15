@@ -6,7 +6,7 @@ import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 import { LocalizedField } from '../common/schemas/localized-field.schema';
 import { escapeHtml } from '../common/helpers/escape-html';
 import { Order } from './schemas/order.schema';
-import { OrderStatus } from './enums/order-status.enum';
+import { OrderStatus, PaymentMethod } from './enums/order-status.enum';
 
 type Lang = 'en' | 'ar';
 
@@ -26,6 +26,13 @@ const COPY: Record<Lang, Record<string, string>> = {
     placedSubject: 'Order #{n} received',
     placedTitle: 'Thanks for your order!',
     placedBody: "We've received order #{n} and will confirm it shortly. You'll pay in cash when it arrives.",
+    placedBodyOnline: "We've received order #{n}. We'll confirm it as soon as your online payment goes through; if you haven't paid yet, you can finish from your order page.",
+    paidSubject: 'Payment received for order #{n}',
+    paidTitle: 'We received your payment',
+    paidBody: 'Thank you! We received your payment of {amount} for order #{n}.',
+    refundedSubject: 'Refund sent for order #{n}',
+    refundedTitle: 'Your refund is on its way',
+    refundedBody: "We've sent {amount} back to the card or wallet you paid with for order #{n}. Depending on your bank it can take a few days to show.",
     confirmedSubject: 'Order #{n} confirmed',
     confirmedTitle: 'Your order is confirmed',
     confirmedBody: "We're preparing order #{n} now.",
@@ -63,6 +70,13 @@ const COPY: Record<Lang, Record<string, string>> = {
     placedSubject: 'تم استلام الطلب رقم #{n}',
     placedTitle: 'شكرًا لطلبك!',
     placedBody: 'استلمنا الطلب رقم #{n} وسنؤكده قريبًا. الدفع نقدًا عند الاستلام.',
+    placedBodyOnline: 'استلمنا الطلب رقم #{n}. سنؤكده فور إتمام دفعك أونلاين؛ وإن لم تُكمل الدفع بعد فيمكنك إتمامه من صفحة طلبك.',
+    paidSubject: 'تم استلام الدفع للطلب رقم #{n}',
+    paidTitle: 'استلمنا دفعتك',
+    paidBody: 'شكرًا لك! استلمنا دفعتك بمبلغ {amount} للطلب رقم #{n}.',
+    refundedSubject: 'تم إرسال المبلغ المسترد للطلب رقم #{n}',
+    refundedTitle: 'المبلغ المسترد في الطريق إليك',
+    refundedBody: 'أرسلنا {amount} إلى البطاقة أو المحفظة التي دفعت بها للطلب رقم #{n}. قد يستغرق ظهوره بضعة أيام حسب البنك.',
     confirmedSubject: 'تم تأكيد الطلب رقم #{n}',
     confirmedTitle: 'تم تأكيد طلبك',
     confirmedBody: 'نقوم الآن بتجهيز الطلب رقم #{n}.',
@@ -125,7 +139,7 @@ export class OrderNotificationsService {
         subject: this.subject(lang, 'placedSubject', n, ctx),
         html: this.layout(lang, ctx, [
           this.heading(this.t(lang, 'placedTitle', { n })),
-          this.paragraph(this.t(lang, 'placedBody', { n })),
+          this.paragraph(this.t(lang, order.paymentMethod === PaymentMethod.ONLINE ? 'placedBodyOnline' : 'placedBody', { n })),
           this.itemsTable(order, lang, ctx),
           this.addressBlock(order, lang),
           this.button(this.customerLink(order, ctx.host), this.t(lang, 'viewOrder')),
@@ -147,6 +161,33 @@ export class OrderNotificationsService {
         this.addressBlock(order, lang),
         order.notes ? this.labelled(this.t(lang, 'notes'), order.notes) : '',
         this.button(this.adminLink(order, ctx.host), this.t(lang, 'openInDashboard')),
+      ]),
+    });
+  }
+
+  /** The customer's online payment was received. Follows the "order status" switch in Settings → Email. */
+  paymentReceived(order: Order, ctx: NotificationContext, amountMinor: number): void {
+    this.paymentMail(order, ctx, amountMinor, 'paid');
+  }
+
+  /** Money went back to the customer's card or wallet. */
+  paymentRefunded(order: Order, ctx: NotificationContext, amountMinor: number): void {
+    this.paymentMail(order, ctx, amountMinor, 'refunded');
+  }
+
+  private paymentMail(order: Order, ctx: NotificationContext, amountMinor: number, kind: 'paid' | 'refunded'): void {
+    if (!ctx.customerEmail) return;
+    const lang = this.lang(order);
+    const n = String(order.orderNumber);
+    const amount = this.money(amountMinor / 100, lang, ctx);
+    this.dispatch(order, 'customerOrderStatus', {
+      to: ctx.customerEmail,
+      subject: this.subject(lang, `${kind}Subject`, n, ctx),
+      html: this.layout(lang, ctx, [
+        this.heading(this.t(lang, `${kind}Title`)),
+        this.paragraph(this.t(lang, `${kind}Body`, { n, amount })),
+        this.itemsTable(order, lang, ctx),
+        this.button(this.customerLink(order, ctx.host), this.t(lang, 'viewOrder')),
       ]),
     });
   }

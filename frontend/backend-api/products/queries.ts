@@ -1,11 +1,19 @@
 import api from "@/lib/api";
-import { Product, ProductSearchParams, ProductSearchResponse } from "./types";
+import { Product, ProductPage, ProductSearchParams, ProductSearchResponse } from "./types";
 
 export const fetchProducts = async (params?: {
   categoryId?: string;
   subCategoryId?: string;
 }): Promise<Product[]> => {
   const response = await api.get("/products", { params });
+  return response.data;
+};
+
+export const fetchProductsPage = async (params: {
+  page: number;
+  limit: number;
+}): Promise<ProductPage> => {
+  const response = await api.get("/products/admin", { params });
   return response.data;
 };
 

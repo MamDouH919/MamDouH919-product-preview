@@ -121,7 +121,7 @@ const SectionsList = () => {
   ], [t, lang, toggleActiveMutation]);
 
   return (
-    <SimpleTable
+    <SimpleTable clientPagination
       columns={columns}
       data={sectionsData}
       borderRadius={0}

@@ -62,6 +62,7 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
   const { data: order, isLoading } = useOrderByIdQuery(id);
   const { data: returns } = useOrderReturnsQuery(id);
+  const openReturn = (returns ?? []).find((r) => r.status === "requested" || r.status === "approved" || r.status === "received");
   const [returnDialog, setReturnDialog] = useState(0);
   const [refundDialog, setRefundDialog] = useState(0);
 
@@ -245,18 +246,6 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
           {keepsBooks && <OrderPaymentPanel orderId={order._id} currency={currency} online={order.paymentMethod === "online"} />}
 
-          {keepsBooks && order.bookedAt && (
-            <RefundsCard
-              orderId={order._id}
-              currency={currency}
-              action={
-                <Button size="small" onClick={() => setRefundDialog((n) => n + 1)}>
-                  {t("refundOrder")}
-                </Button>
-              }
-            />
-          )}
-
           {(order.status === "delivered" || !!returns?.length) && (
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={returns?.length ? 1.5 : 0}>
@@ -288,6 +277,25 @@ const AdminOrderPage = ({ params }: { params: Promise<{ id: string }> }) => {
                 ))}
               </Stack>
             </Paper>
+          )}
+
+          {keepsBooks && order.bookedAt && (
+            <RefundsCard
+              orderId={order._id}
+              currency={currency}
+              action={
+                openReturn ? (
+                  // Goods are on their way back: the refund belongs to that return, not to a separate one.
+                  <CustomLink href={`/admin/returns/${openReturn._id}`}>
+                    <Button size="small">{t("refundFromReturn", { number: openReturn.returnNumber })}</Button>
+                  </CustomLink>
+                ) : (
+                  <Button size="small" onClick={() => setRefundDialog((n) => n + 1)}>
+                    {t("refundWithoutReturn")}
+                  </Button>
+                )
+              }
+            />
           )}
 
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>

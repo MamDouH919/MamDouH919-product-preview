@@ -187,7 +187,7 @@ const PagesList = () => {
 
   return (
     <>
-      <SimpleTable
+      <SimpleTable clientPagination
         columns={columns}
         data={pages ?? []}
         borderRadius={0}

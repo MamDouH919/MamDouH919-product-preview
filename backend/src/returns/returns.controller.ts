@@ -70,6 +70,12 @@ export class ReturnsController {
   }
 
   @Permissions([{ resource: Resource.ORDERS, actions: [Action.UPDATE] }])
+  @Patch(':id/receive')
+  receive(@Param('id') id: string, @Body() dto: ReturnDecisionDto, @Req() req: AdminRequest) {
+    return this.returnsService.receive(id, dto.note, req.userId, req.hostname);
+  }
+
+  @Permissions([{ resource: Resource.ORDERS, actions: [Action.UPDATE] }])
   @Patch(':id/reject')
   reject(@Param('id') id: string, @Body() dto: ReturnDecisionDto, @Req() req: AdminRequest) {
     return this.returnsService.reject(id, dto.note, req.userId, req.hostname);

@@ -7,6 +7,7 @@ import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { useActivityLogFacetsQuery, useActivityLogQuery } from "@/backend-api/activity-log/hooks";
 import { ActivityAction, ActivityLogEntry, ActivityLogFilters } from "@/backend-api/activity-log/types";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import CustomLink from "@/components/CustomLink";
 import { formatDateTime } from "@/features/Order/format";
@@ -119,7 +120,10 @@ const ActivityLogPage = () => {
       <Typography variant="body2" color="text.secondary">
         {t("activityLogHint")}
       </Typography>
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+      <FilterLayout
+        activeCount={[filters.userId, filters.resource, filters.action, filters.from, filters.to].filter(Boolean).length}
+        filters={
+          <>
         <TextField select size="small" label={t("by")} value={filters.userId ?? ""} onChange={(e) => set({ userId: e.target.value || undefined })} sx={{ minWidth: 200 }}>
           <MenuItem value="">{t("all")}</MenuItem>
           {(facets?.users ?? []).map((u) => (
@@ -167,8 +171,10 @@ const ActivityLogPage = () => {
           onChange={(e) => set({ to: e.target.value || undefined })}
           slotProps={{ inputLabel: { shrink: true } }}
         />
-      </Stack>
-
+          </>
+        }
+      >
+        <Stack flex={1} minHeight={0}>
       <Box flex={1} minHeight={0}>
         <SimpleTable columns={columns} data={data?.data ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>
@@ -182,6 +188,8 @@ const ActivityLogPage = () => {
         onRowsPerPageChange={(e) => setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))}
         rowsPerPageOptions={[50, 100]}
       />
+        </Stack>
+      </FilterLayout>
     </Stack>
   );
 };
