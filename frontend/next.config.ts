@@ -13,6 +13,7 @@ const imageBackends = [
   "https://api-demo.novaslash.com",
   "https://api-mk.novaslash.com",
   "https://api.nuxi-eg.com",
+  "https://api-test-shop.novaslash.com",
 ];
 
 function parseRemotePattern(url: string) {

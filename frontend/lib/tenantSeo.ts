@@ -22,6 +22,7 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   "gravity.novaslash.com": gravity,
   "demo.localhost": demo,
   "demo.novaslash.com": demo,
+  "test-shop.novaslash.com": demo,
   "mk.localhost": mk,
   "mk.novaslash.com": mk,
   "nuxi.localhost": nuxi,
