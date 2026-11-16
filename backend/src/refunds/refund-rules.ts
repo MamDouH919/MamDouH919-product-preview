@@ -46,7 +46,11 @@ export interface Capacity {
   lines: LineCapacity[];
   deliveryRemainingMinor: number;
   totalRemainingMinor: number;
-  /** Cash can only go back once it came in: collected less cash already refunded. */
+  /**
+   * Cash (till or courier) can only go back once it came in: collected less
+   * what sits with the gateway, less cash already refunded. Online payments
+   * go back through the gateway, never out of the till.
+   */
   cashRemainingMinor: number;
   /** A credit can only cancel what is still owed. */
   creditRemainingMinor: number;
@@ -60,7 +64,7 @@ export const isCashMethod = (method: RefundMethod) =>
  * what was collected, and the refunds that count — executed ones when paying
  * out, executed and still-open ones when a new refund is asked for.
  */
-export function capacity(amounts: OrderAmounts, money: MoneyState, refunds: CountedRefund[]): Capacity {
+export function capacity(amounts: OrderAmounts, money: MoneyState, refunds: CountedRefund[], gatewayCollectedMinor = 0): Capacity {
   const lines = amounts.lines.map((line, lineIndex) => {
     const netMinor = line.lineTotalMinor - line.discountMinor;
     let qty = 0;
@@ -82,7 +86,8 @@ export function capacity(amounts: OrderAmounts, money: MoneyState, refunds: Coun
     lines,
     deliveryRemainingMinor: amounts.shippingFeeMinor - sum((r) => r.deliveryMinor),
     totalRemainingMinor: amounts.totalMinor - sum((r) => r.totalMinor),
-    cashRemainingMinor: (money.collectedMinor ?? 0) - sum((r) => r.totalMinor, (r) => isCashMethod(r.method)),
+    cashRemainingMinor:
+      (money.collectedMinor ?? 0) - gatewayCollectedMinor - sum((r) => r.totalMinor, (r) => r.method === RefundMethod.CASH || r.method === RefundMethod.COURIER_CASH),
     creditRemainingMinor:
       outstandingOf(amounts.totalMinor, { collectedMinor: money.collectedMinor, writtenOffMinor: money.writtenOffMinor }) -
       sum((r) => r.totalMinor, (r) => r.method === RefundMethod.CREDIT_AGAINST_RECEIVABLE),

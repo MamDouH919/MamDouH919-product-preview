@@ -92,7 +92,7 @@ const RefundRequestDialog = ({
       : m === "credit_against_receivable"
         ? preview.creditRemainingMinor
         : m === "gateway"
-          ? Math.min(preview.gatewayRemainingMinor, preview.cashRemainingMinor)
+          ? Math.min(preview.gatewayRemainingMinor, preview.totalRemainingMinor)
           : preview.cashRemainingMinor;
   const valid = productOk && deliveryOk && totalMinor > 0 && totalMinor <= methodRoom(method) && (!beyondPolicy || !!note.trim()) && (method !== "courier_cash" || !!courierId);
 

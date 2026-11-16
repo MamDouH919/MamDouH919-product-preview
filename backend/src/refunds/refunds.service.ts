@@ -153,6 +153,17 @@ export class RefundsService {
     };
   }
 
+  /** Online money still counted in the order's collected total: it sits with the gateway, not in the till. */
+  private async gatewayCollected(orderId: Types.ObjectId, session?: ClientSession): Promise<number> {
+    const payments = await this.paymentModel
+      .find({ order: orderId, custody: Custody.GATEWAY, status: CollectionStatus.COLLECTED, refundState: { $ne: GatewayRefundState.DONE } })
+      .select('amountMinor')
+      .session(session ?? null)
+      .lean()
+      .exec();
+    return payments.reduce((t, p) => t + p.amountMinor, 0);
+  }
+
   /**
    * What each online payment of an order can still send back through the
    * gateway: its amount less the gateway refunds already asked for or paid
@@ -312,7 +323,10 @@ export class RefundsService {
         .session(session)
         .lean()
         .exec();
-      this.assertWithin(capacity(amounts, order.money ?? {}, paid as unknown as CountedRefund[]), claimed);
+      this.assertWithin(
+        capacity(amounts, order.money ?? {}, paid as unknown as CountedRefund[], await this.gatewayCollected(order._id as Types.ObjectId, session)),
+        claimed,
+      );
       if (claimed.method === RefundMethod.GATEWAY) {
         const room = (await this.gatewayRoom(order._id as Types.ObjectId, session, claimed._id as Types.ObjectId)).find(
           (r) => String(r.payment) === String(claimed.gatewayPayment),
@@ -681,7 +695,12 @@ export class RefundsService {
       .session(session ?? null)
       .lean()
       .exec();
-    const cap = capacity(orderAmounts(order), order.money ?? {}, counted as unknown as CountedRefund[]);
+    const cap = capacity(
+      orderAmounts(order),
+      order.money ?? {},
+      counted as unknown as CountedRefund[],
+      await this.gatewayCollected(order._id as Types.ObjectId, session),
+    );
     for (const line of requested) {
       const left = cap.lines[line.lineIndex].remainingQty;
       if (line.quantity > left) throw new BadRequestException(`Only ${left} of line ${line.lineIndex + 1} can still be refunded`);
@@ -749,9 +768,9 @@ export class RefundsService {
     if (refund.totalMinor > cap.totalRemainingMinor) {
       throw new ConflictException(`Only ${formatMinor(cap.totalRemainingMinor)} of this order is left to refund`);
     }
-    if (isCashMethod(refund.method) && refund.totalMinor > cap.cashRemainingMinor) {
+    if ((refund.method === RefundMethod.CASH || refund.method === RefundMethod.COURIER_CASH) && refund.totalMinor > cap.cashRemainingMinor) {
       throw new ConflictException(
-        `Only ${formatMinor(Math.max(0, cap.cashRemainingMinor))} was collected and not yet refunded; refund the rest as a credit against what is owed`,
+        `Only ${formatMinor(Math.max(0, cap.cashRemainingMinor))} was collected in cash and not yet refunded. Money paid online goes back through the gateway; refund the rest as a credit against what is owed`,
       );
     }
     if (refund.method === RefundMethod.CREDIT_AGAINST_RECEIVABLE && refund.totalMinor > cap.creditRemainingMinor) {

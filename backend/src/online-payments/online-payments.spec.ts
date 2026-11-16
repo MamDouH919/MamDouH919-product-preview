@@ -218,6 +218,17 @@ describe('Online payments', () => {
       );
     const refundDoc = (id: unknown) => db.model('Refund').findById(id).lean().exec() as Promise<any>;
 
+    it('refuses to pay an online order back in cash — it goes back through the gateway', async () => {
+      const id = await delivered();
+      await expect(
+        store.refunds.request(
+          { orderId: id, lines: [{ lineIndex: 0, quantity: 1 }], reason: RefundReason.CHANGED_MIND, method: RefundMethod.CASH } as never,
+          alice,
+        ),
+      ).rejects.toThrow(/through the gateway/);
+      expect((await balances())[ACCOUNT.CASH] ?? 0).toBe(0);
+    });
+
     it('sends the money back through the payment it came in on and keeps the books straight', async () => {
       const id = await delivered();
       const refund = await ask(id);
