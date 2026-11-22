@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsMongoId,
   IsNumber,
@@ -87,6 +88,46 @@ export class SearchProductsDto {
 
 /** The dashboard's product list: everything, active or not, one page at a time. */
 export class ListProductsDto {
+  @ApiProperty({ required: false, description: 'Name (either language), SKU or tag' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsMongoId()
+  categoryId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsMongoId()
+  subCategoryId?: string;
+
+  @ApiProperty({ required: false, enum: ['active', 'inactive'] })
+  @IsOptional()
+  @IsIn(['active', 'inactive'])
+  status?: 'active' | 'inactive';
+
+  @ApiProperty({ required: false, enum: ['in', 'out'], description: 'Sellable now, or not' })
+  @IsOptional()
+  @IsIn(['in', 'out'])
+  stock?: 'in' | 'out';
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Transform(toNumber)
+  @IsNumber()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Transform(toNumber)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
+
   @ApiProperty({ required: false, default: 1 })
   @IsOptional()
   @Transform(toNumber)

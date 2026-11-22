@@ -48,7 +48,7 @@ export const fetchOrderById = async (id: string): Promise<Order> => {
 
 /** Every order matching the filters as CSV (not just the page on screen). */
 export const exportOrdersCsv = async (
-  filters: Pick<OrderFilters, "status" | "search" | "from" | "to">,
+  filters: Pick<OrderFilters, "status" | "search" | "from" | "to" | "paymentMethod">,
   lang: string
 ): Promise<Blob> => {
   const response = await api.get("/orders/export", {

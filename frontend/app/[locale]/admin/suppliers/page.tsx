@@ -9,6 +9,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import { useSuppliersQuery } from "@/backend-api/purchasing/hooks";
 import { Supplier } from "@/backend-api/purchasing/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import PageActions, { PagePrimaryButton } from "@/components/PageActions";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatMinorMoney } from "@/features/Order/format";
 import SupplierDialog from "@/features/Purchasing/SupplierDialog";
@@ -83,9 +84,9 @@ const SuppliersPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Button variant="contained" sx={{ alignSelf: "flex-start" }} onClick={() => setEditing({ key: Date.now() })}>
-        {t("newSupplier")}
-      </Button>
+      <PageActions>
+        <PagePrimaryButton onClick={() => setEditing({ key: Date.now() })}>{t("newSupplier")}</PagePrimaryButton>
+      </PageActions>
       <Box flex={1} minHeight={0}>
         <SimpleTable clientPagination columns={columns} data={suppliers ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>

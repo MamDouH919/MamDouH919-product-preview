@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { ReturnsService } from './returns.service';
-import { CreateReturnDto, QueryReturnsDto, ReturnDecisionDto } from './dto/return.dto';
+import { CreateReturnDto, QueryReturnsDto, ReturnDecisionDto, SettleReturnDto } from './dto/return.dto';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
 import { AuthenticationGuard } from '../guards/authentication.guard';
 import { AuthorizationGuard } from '../guards/authorization.guard';
@@ -81,6 +81,13 @@ export class ReturnsController {
     return this.returnsService.reject(id, dto.note, req.userId, req.hostname);
   }
 
-  // Refunding a return is `POST /finance/refunds` with its `returnId`: refunds
+  /** Closes a return in a store without books: records the money given back and restocks. */
+  @Permissions([{ resource: Resource.ORDERS, actions: [Action.UPDATE] }])
+  @Patch(':id/settle')
+  settle(@Param('id') id: string, @Body() dto: SettleReturnDto, @Req() req: AdminRequest) {
+    return this.returnsService.settle(id, dto, req.userId, req.hostname);
+  }
+
+  // In a store with books, refunding a return is `POST /finance/refunds` with its `returnId`: refunds
   // have their own permissions, approval and record.
 }

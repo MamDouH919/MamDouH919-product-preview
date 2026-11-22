@@ -146,6 +146,7 @@ export type OrdersResponse = {
 export type OrderFilters = {
   status?: OrderStatus;
   search?: string;
+  paymentMethod?: "online" | "cash_on_delivery";
   from?: string;
   to?: string;
   page?: number;

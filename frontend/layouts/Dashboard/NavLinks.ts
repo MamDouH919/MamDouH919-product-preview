@@ -29,7 +29,7 @@ export interface LinkItem {
 
 export const useLinksList = () => {
     const { t } = useTranslation()
-    const { allows } = useStoreModules()
+    const { allows, has } = useStoreModules()
     const { canOpen } = usePermissions()
 
     const linksList: LinkItem[] = useMemo(() => [
@@ -46,6 +46,8 @@ export const useLinksList = () => {
                 { primary: t("orders"), pathname: "/admin/orders" },
                 { primary: t("returns"), pathname: "/admin/returns" },
                 { primary: t("refunds"), pathname: "/admin/refunds" },
+                // Stores with the books have the finance pages; this is the plain version for those without.
+                { primary: t("cashFlow"), pathname: "/admin/cash-flow" },
                 { primary: t("coupons"), pathname: "/admin/coupons" },
             ],
         },
@@ -135,10 +137,14 @@ export const useLinksList = () => {
     ], [t]);
 
     // Links the store's plan leaves out or the user's role can't open go, and so does a group left empty.
-    return useMemo(() => linksList.flatMap((link): LinkItem[] => {
-        if (link.pathname && !(allows(link.pathname) && canOpen(link.pathname))) return []
-        if (!link.children) return [link]
-        const children = link.children.filter((child) => !child.pathname || (allows(child.pathname) && canOpen(child.pathname)))
-        return children.length ? [{ ...link, children }] : []
-    }), [linksList, allows, canOpen])
+    return useMemo(() => {
+        // The plain cash-in/cash-out page is for stores without the books; the finance pages replace it.
+        const shown = (pathname: string) => allows(pathname) && canOpen(pathname) && !(pathname === "/admin/cash-flow" && has("finance"))
+        return linksList.flatMap((link): LinkItem[] => {
+            if (link.pathname && !shown(link.pathname)) return []
+            if (!link.children) return [link]
+            const children = link.children.filter((child) => !child.pathname || shown(child.pathname))
+            return children.length ? [{ ...link, children }] : []
+        })
+    }, [linksList, allows, canOpen, has])
 }

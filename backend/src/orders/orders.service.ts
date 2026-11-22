@@ -1330,9 +1330,13 @@ export class OrdersService {
    * inclusive — the same days the dashboard means, whatever zone the server
    * runs in.
    */
-  private async buildFilter(query: Pick<QueryOrdersDto, 'status' | 'search' | 'from' | 'to'>): Promise<QueryFilter<Order>> {
+  private async buildFilter(query: Pick<QueryOrdersDto, 'status' | 'search' | 'from' | 'to' | 'paymentMethod'>): Promise<QueryFilter<Order>> {
     const filter: QueryFilter<Order> = {};
     if (query.status) filter.status = query.status;
+    if (query.paymentMethod === PaymentMethod.ONLINE) filter.paymentMethod = PaymentMethod.ONLINE;
+    // Orders placed before online payments existed have no paymentMethod: they were all cash.
+    else if (query.paymentMethod === PaymentMethod.CASH_ON_DELIVERY)
+      filter.paymentMethod = { $ne: PaymentMethod.ONLINE };
 
     if (query.from || query.to) {
       const { timezone } = await this.getCheckoutSettings();

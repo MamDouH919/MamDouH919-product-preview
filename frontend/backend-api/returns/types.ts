@@ -85,7 +85,15 @@ export type CreateReturnPayload = {
   note?: string;
 };
 
-export type ReturnFilters = { status?: ReturnStatus; search?: string; page?: number; limit?: number };
+export type ReturnFilters = {
+  status?: ReturnStatus;
+  reason?: ReturnReason;
+  search?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+};
 
 export type ReturnsResponse = {
   data: ReturnRequest[];

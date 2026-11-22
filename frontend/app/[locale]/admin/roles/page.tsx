@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Box,
   Button,
   Chip,
   Dialog,
@@ -23,10 +22,15 @@ import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import Visibility from "@mui/icons-material/Visibility";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
 import { ROLES_QUERY_KEY, useRolesQuery } from "@/backend-api/roles/hooks";
 import { deleteRole } from "@/backend-api/roles/mutations";
 import { Role } from "@/backend-api/roles/types";
+import PageActions, { PagePrimaryButton } from "@/components/PageActions";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import RoleFormDialog from "@/features/Team/RoleFormDialog";
 
@@ -42,7 +46,12 @@ const RolesPage = () => {
   const { data, isLoading } = useRolesQuery();
 
   useEffect(() => {
-    dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("team.roles") }], breadCrumbBtns: [] }));
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [{ title: t("team.roles") }],
+        breadCrumbBtns: [],
+      }),
+    );
     return () => {
       dispatch(resetBreadCrumbActions());
     };
@@ -56,8 +65,47 @@ const RolesPage = () => {
       setDeleting(null);
       toast.success(t("deletedSuccessfully"));
     },
-    onError: (error: any) => toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
   });
+
+  const [search, setSearch] = useState("");
+  const [kind, setKind] = useState<"builtIn" | "custom">();
+  const openRole = (row: Role) => {
+    setEditing(row);
+    setFormOpen(true);
+  };
+
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (data ?? []).filter(
+      (r) =>
+        (!kind || (kind === "builtIn") === !!r.builtIn) &&
+        (!term || r.name.toLowerCase().includes(term)),
+    );
+  }, [data, search, kind]);
+
+  const chips = [
+    ...(kind
+      ? [
+          {
+            key: "kind",
+            label:
+              kind === "builtIn" ? t("team.builtIn") : t("team.customRole"),
+            onDelete: () => setKind(undefined),
+          },
+        ]
+      : []),
+    ...(search
+      ? [
+          {
+            key: "search",
+            label: `${t("search")}: ${search}`,
+            onDelete: () => setSearch(""),
+          },
+        ]
+      : []),
+  ];
 
   const columns = useMemo(
     () => [
@@ -69,7 +117,9 @@ const RolesPage = () => {
             <Typography variant="body2" fontWeight={700}>
               {row.name}
             </Typography>
-            {row.builtIn && <Chip size="small" variant="outlined" label={t("team.builtIn")} />}
+            {row.builtIn && (
+              <Chip size="small" variant="outlined" label={t("team.builtIn")} />
+            )}
           </Stack>
         ),
       },
@@ -79,7 +129,10 @@ const RolesPage = () => {
         render: (row: Role) =>
           t("team.permissionsSummary", {
             areas: row.permissions.filter((p) => p.actions.length > 0).length,
-            count: row.permissions.reduce((sum, p) => sum + p.actions.length, 0),
+            count: row.permissions.reduce(
+              (sum, p) => sum + p.actions.length,
+              0,
+            ),
           }),
       },
       {
@@ -100,13 +153,24 @@ const RolesPage = () => {
                   setFormOpen(true);
                 }}
               >
-                {row.builtIn ? <Visibility fontSize="small" /> : <Edit fontSize="small" />}
+                {row.builtIn ? (
+                  <Visibility fontSize="small" />
+                ) : (
+                  <Edit fontSize="small" />
+                )}
               </IconButton>
             </Tooltip>
             {!row.builtIn && (
-              <Tooltip title={row.usersCount > 0 ? t("team.roleInUse") : t("delete")}>
+              <Tooltip
+                title={row.usersCount > 0 ? t("team.roleInUse") : t("delete")}
+              >
                 <span>
-                  <IconButton size="small" color="error" disabled={row.usersCount > 0} onClick={() => setDeleting(row)}>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={row.usersCount > 0}
+                    onClick={() => setDeleting(row)}
+                  >
                     <Delete fontSize="small" />
                   </IconButton>
                 </span>
@@ -121,9 +185,8 @@ const RolesPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" justifyContent="flex-end">
-        <Button
-          variant="contained"
+      <PageActions>
+        <PagePrimaryButton
           startIcon={<Add />}
           onClick={() => {
             setEditing(null);
@@ -131,17 +194,56 @@ const RolesPage = () => {
           }}
         >
           {t("team.addRole")}
-        </Button>
-      </Stack>
+        </PagePrimaryButton>
+      </PageActions>
 
-      <Box flex={1} minHeight={0}>
-        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
-      </Box>
+      <FilterLayout
+        search={{ value: search, onChange: setSearch }}
+        activeCount={chips.length}
+        chips={chips}
+        onClear={() => {
+          setSearch("");
+          setKind(undefined);
+        }}
+        filters={
+          <FilterSelect
+            label={t("type")}
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: "builtIn", label: t("team.builtIn") },
+              { value: "custom", label: t("team.customRole") },
+            ]}
+          />
+        }
+      >
+        <SimpleTable
+          clientPagination
+          columns={columns}
+          data={rows}
+          height="100%"
+          loading={isLoading}
+          onRowClick={openRole}
+        />
+      </FilterLayout>
 
-      {formOpen && <RoleFormDialog role={editing} readOnly={editing?.builtIn} onClose={() => setFormOpen(false)} />}
+      {formOpen && (
+        <RoleFormDialog
+          role={editing}
+          readOnly={editing?.builtIn}
+          onClose={() => setFormOpen(false)}
+        />
+      )}
 
-      <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{t("team.deleteRoleConfirm", { name: deleting?.name })}</DialogTitle>
+      <Dialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {t("team.deleteRoleConfirm", { name: deleting?.name })}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>{t("team.deleteRoleHint")}</DialogContentText>
         </DialogContent>

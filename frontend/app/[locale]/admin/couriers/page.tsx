@@ -10,6 +10,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
 import { COURIERS_QUERY_KEY, saveCourier, useCouriersQuery } from "@/backend-api/couriers/api";
 import { Courier, CourierType } from "@/backend-api/couriers/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import PageActions, { PagePrimaryButton } from "@/components/PageActions";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatMinorMoney } from "@/features/Order/format";
 import { toastError } from "@/features/Purchasing/shared";
@@ -77,9 +78,9 @@ const CouriersPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Button variant="contained" sx={{ alignSelf: "flex-start" }} onClick={() => setEditing({ key: Date.now() })}>
-        {t("newCourier")}
-      </Button>
+      <PageActions>
+        <PagePrimaryButton onClick={() => setEditing({ key: Date.now() })}>{t("newCourier")}</PagePrimaryButton>
+      </PageActions>
       <Box flex={1} minHeight={0}>
         <SimpleTable clientPagination columns={columns} data={couriers ?? []} borderRadius={0} height="100%" loading={isLoading} />
       </Box>

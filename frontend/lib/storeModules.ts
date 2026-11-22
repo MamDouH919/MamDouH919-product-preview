@@ -1,7 +1,7 @@
 import { splitLocale } from "@/lib/locales";
 
 /** What the store is sold as; set on the platform, never by the store. Mirrors the API's StorePlan. */
-export type StorePlan = "catalog" | "orders" | "full";
+export type StorePlan = "catalog" | "orders" | "stock" | "full";
 
 /** The parts of the system a plan switches on. Products and the website are always on. */
 export type StoreModule = "orders" | "inventory" | "finance" | "team" | "online_payments";
@@ -28,6 +28,7 @@ const ROUTE_MODULES: [string, StoreModule[]][] = [
     // Dashboard
     ["/admin/orders", ["orders"]],
     ["/admin/returns", ["orders"]],
+    ["/admin/cash-flow", ["orders"]],
     ["/admin/refunds", ["orders", "finance"]],
     ["/admin/coupons", ["orders"]],
     ["/admin/customers", ["orders"]],

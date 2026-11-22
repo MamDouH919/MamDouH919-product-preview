@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Box,
   Button,
   Chip,
   Dialog,
@@ -15,7 +14,6 @@ import {
   DialogTitle,
   IconButton,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -23,11 +21,16 @@ import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
 import { USERS_QUERY_KEY, useUsersQuery } from "@/backend-api/users/hooks";
 import { deleteUser } from "@/backend-api/users/mutations";
 import { StaffUser } from "@/backend-api/users/types";
 import { ROLES_QUERY_KEY } from "@/backend-api/roles/hooks";
+import PageActions, { PagePrimaryButton } from "@/components/PageActions";
+import FilterLayout from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import UserFormDialog from "@/features/Team/UserFormDialog";
 
@@ -52,7 +55,12 @@ const UsersPage = () => {
   const { data, isLoading } = useUsersQuery(debounced);
 
   useEffect(() => {
-    dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("team.users") }], breadCrumbBtns: [] }));
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [{ title: t("team.users") }],
+        breadCrumbBtns: [],
+      }),
+    );
     return () => {
       dispatch(resetBreadCrumbActions());
     };
@@ -67,7 +75,8 @@ const UsersPage = () => {
       setDeleting(null);
       toast.success(t("deletedSuccessfully"));
     },
-    onError: (error: any) => toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
   });
 
   const columns = useMemo(
@@ -80,7 +89,9 @@ const UsersPage = () => {
             <Typography variant="body2" fontWeight={700}>
               {row.name}
             </Typography>
-            {row._id === currentUserId && <Chip size="small" variant="outlined" label={t("team.you")} />}
+            {row._id === currentUserId && (
+              <Chip size="small" variant="outlined" label={t("team.you")} />
+            )}
           </Stack>
         ),
       },
@@ -97,19 +108,30 @@ const UsersPage = () => {
         id: "role",
         header: t("team.role"),
         render: (row: StaffUser) =>
-          row.role ? <Chip size="small" label={row.role.name} /> : <Typography color="text.secondary">—</Typography>,
+          row.role ? (
+            <Chip size="small" label={row.role.name} />
+          ) : (
+            <Typography color="text.secondary">—</Typography>
+          ),
       },
       {
         id: "status",
         header: t("status"),
         render: (row: StaffUser) => (
-          <Chip size="small" color={row.isActive ? "success" : "default"} label={row.isActive ? t("active") : t("inactive")} />
+          <Chip
+            size="small"
+            color={row.isActive ? "success" : "default"}
+            label={row.isActive ? t("active") : t("inactive")}
+          />
         ),
       },
       {
         id: "createdAt",
         header: t("team.addedOn"),
-        render: (row: StaffUser) => new Date(row.createdAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB"),
+        render: (row: StaffUser) =>
+          new Date(row.createdAt).toLocaleDateString(
+            lang === "ar" ? "ar-EG" : "en-GB",
+          ),
       },
       {
         id: "actions",
@@ -131,7 +153,12 @@ const UsersPage = () => {
               </Tooltip>
               <Tooltip title={self ? t("team.cannotDeleteSelf") : t("delete")}>
                 <span>
-                  <IconButton size="small" color="error" disabled={self} onClick={() => setDeleting(row)}>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={self}
+                    onClick={() => setDeleting(row)}
+                  >
                     <Delete fontSize="small" />
                   </IconButton>
                 </span>
@@ -146,16 +173,8 @@ const UsersPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
-        <TextField
-          size="small"
-          label={t("search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 240 }}
-        />
-        <Button
-          variant="contained"
+      <PageActions>
+        <PagePrimaryButton
           startIcon={<Add />}
           onClick={() => {
             setEditing(null);
@@ -163,12 +182,32 @@ const UsersPage = () => {
           }}
         >
           {t("team.addUser")}
-        </Button>
-      </Stack>
-
-      <Box flex={1} minHeight={0}>
-        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
-      </Box>
+        </PagePrimaryButton>
+      </PageActions>
+      <FilterLayout
+        search={{ value: search, onChange: setSearch }}
+        activeCount={search ? 1 : 0}
+        chips={
+          search
+            ? [
+                {
+                  key: "search",
+                  label: `${t("search")}: ${search}`,
+                  onDelete: () => setSearch(""),
+                },
+              ]
+            : []
+        }
+        onClear={() => setSearch("")}
+      >
+        <SimpleTable
+          clientPagination
+          columns={columns}
+          data={data ?? []}
+          height="100%"
+          loading={isLoading}
+        />
+      </FilterLayout>
 
       {formOpen && (
         <UserFormDialog
@@ -178,8 +217,15 @@ const UsersPage = () => {
         />
       )}
 
-      <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{t("team.deleteUserConfirm", { name: deleting?.name })}</DialogTitle>
+      <Dialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {t("team.deleteUserConfirm", { name: deleting?.name })}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>{t("team.deleteUserHint")}</DialogContentText>
         </DialogContent>

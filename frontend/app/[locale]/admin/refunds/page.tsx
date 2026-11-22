@@ -3,17 +3,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { Box, Button, Stack, Tab, TablePagination, Tabs, Typography } from "@mui/material";
+import { Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
 import { useRefundsQuery } from "@/backend-api/refunds/hooks";
-import { REFUND_STATUSES, Refund, RefundFilters, RefundStatus } from "@/backend-api/refunds/types";
+import {
+  REFUND_STATUSES,
+  Refund,
+  RefundFilters,
+} from "@/backend-api/refunds/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import RefundStatusChip from "@/features/Refund/RefundStatusChip";
 import { formatDateTime, formatMinorMoney } from "@/features/Order/format";
 
-const name = (who?: { name: string } | string) => (typeof who === "object" ? who?.name : undefined);
+const name = (who?: { name: string } | string) =>
+  typeof who === "object" ? who?.name : undefined;
 
 /** The refund queue: what is waiting to be approved or paid out. Each refund is acted on from its order. */
 const RefundsPage = () => {
@@ -23,11 +32,20 @@ const RefundsPage = () => {
   const dispatch = useAppDispatch();
   const currency = useCurrency();
 
-  const [filters, setFilters] = useState<RefundFilters>({ status: "requested", page: 1, limit: 25 });
+  const [filters, setFilters] = useState<RefundFilters>({
+    status: "requested",
+    page: 1,
+    limit: 25,
+  });
   const { data, isLoading } = useRefundsQuery(filters);
 
   useEffect(() => {
-    dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("refunds") }], breadCrumbBtns: [] }));
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [{ title: t("refunds") }],
+        breadCrumbBtns: [],
+      }),
+    );
     return () => {
       dispatch(resetBreadCrumbActions());
     };
@@ -53,15 +71,22 @@ const RefundsPage = () => {
       {
         id: "order",
         header: t("order"),
-        render: (row: Refund) => `#${row.orderNumber}${row.returnNumber ? ` · ${t("returnNumber", { number: row.returnNumber })}` : ""}`,
+        render: (row: Refund) =>
+          `#${row.orderNumber}${row.returnNumber ? ` · ${t("returnNumber", { number: row.returnNumber })}` : ""}`,
       },
-      { id: "amount", header: t("amount"), render: (row: Refund) => formatMinorMoney(row.totalMinor, currency) },
+      {
+        id: "amount",
+        header: t("amount"),
+        render: (row: Refund) => formatMinorMoney(row.totalMinor, currency),
+      },
       {
         id: "method",
         header: t("refundMethodLabel"),
         render: (row: Refund) => (
           <Stack>
-            <Typography variant="body2">{t(`refundMethod.${row.method}`)}</Typography>
+            <Typography variant="body2">
+              {t(`refundMethod.${row.method}`)}
+            </Typography>
             <Typography variant="caption" color="text.secondary">
               {t(`refundReason.${row.reason}`)}
               {row.beyondPolicy ? ` · ${t("beyondPolicy")}` : ""}
@@ -69,13 +94,24 @@ const RefundsPage = () => {
           </Stack>
         ),
       },
-      { id: "requestedBy", header: t("requestedBy"), render: (row: Refund) => name(row.requestedBy) ?? "—" },
-      { id: "status", header: t("status"), render: (row: Refund) => <RefundStatusChip status={row.status} /> },
+      {
+        id: "requestedBy",
+        header: t("requestedBy"),
+        render: (row: Refund) => name(row.requestedBy) ?? "—",
+      },
+      {
+        id: "status",
+        header: t("status"),
+        render: (row: Refund) => <RefundStatusChip status={row.status} />,
+      },
       {
         id: "actions",
         header: "",
         render: (row: Refund) => (
-          <Button size="small" onClick={() => router.push(`/${lang}/admin/orders/${row.order}`)}>
+          <Button
+            size="small"
+            onClick={() => router.push(`/${lang}/admin/orders/${row.order}`)}
+          >
             {t("view")}
           </Button>
         ),
@@ -86,33 +122,54 @@ const RefundsPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Tabs
-        value={filters.status ?? "all"}
-        onChange={(_, value: RefundStatus | "all") =>
-          setFilters((prev) => ({ ...prev, status: value === "all" ? undefined : value, page: 1 }))
+      <FilterLayout
+        activeCount={filters.status ? 1 : 0}
+        chips={
+          filters.status
+            ? [
+                {
+                  key: "status",
+                  label: t(`refundStatus.${filters.status}`),
+                  onDelete: () =>
+                    setFilters((p) => ({ ...p, status: undefined, page: 1 })),
+                },
+              ]
+            : []
         }
-        variant="scrollable"
-        allowScrollButtonsMobile
+        onClear={() => setFilters((p) => ({ page: 1, limit: p.limit }))}
+        filters={
+          <FilterSelect
+            label={t("status")}
+            value={filters.status}
+            onChange={(status) =>
+              setFilters((prev) => ({ ...prev, status, page: 1 }))
+            }
+            options={REFUND_STATUSES.map((st) => ({
+              value: st,
+              label: `${t(`refundStatus.${st}`)}${data ? ` (${data.statusCounts[st]})` : ""}`,
+            }))}
+          />
+        }
       >
-        {REFUND_STATUSES.map((status) => (
-          <Tab key={status} value={status} label={`${t(`refundStatus.${status}`)}${data ? ` (${data.statusCounts[status]})` : ""}`} />
-        ))}
-        <Tab value="all" label={t("all")} />
-      </Tabs>
-
-      <Box flex={1} minHeight={0}>
-        <SimpleTable columns={columns} data={data?.data ?? []} borderRadius={0} height="100%" loading={isLoading} />
-      </Box>
-
-      <TablePagination
-        component="div"
-        count={data?.total ?? 0}
-        page={(filters.page ?? 1) - 1}
-        onPageChange={(_, page) => setFilters((prev) => ({ ...prev, page: page + 1 }))}
-        rowsPerPage={filters.limit ?? 25}
-        onRowsPerPageChange={(e) => setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))}
-        rowsPerPageOptions={[25, 50, 100]}
-      />
+        <SimpleTable
+          columns={columns}
+          data={data?.data ?? []}
+          height="100%"
+          loading={isLoading}
+          onRowClick={(row: Refund) =>
+            router.push(`/${lang}/admin/orders/${row.order}`)
+          }
+          pagination={{
+            count: data?.total ?? 0,
+            page: (filters.page ?? 1) - 1,
+            rowsPerPage: filters.limit ?? 25,
+            onPageChange: (page) =>
+              setFilters((prev) => ({ ...prev, page: page + 1 })),
+            onRowsPerPageChange: (limit) =>
+              setFilters((prev) => ({ ...prev, limit, page: 1 })),
+          }}
+        />
+      </FilterLayout>
     </Stack>
   );
 };

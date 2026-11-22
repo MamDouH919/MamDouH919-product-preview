@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { ReturnRequest, ReturnStatus } from '../returns/schemas/return-request.schema';
 import { Order } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { Customer } from '../customers/schemas/customer.schema';
@@ -65,12 +66,13 @@ export class ReportsService {
     @InjectModel(Review.name) private reviewModel: Model<Review>,
     private readonly finance: FinanceReportsService,
     @Inject(STORE_MODULES) private readonly modules: readonly StoreModule[],
+    @InjectModel(ReturnRequest.name) private returnModel: Model<ReturnRequest>,
   ) {}
 
   /**
    * Whether sales figures come from the books. A store without them counts
-   * the orders it delivered instead — the same figures while nothing has been
-   * refunded, which such a store can't record anyway.
+   * the orders it delivered instead, before any refunds: a store with stock but
+   * no books records refunds on its cash-flow page, not here.
    */
   private get fromBooks(): boolean {
     return this.modules.includes(StoreModule.FINANCE);
@@ -194,6 +196,103 @@ export class ReportsService {
       ])
       .exec();
     return new Map(rows.map((row) => [row._id, { revenueMinor: row.revenue, orders: row.orders }]));
+  }
+
+  /**
+   * Plain money in and out for a store without books: what orders
+   * brought in the day they were delivered, what settled returns gave back
+   * the day they were settled, and the net. No accounts, no tax split.
+   */
+  async cashFlow(query: DashboardQueryDto) {
+    if (this.fromBooks) throw new NotFoundException('Not found');
+    const days = Number(query.days ?? 30);
+    const { timeZone: tz } = await this.finance.storeClock();
+    const now = new Date();
+    const end = startOfNextDay(now, tz);
+    const periodStart = startOfDay(new Date(startOfDay(now, tz).getTime() - (days - 1) * DAY_MS + DAY_MS / 2), tz);
+
+    const inFilter = { status: OrderStatus.DELIVERED, deliveredAt: { $gte: periodStart, $lt: end } };
+    const outFilter = { status: ReturnStatus.REFUNDED, settledAt: { $gte: periodStart, $lt: end }, refundAmount: { $gt: 0 } };
+
+    const [inDaily, outDaily, orders, returns] = await Promise.all([
+      this.orderModel
+        .aggregate<{ _id: string; amount: number; count: number }>([
+          { $match: inFilter },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$deliveredAt', timezone: tz } },
+              amount: { $sum: orderTotalMinor },
+              count: { $sum: 1 },
+            },
+          },
+        ])
+        .exec(),
+      this.returnModel
+        .aggregate<{ _id: string; amount: number; count: number }>([
+          { $match: outFilter },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$settledAt', timezone: tz } },
+              amount: { $sum: { $round: [{ $multiply: ['$refundAmount', 100] }, 0] } },
+              count: { $sum: 1 },
+            },
+          },
+        ])
+        .exec(),
+      this.orderModel.find(inFilter).sort({ deliveredAt: -1 }).limit(100).select('orderNumber total totalMinor deliveredAt').lean().exec(),
+      this.returnModel.find(outFilter).sort({ settledAt: -1 }).limit(100).select('returnNumber orderNumber order refundAmount settledAt').lean().exec(),
+    ]);
+
+    const inByDay = new Map(inDaily.map((r) => [r._id, r]));
+    const outByDay = new Map(outDaily.map((r) => [r._id, r]));
+    const series = Array.from({ length: days }, (_, i) => {
+      const date = dayKey(new Date(periodStart.getTime() + i * DAY_MS + DAY_MS / 2), tz);
+      const moneyIn = inByDay.get(date)?.amount ?? 0;
+      const moneyOut = outByDay.get(date)?.amount ?? 0;
+      return { date, in: toMajor(moneyIn), out: toMajor(moneyOut), net: toMajor(moneyIn - moneyOut) };
+    });
+    const sum = (rows: { amount: number; count: number }[]) => ({
+      amount: rows.reduce((t, r) => t + r.amount, 0),
+      count: rows.reduce((t, r) => t + r.count, 0),
+    });
+    const totalIn = sum(inDaily);
+    const totalOut = sum(outDaily);
+
+    const entries = [
+      ...orders.map((o) => ({
+        type: 'in' as const,
+        at: o.deliveredAt!,
+        amount: o.totalMinor !== undefined ? toMajor(o.totalMinor) : o.total,
+        orderId: String(o._id),
+        orderNumber: o.orderNumber,
+      })),
+      ...returns.map((r) => ({
+        type: 'out' as const,
+        at: r.settledAt!,
+        amount: r.refundAmount!,
+        orderId: String(r.order),
+        orderNumber: r.orderNumber,
+        returnId: String(r._id),
+        returnNumber: r.returnNumber,
+      })),
+    ]
+      .sort((a, b) => +new Date(b.at) - +new Date(a.at))
+      .slice(0, 100);
+
+    return {
+      days,
+      timeZone: tz,
+      periodStart,
+      totals: {
+        in: toMajor(totalIn.amount),
+        out: toMajor(totalOut.amount),
+        net: toMajor(totalIn.amount - totalOut.amount),
+        orders: totalIn.count,
+        returns: totalOut.count,
+      },
+      series,
+      entries,
+    };
   }
 
   private async pipeline(start: Date, end: Date): Promise<Pipeline> {

@@ -6,27 +6,49 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Alert,
-  Box,
   Button,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import Edit from "@mui/icons-material/Edit";
+import Delete from "@mui/icons-material/Delete";
+import StarOutline from "@mui/icons-material/StarOutline";
+import LockOutlined from "@mui/icons-material/LockOutlined";
+import LockOpenOutlined from "@mui/icons-material/LockOpenOutlined";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
-import { INVENTORY_QUERY_KEY, WAREHOUSES_QUERY_KEY, useWarehousesQuery } from "@/backend-api/inventory/hooks";
-import { deleteWarehouse, setMainWarehouse, updateWarehouse } from "@/backend-api/inventory/mutations";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
+import {
+  INVENTORY_QUERY_KEY,
+  WAREHOUSES_QUERY_KEY,
+  useWarehousesQuery,
+} from "@/backend-api/inventory/hooks";
+import {
+  deleteWarehouse,
+  setMainWarehouse,
+  updateWarehouse,
+} from "@/backend-api/inventory/mutations";
 import { Warehouse } from "@/backend-api/inventory/types";
+import PageActions, { PagePrimaryButton } from "@/components/PageActions";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import WarehouseDialog from "@/features/Inventory/WarehouseDialog";
 import { warehouseName } from "@/features/Inventory/warehouseName";
 import { toastError } from "@/features/Purchasing/shared";
 
-type Pending = { kind: "main" | "close" | "open" | "delete"; warehouse: Warehouse };
+type Pending = {
+  kind: "main" | "close" | "open" | "delete";
+  warehouse: Warehouse;
+};
 
 /**
  * Where stock is kept. Sales take stock from the main warehouse only; the
@@ -39,14 +61,26 @@ const WarehousesPage = () => {
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const { data, isLoading } = useWarehousesQuery();
-  const [editing, setEditing] = useState<{ key: number; warehouse?: Warehouse } | null>(null);
+  const [editing, setEditing] = useState<{
+    key: number;
+    warehouse?: Warehouse;
+  } | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
 
   useEffect(() => {
     dispatch(
       changeBreadCrumbActions({
-        breadCrumb: [{ title: t("inventory"), link: `/${lang}/admin/inventory` }, { title: t("warehouses") }],
-        breadCrumbBtns: [{ title: t("stockTransfers"), icon: "add", link: `/${lang}/admin/inventory/transfers` }],
+        breadCrumb: [
+          { title: t("inventory"), link: `/${lang}/admin/inventory` },
+          { title: t("warehouses") },
+        ],
+        breadCrumbBtns: [
+          {
+            title: t("stockTransfers"),
+            icon: "add",
+            link: `/${lang}/admin/inventory/transfers`,
+          },
+        ],
       }),
     );
     return () => {
@@ -55,10 +89,46 @@ const WarehousesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const warehouses = data?.data ?? [];
+  const warehouses = useMemo(() => data?.data ?? [], [data]);
   const open = warehouses.filter((w) => w.isActive).length;
   const max = data?.max ?? 1;
   const full = open >= max;
+
+  const [search, setSearch] = useState("");
+  const [state, setState] = useState<"active" | "closed">();
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return warehouses
+      .filter(
+        (w) =>
+          (!state || (state === "active") === w.isActive) &&
+          (!term ||
+            [warehouseName(w, lang), w.code, w.address].some((v) =>
+              v?.toLowerCase().includes(term),
+            )),
+      )
+      .map((w) => ({ ...w, id: w._id }));
+  }, [warehouses, search, state, lang]);
+  const chips = [
+    ...(state
+      ? [
+          {
+            key: "state",
+            label: t(state === "active" ? "active" : "closed"),
+            onDelete: () => setState(undefined),
+          },
+        ]
+      : []),
+    ...(search
+      ? [
+          {
+            key: "search",
+            label: `${t("search")}: ${search}`,
+            onDelete: () => setSearch(""),
+          },
+        ]
+      : []),
+  ];
 
   const action = useMutation({
     mutationFn: async ({ kind, warehouse }: Pending) => {
@@ -86,7 +156,9 @@ const WarehousesPage = () => {
               <Typography variant="body2" fontWeight={600}>
                 {warehouseName(row, lang)}
               </Typography>
-              {row.isMain && <Chip size="small" color="primary" label={t("mainWarehouse")} />}
+              {row.isMain && (
+                <Chip size="small" color="primary" label={t("mainWarehouse")} />
+              )}
             </Stack>
             {row.address && (
               <Typography variant="caption" color="text.secondary">
@@ -96,50 +168,100 @@ const WarehousesPage = () => {
           </Stack>
         ),
       },
-      { id: "code", header: t("warehouseCode"), render: (row: Warehouse) => <span dir="ltr">{row.code}</span> },
+      {
+        id: "code",
+        header: t("warehouseCode"),
+        render: (row: Warehouse) => <span dir="ltr">{row.code}</span>,
+      },
       {
         id: "units",
         header: t("totalUnits"),
         render: (row: Warehouse) => (
-          <Typography variant="body2" fontWeight={700} color={row.units < 0 ? "error.main" : "text.primary"}>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color={row.units < 0 ? "error.main" : "text.primary"}
+          >
             {row.units}
           </Typography>
         ),
       },
-      { id: "items", header: t("items"), render: (row: Warehouse) => row.items },
+      {
+        id: "items",
+        header: t("items"),
+        render: (row: Warehouse) => row.items,
+      },
       {
         id: "status",
         header: t("status"),
         render: (row: Warehouse) =>
-          row.isActive ? <Chip size="small" color="success" label={t("active")} /> : <Chip size="small" label={t("closed")} />,
+          row.isActive ? (
+            <Chip size="small" color="success" label={t("active")} />
+          ) : (
+            <Chip size="small" label={t("closed")} />
+          ),
       },
       {
         id: "actions",
         header: "",
         render: (row: Warehouse) => (
-          <Stack direction="row" spacing={1}>
-            <Button size="small" onClick={() => setEditing({ key: Date.now(), warehouse: row })}>
-              {t("edit")}
-            </Button>
+          <Stack direction="row" gap={0.25}>
+            <Tooltip title={t("edit")}>
+              <IconButton
+                size="small"
+                onClick={() => setEditing({ key: Date.now(), warehouse: row })}
+              >
+                <Edit fontSize="small" />
+              </IconButton>
+            </Tooltip>
             {!row.isMain && row.isActive && (
-              <Button size="small" onClick={() => setPending({ kind: "main", warehouse: row })}>
-                {t("makeMain")}
-              </Button>
+              <Tooltip title={t("makeMain")}>
+                <IconButton
+                  size="small"
+                  onClick={() => setPending({ kind: "main", warehouse: row })}
+                >
+                  <StarOutline fontSize="small" />
+                </IconButton>
+              </Tooltip>
             )}
             {!row.isMain &&
               (row.isActive ? (
-                <Button size="small" color="warning" onClick={() => setPending({ kind: "close", warehouse: row })}>
-                  {t("closeWarehouse")}
-                </Button>
+                <Tooltip title={t("closeWarehouse")}>
+                  <IconButton
+                    size="small"
+                    color="warning"
+                    onClick={() =>
+                      setPending({ kind: "close", warehouse: row })
+                    }
+                  >
+                    <LockOutlined fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               ) : (
-                <Button size="small" disabled={full} onClick={() => setPending({ kind: "open", warehouse: row })}>
-                  {t("openWarehouse")}
-                </Button>
+                <Tooltip title={t("openWarehouse")}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={full}
+                      onClick={() =>
+                        setPending({ kind: "open", warehouse: row })
+                      }
+                    >
+                      <LockOpenOutlined fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               ))}
             {!row.isMain && (
-              <Button size="small" color="error" onClick={() => setPending({ kind: "delete", warehouse: row })}>
-                {t("delete")}
-              </Button>
+              <Tooltip title={t("delete")}>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => setPending({ kind: "delete", warehouse: row })}
+                >
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Tooltip>
             )}
           </Stack>
         ),
@@ -150,27 +272,74 @@ const WarehousesPage = () => {
 
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-        <Button variant="contained" disabled={full} onClick={() => setEditing({ key: Date.now() })}>
+      <PageActions>
+        <PagePrimaryButton
+          disabled={full}
+          onClick={() => setEditing({ key: Date.now() })}
+        >
           {t("newWarehouse")}
-        </Button>
-        <Typography variant="body2" color="text.secondary">
-          {t("warehousesUsed", { open, max })}
-        </Typography>
-      </Stack>
-      {full && max > 1 && <Alert severity="info">{t("warehouseLimitReached")}</Alert>}
+        </PagePrimaryButton>
+      </PageActions>
+      {full && max > 1 && (
+        <Alert severity="info">{t("warehouseLimitReached")}</Alert>
+      )}
       {max === 1 && <Alert severity="info">{t("warehouseLimitOne")}</Alert>}
 
-      <Box flex={1} minHeight={0}>
-        <SimpleTable clientPagination columns={columns} data={warehouses.map((w) => ({ ...w, id: w._id }))} borderRadius={0} height="100%" loading={isLoading} />
-      </Box>
+      <FilterLayout
+        search={{ value: search, onChange: setSearch }}
+        activeCount={chips.length}
+        chips={chips}
+        onClear={() => {
+          setSearch("");
+          setState(undefined);
+        }}
+        filters={
+          <FilterSelect
+            label={t("status")}
+            value={state}
+            onChange={setState}
+            options={[
+              { value: "active", label: t("active") },
+              { value: "closed", label: t("closed") },
+            ]}
+          />
+        }
+        actions={
+          <Typography variant="body2" color="text.secondary">
+            {t("warehousesUsed", { open, max })}
+          </Typography>
+        }
+      >
+        <SimpleTable
+          clientPagination
+          columns={columns}
+          data={rows}
+          height="100%"
+          loading={isLoading}
+        />
+      </FilterLayout>
 
-      {editing && <WarehouseDialog key={editing.key} warehouse={editing.warehouse} onClose={() => setEditing(null)} />}
+      {editing && (
+        <WarehouseDialog
+          key={editing.key}
+          warehouse={editing.warehouse}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
-      <Dialog open={!!pending} onClose={() => setPending(null)} fullWidth maxWidth="xs">
-        <DialogTitle>{pending && warehouseName(pending.warehouse, lang)}</DialogTitle>
+      <Dialog
+        open={!!pending}
+        onClose={() => setPending(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>
+          {pending && warehouseName(pending.warehouse, lang)}
+        </DialogTitle>
         <DialogContent>
-          <Typography variant="body2">{pending && t(`warehouseConfirm_${pending.kind}`)}</Typography>
+          <Typography variant="body2">
+            {pending && t(`warehouseConfirm_${pending.kind}`)}
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPending(null)}>{t("back")}</Button>

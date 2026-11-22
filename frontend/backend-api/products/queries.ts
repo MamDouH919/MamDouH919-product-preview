@@ -9,10 +9,19 @@ export const fetchProducts = async (params?: {
   return response.data;
 };
 
-export const fetchProductsPage = async (params: {
-  page: number;
-  limit: number;
-}): Promise<ProductPage> => {
+export type ProductListFilters = {
+  q?: string;
+  categoryId?: string;
+  subCategoryId?: string;
+  status?: "active" | "inactive";
+  stock?: "in" | "out";
+  minPrice?: number;
+  maxPrice?: number;
+};
+
+export const fetchProductsPage = async (
+  params: { page: number; limit: number } & ProductListFilters
+): Promise<ProductPage> => {
   const response = await api.get("/products/admin", { params });
   return response.data;
 };

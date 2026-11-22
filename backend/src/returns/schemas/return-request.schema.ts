@@ -118,6 +118,10 @@ export class ReturnRequest extends Document {
   @Prop({ required: false })
   refundAmount?: number;
 
+  /** When the money went back. Set by either kind of refund; the cash-flow page dates it by this. */
+  @Prop({ type: Date, required: false })
+  settledAt?: Date;
+
   @Prop({ type: [ReturnStatusChangeSchema], default: [] })
   history!: ReturnStatusChange[];
 }

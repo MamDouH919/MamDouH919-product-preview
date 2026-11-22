@@ -9,6 +9,13 @@ export enum StorePlan {
    * moved to FULL, since it has no books to start them from.
    */
   ORDERS = 'orders',
+  /**
+   * Online orders plus stock: orders take stock off the shelf and returns put
+   * it back, but there are no books, purchases, suppliers or couriers. Money
+   * is followed by a plain cash-in/cash-out page instead. Final, like ORDERS:
+   * never moved to FULL, since it has no books to start them from.
+   */
+  STOCK = 'stock',
   /** Everything: online orders, stock and the books. */
   FULL = 'full',
 }
@@ -46,6 +53,7 @@ export enum StoreModule {
 export const PLAN_MODULES: Record<StorePlan, readonly StoreModule[]> = {
   [StorePlan.CATALOG]: [],
   [StorePlan.ORDERS]: [StoreModule.ORDERS],
+  [StorePlan.STOCK]: [StoreModule.ORDERS, StoreModule.INVENTORY],
   [StorePlan.FULL]: [StoreModule.ORDERS, StoreModule.INVENTORY, StoreModule.FINANCE],
 };
 

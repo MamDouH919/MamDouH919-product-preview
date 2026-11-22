@@ -7,14 +7,7 @@ import {
   changeBreadCrumbActions,
   resetBreadCrumbActions,
 } from "@/Store/slices/bread-crumb";
-import {
-  Box,
-  MenuItem,
-  Stack,
-  TablePagination,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Stack, TextField, Typography } from "@mui/material";
 import {
   useMovementTypesQuery,
   useStockMovementsQuery,
@@ -25,7 +18,7 @@ import {
   StockMovement,
 } from "@/backend-api/inventory/types";
 import { useProductsQuery } from "@/backend-api/products/hooks";
-import FilterLayout from "@/components/FilterLayout";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { warehouseName } from "@/features/Inventory/warehouseName";
 
@@ -34,7 +27,10 @@ const StockMovementsPage = () => {
   const dispatch = useAppDispatch();
   const lang = i18n.language;
 
-  const [filters, setFilters] = useState<MovementFilters>({ page: 1, limit: 25 });
+  const [filters, setFilters] = useState<MovementFilters>({
+    page: 1,
+    limit: 25,
+  });
 
   const { data, isLoading } = useStockMovementsQuery(filters);
   const { data: products } = useProductsQuery();
@@ -48,7 +44,7 @@ const StockMovementsPage = () => {
           { title: t("stockMovements") },
         ],
         breadCrumbBtns: [],
-      })
+      }),
     );
     return () => {
       dispatch(resetBreadCrumbActions());
@@ -65,7 +61,9 @@ const StockMovementsPage = () => {
         id: "createdAt",
         header: t("date"),
         render: (row: StockMovement) =>
-          new Date(row.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-GB"),
+          new Date(row.createdAt).toLocaleString(
+            lang === "ar" ? "ar-EG" : "en-GB",
+          ),
       },
       {
         id: "product",
@@ -91,7 +89,10 @@ const StockMovementsPage = () => {
       {
         id: "warehouse",
         header: t("warehouse"),
-        render: (row: StockMovement) => (row.warehouse ? warehouseName(row.warehouse, lang) : t("mainWarehouse")),
+        render: (row: StockMovement) =>
+          row.warehouse
+            ? warehouseName(row.warehouse, lang)
+            : t("mainWarehouse"),
       },
       {
         id: "quantity",
@@ -127,91 +128,108 @@ const StockMovementsPage = () => {
         render: (row: StockMovement) => row.user?.name ?? t("system"),
       },
     ],
-    [t, lang]
+    [t, lang],
   );
+
+  const chips = [
+    ...(filters.productId
+      ? [
+          {
+            key: "product",
+            label: (() => {
+              const pr = products?.find((x) => x._id === filters.productId);
+              return pr ? (pr.name[lang] ?? pr.name.en ?? "") : t("product");
+            })(),
+            onDelete: () => setFilter({ productId: undefined }),
+          },
+        ]
+      : []),
+    ...(filters.type
+      ? [
+          {
+            key: "type",
+            label: t(`movement_${filters.type}`),
+            onDelete: () => setFilter({ type: undefined }),
+          },
+        ]
+      : []),
+    ...(filters.from || filters.to
+      ? [
+          {
+            key: "date",
+            label: `${filters.from ?? "…"} → ${filters.to ?? "…"}`,
+            onDelete: () => setFilter({ from: undefined, to: undefined }),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Stack spacing={2} height="100%">
       <FilterLayout
-        activeCount={[filters.productId, filters.type, filters.from, filters.to].filter(Boolean).length}
+        activeCount={chips.length}
+        chips={chips}
+        onClear={() => setFilters((prev) => ({ page: 1, limit: prev.limit }))}
         filters={
           <>
-        <TextField
-          select
-          size="small"
-          label={t("product")}
-          value={filters.productId ?? ""}
-          onChange={(e) => setFilter({ productId: e.target.value || undefined })}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">{t("all")}</MenuItem>
-          {(products ?? []).map((product) => (
-            <MenuItem key={product._id} value={product._id}>
-              {product.name[lang] ?? product.name.en ?? ""}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          select
-          size="small"
-          label={t("movementType")}
-          value={filters.type ?? ""}
-          onChange={(e) =>
-            setFilter({ type: (e.target.value || undefined) as MovementType | undefined })
-          }
-          sx={{ minWidth: 170 }}
-        >
-          <MenuItem value="">{t("all")}</MenuItem>
-          {(movementTypes ?? []).map(({ type }) => (
-            <MenuItem key={type} value={type}>
-              {t(`movement_${type}`)}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <TextField
-          size="small"
-          type="date"
-          label={t("from")}
-          InputLabelProps={{ shrink: true }}
-          value={filters.from ?? ""}
-          onChange={(e) => setFilter({ from: e.target.value || undefined })}
-        />
-        <TextField
-          size="small"
-          type="date"
-          label={t("to")}
-          InputLabelProps={{ shrink: true }}
-          value={filters.to ?? ""}
-          onChange={(e) => setFilter({ to: e.target.value || undefined })}
-        />
+            <FilterSelect
+              label={t("product")}
+              value={filters.productId}
+              onChange={(productId) => setFilter({ productId })}
+              options={(products ?? []).map((p) => ({
+                value: p._id,
+                label: p.name[lang] ?? p.name.en ?? "",
+              }))}
+            />
+            <FilterSelect
+              label={t("movementType")}
+              value={filters.type}
+              onChange={(type) =>
+                setFilter({ type: type as MovementType | undefined })
+              }
+              options={(movementTypes ?? []).map(({ type }) => ({
+                value: type,
+                label: t(`movement_${type}`),
+              }))}
+            />
+            <Stack direction="row" gap={1}>
+              <TextField
+                size="small"
+                type="date"
+                label={t("from")}
+                slotProps={{ inputLabel: { shrink: true } }}
+                value={filters.from ?? ""}
+                onChange={(e) =>
+                  setFilter({ from: e.target.value || undefined })
+                }
+              />
+              <TextField
+                size="small"
+                type="date"
+                label={t("to")}
+                slotProps={{ inputLabel: { shrink: true } }}
+                value={filters.to ?? ""}
+                onChange={(e) => setFilter({ to: e.target.value || undefined })}
+              />
+            </Stack>
           </>
         }
       >
-        <Stack flex={1} minHeight={0}>
-      <Box flex={1} minHeight={0}>
         <SimpleTable
           columns={columns}
           data={data?.data ?? []}
-          borderRadius={0}
           height="100%"
           loading={isLoading}
+          pagination={{
+            count: data?.total ?? 0,
+            page: (filters.page ?? 1) - 1,
+            rowsPerPage: filters.limit ?? 25,
+            onPageChange: (page) =>
+              setFilters((prev) => ({ ...prev, page: page + 1 })),
+            onRowsPerPageChange: (limit) =>
+              setFilters((prev) => ({ ...prev, limit, page: 1 })),
+          }}
         />
-      </Box>
-
-      <TablePagination
-        component="div"
-        count={data?.total ?? 0}
-        page={(filters.page ?? 1) - 1}
-        onPageChange={(_, page) => setFilters((prev) => ({ ...prev, page: page + 1 }))}
-        rowsPerPage={filters.limit ?? 25}
-        onRowsPerPageChange={(e) =>
-          setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))
-        }
-        rowsPerPageOptions={[25, 50, 100]}
-      />
-        </Stack>
       </FilterLayout>
     </Stack>
   );

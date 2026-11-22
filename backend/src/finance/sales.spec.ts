@@ -412,4 +412,104 @@ describe('Sales and collections', () => {
       expect(await entries()).toEqual([]);
     });
   });
+
+  describe('A store on the orders-with-stock plan', () => {
+    beforeEach(() => {
+      store = buildStore(db, PLAN_MODULES[StorePlan.STOCK]);
+      store.delivery.price = 45;
+    });
+
+    const deliveredWithReturn = async (quantity = 3, returned = 2) => {
+      const a = await store.product(100, 10);
+      const placed = await store.place(await store.customer(), [{ productId: a, quantity }]);
+      const order = await store.advance(String(placed._id));
+      const ret = await store.returns.createByStore(
+        { orderId: String(order._id), items: [{ lineIndex: 0, quantity: returned }], reason: 'changed_mind' } as never,
+        undefined,
+        'shop.test',
+      );
+      return { a, order, ret };
+    };
+    const stockOf = async (id: string) => ((await db.model('Product').findById(id).lean().exec()) as any).stock;
+
+    it('takes stock when it sells and books nothing', async () => {
+      const a = await store.product(100, 10);
+      const placed = await store.place(await store.customer(), [{ productId: a, quantity: 3 }]);
+      await store.advance(String(placed._id));
+
+      expect(await stockOf(a)).toBe(7);
+      expect(await entries()).toEqual([]);
+    });
+
+    it('settles a return: puts the chosen lines back and records what went back, with no entries', async () => {
+      const { a, order, ret } = await deliveredWithReturn();
+
+      const settled = await store.returns.settle(String(ret._id), { refundAmount: 200, restockLines: [0] }, undefined, 'shop.test');
+
+      expect(settled.status).toBe('refunded');
+      expect(settled.refundAmount).toBe(200);
+      expect(settled.items[0].restocked).toBe(true);
+      expect(await stockOf(a)).toBe(9);
+      expect(await entries()).toEqual([]);
+      expect(((await db.model('Order').findById(order._id).lean().exec()) as any).refundedTotal).toBe(200);
+    });
+
+    it('leaves a line off the shelf when it is not chosen, and refuses a second settlement', async () => {
+      const { a, ret } = await deliveredWithReturn();
+
+      await store.returns.settle(String(ret._id), { refundAmount: 0, restockLines: [] }, undefined, 'shop.test');
+
+      expect(await stockOf(a)).toBe(7);
+      await expect(
+        store.returns.settle(String(ret._id), { refundAmount: 0, restockLines: [0] }, undefined, 'shop.test'),
+      ).rejects.toThrow(/can't be settled/);
+      expect(await stockOf(a)).toBe(7);
+    });
+
+    it('refuses to give back more than the order was worth, and rolls the return back', async () => {
+      const { ret } = await deliveredWithReturn();
+
+      await expect(
+        store.returns.settle(String(ret._id), { refundAmount: 99999, restockLines: [0] }, undefined, 'shop.test'),
+      ).rejects.toThrow(/left to give back/);
+      expect(((await db.model('ReturnRequest').findById(ret._id).lean().exec()) as any).status).toBe('approved');
+    });
+
+    it('reports money in from delivered orders and money out from settled returns', async () => {
+      const { ret } = await deliveredWithReturn();
+      await store.returns.settle(String(ret._id), { refundAmount: 200, restockLines: [0] }, undefined, 'shop.test');
+
+      const flow = await store.dashboard.cashFlow({ days: '7' } as never);
+
+      expect(flow.totals).toMatchObject({ in: 345, out: 200, net: 145, orders: 1, returns: 1 });
+      expect(flow.entries.map((e) => e.type).sort()).toEqual(['in', 'out']);
+    });
+  });
+
+  describe('Settling returns and the cash-flow page', () => {
+    it('are not part of a store with the books', async () => {
+      store = buildStore(db);
+      await expect(store.returns.settle(String(new Types.ObjectId()), { refundAmount: 0, restockLines: [] }, undefined, 'shop.test')).rejects.toThrow(/Not found/);
+      await expect(store.dashboard.cashFlow({ days: '7' } as never)).rejects.toThrow(/Not found/);
+    });
+
+    it('work in an orders-only store too, which has nothing to restock', async () => {
+      store = buildStore(db, PLAN_MODULES[StorePlan.ORDERS]);
+      store.delivery.price = 45;
+      const a = await store.product(100, 10);
+      const order = await store.advance(String((await store.place(await store.customer(), [{ productId: a, quantity: 2 }]))._id));
+      const ret = await store.returns.createByStore(
+        { orderId: String(order._id), items: [{ lineIndex: 0, quantity: 1 }], reason: 'changed_mind' } as never,
+        undefined,
+        'shop.test',
+      );
+
+      const settled = await store.returns.settle(String(ret._id), { refundAmount: 100, restockLines: [0] }, undefined, 'shop.test');
+      const flow = await store.dashboard.cashFlow({ days: '7' } as never);
+
+      expect(settled.items[0].restocked).toBe(false);
+      expect(((await db.model('Product').findById(a).lean().exec()) as any).stock).toBe(10);
+      expect(flow.totals).toMatchObject({ in: 245, out: 100, net: 145 });
+    });
+  });
 });

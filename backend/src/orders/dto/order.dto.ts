@@ -208,6 +208,11 @@ export class CancelOrderDto {
 }
 
 export class ExportOrdersDto {
+  @ApiProperty({ required: false, enum: PaymentMethod })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+
   @ApiProperty({ required: false, enum: OrderStatus })
   @IsOptional()
   @IsEnum(OrderStatus)
@@ -235,6 +240,11 @@ export class ExportOrdersDto {
 }
 
 export class QueryOrdersDto {
+  @ApiProperty({ required: false, enum: PaymentMethod })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+
   @ApiProperty({ required: false, enum: OrderStatus })
   @IsOptional()
   @IsEnum(OrderStatus)

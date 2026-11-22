@@ -6,9 +6,11 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsNumber,
   IsMongoId,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -66,6 +68,30 @@ export class ReturnDecisionDto {
   note?: string;
 }
 
+/** Settles a return in a store without books: what went back, and which lines went back on the shelf. */
+export class SettleReturnDto {
+  @ApiProperty({ description: 'Money given back to the customer, in the store currency. 0 for an exchange or a goodwill return.' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  refundAmount!: number;
+
+  @ApiProperty({ type: [Number], description: 'Order line indexes of the return to put back on the shelf' })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  restockLines!: number[];
+
+  @ApiProperty({ required: false, description: 'Shown to the customer' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  @Transform(trim)
+  note?: string;
+}
+
 export class QueryReturnsDto {
   @ApiProperty({ required: false, enum: ReturnStatus })
   @IsOptional()
@@ -77,6 +103,23 @@ export class QueryReturnsDto {
   @IsString()
   @MaxLength(20)
   search?: string;
+
+  @ApiProperty({ required: false, enum: ReturnReason })
+  @IsOptional()
+  @IsEnum(ReturnReason)
+  reason?: ReturnReason;
+
+  @ApiProperty({ required: false, description: 'YYYY-MM-DD, inclusive' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  from?: string;
+
+  @ApiProperty({ required: false, description: 'YYYY-MM-DD, inclusive' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string;
 
   @ApiProperty({ required: false, default: 1 })
   @IsOptional()

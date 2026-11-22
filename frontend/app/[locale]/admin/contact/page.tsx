@@ -1,22 +1,33 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Chip, IconButton, Stack } from "@mui/material";
+import { Chip, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import Delete from "@mui/icons-material/Delete";
 import Visibility from "@mui/icons-material/Visibility";
-import { useContactsQuery, CONTACT_QUERY_KEY } from "@/backend-api/contact/hooks";
+import {
+  useContactsQuery,
+  CONTACT_QUERY_KEY,
+} from "@/backend-api/contact/hooks";
 import { deleteContact } from "@/backend-api/contact/mutations";
 import { Contact } from "@/backend-api/contact/types";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import SimpleTable from "@/components/Table/SimpleTable";
 import CustomLink from "@/components/CustomLink";
 
 const ContactMessagesPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
 
@@ -38,7 +49,7 @@ const ContactMessagesPage = () => {
       changeBreadCrumbActions({
         breadCrumb: [{ title: t("contactMessages") }],
         breadCrumbBtns: [],
-      })
+      }),
     );
     return () => {
       dispatch(resetBreadCrumbActions());
@@ -63,12 +74,21 @@ const ContactMessagesPage = () => {
       {
         id: "name",
         header: t("name"),
-        render: (row: Contact) => row.name,
-      },
-      {
-        id: "email",
-        header: t("email"),
-        render: (row: Contact) => row.email,
+        render: (row: Contact) => (
+          <Stack>
+            <Typography variant="body2" fontWeight={row.isRead ? 400 : 700}>
+              {row.name}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              dir="ltr"
+              sx={{ textAlign: "start" }}
+            >
+              {row.email}
+            </Typography>
+          </Stack>
+        ),
       },
       {
         id: "phone",
@@ -88,36 +108,115 @@ const ContactMessagesPage = () => {
       },
       {
         id: "actions",
-        header: t("actions"),
+        header: "",
         render: (row: Contact) => (
-          <Stack direction="row">
-            <CustomLink href={`/admin/contact/${row._id}`}>
-              <IconButton>
-                <Visibility />
+          <Stack direction="row" gap={0.25}>
+            <Tooltip title={t("view")}>
+              <IconButton
+                size="small"
+                component={CustomLink}
+                href={`/admin/contact/${row._id}`}
+              >
+                <Visibility fontSize="small" />
               </IconButton>
-            </CustomLink>
-            <IconButton
-              color="error"
-              onClick={() => deleteMutation.mutate(row._id)}
-              disabled={deleteMutation.isPending}
-            >
-              <Delete />
-            </IconButton>
+            </Tooltip>
+            <Tooltip title={t("delete")}>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setDeleting(row)}
+              >
+                <Delete fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Stack>
         ),
       },
     ],
-    [t, deleteMutation]
+    [t],
   );
 
+  const [search, setSearch] = useState("");
+  const [read, setRead] = useState<"read" | "unread">();
+  const [deleting, setDeleting] = useState<Contact | null>(null);
+
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (messages ?? []).filter(
+      (m) =>
+        (!read || (read === "read") === m.isRead) &&
+        (!term ||
+          [m.name, m.email, m.phone, m.subject].some((v) =>
+            v?.toLowerCase().includes(term),
+          )),
+    );
+  }, [messages, search, read]);
+
+  const chips = [
+    ...(read
+      ? [{ key: "read", label: t(read), onDelete: () => setRead(undefined) }]
+      : []),
+    ...(search
+      ? [
+          {
+            key: "search",
+            label: `${t("search")}: ${search}`,
+            onDelete: () => setSearch(""),
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <SimpleTable clientPagination
-      columns={columns}
-      data={messages ?? []}
-      borderRadius={0}
-      height="100%"
-      loading={isLoading}
-    />
+    <>
+      <FilterLayout
+        search={{ value: search, onChange: setSearch }}
+        activeCount={chips.length}
+        chips={chips}
+        onClear={() => {
+          setSearch("");
+          setRead(undefined);
+        }}
+        filters={
+          <FilterSelect
+            label={t("status")}
+            value={read}
+            onChange={setRead}
+            options={[
+              { value: "unread", label: t("unread") },
+              { value: "read", label: t("read") },
+            ]}
+          />
+        }
+      >
+        <SimpleTable
+          clientPagination
+          columns={columns}
+          data={rows}
+          height="100%"
+          loading={isLoading}
+          onRowClick={(row: Contact) =>
+            router.push(`/${lang}/admin/contact/${row._id}`)
+          }
+        />
+      </FilterLayout>
+      <ConfirmDialog
+        title={deleting ? t("delete") : null}
+        message={
+          deleting
+            ? `${deleting.name} · ${deleting.subject ?? deleting.email}`
+            : undefined
+        }
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() =>
+          deleting &&
+          deleteMutation.mutate(deleting._id, {
+            onSuccess: () => setDeleting(null),
+          })
+        }
+      />
+    </>
   );
 };
 

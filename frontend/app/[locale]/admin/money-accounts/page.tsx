@@ -18,6 +18,7 @@ import {
   useMoneyAccountsQuery,
 } from "@/backend-api/money-accounts/api";
 import { useCurrency } from "@/Hooks/useCurrency";
+import PageActions, { PageActionButton, PagePrimaryButton } from "@/components/PageActions";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatMinorMoney } from "@/features/Order/format";
 import { AMOUNT, inputToMinor, toastError, todayInput } from "@/features/Purchasing/shared";
@@ -92,12 +93,14 @@ const MoneyAccountsPage = () => {
   const active = (data ?? []).filter((a) => a.isActive);
   return (
     <Stack spacing={2} height="100%">
+      <PageActions>
+        <PageActionButton disabled={active.length < 2} onClick={() => setTransferring((n) => n + 1)}>{t("transferMoney")}</PageActionButton>
+        <PagePrimaryButton onClick={() => setEditing("new")}>{t("newMoneyAccount")}</PagePrimaryButton>
+      </PageActions>
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
         <Typography variant="body2" color="text.secondary">{t("moneyAccountsHint")}</Typography>
         <Box flex={1} />
         <Chip variant="outlined" label={`${t("total")}: ${formatMinorMoney(total, currency)}`} />
-        <Button variant="outlined" disabled={active.length < 2} onClick={() => setTransferring((n) => n + 1)}>{t("transferMoney")}</Button>
-        <Button variant="contained" onClick={() => setEditing("new")}>{t("newMoneyAccount")}</Button>
       </Stack>
       <Box flex={1} minHeight={0}>
         <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />

@@ -21,4 +21,11 @@ export class ReportsController {
   dashboard(@Query() query: DashboardQueryDto) {
     return this.reportsService.dashboard(query);
   }
+
+  /** Money in and out for a store without books; 404 elsewhere. */
+  @Permissions([{ resource: Resource.FINANCE_REPORTS, actions: [Action.READ] }])
+  @Get('cash-flow')
+  cashFlow(@Query() query: DashboardQueryDto) {
+    return this.reportsService.cashFlow(query);
+  }
 }

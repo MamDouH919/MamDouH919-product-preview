@@ -10,7 +10,7 @@
  * automatically targets its own `api.<host>` backend.
  */
 const api: Record<string, string> = {
-  "localhost": "https://graham-counties-waiting-owned.trycloudflare.com",
+  "localhost": "http://localhost:3044",
   "app.localhost": "http://app.localhost:3055",
   "demo.localhost": "http://demo.localhost:3055",
   "ranosh.novaslash.com": "https://api-ranosh.novaslash.com",

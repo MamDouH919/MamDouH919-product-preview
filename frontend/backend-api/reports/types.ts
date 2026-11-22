@@ -56,3 +56,25 @@ export type DashboardReport = {
   newCustomers: number;
   pendingReviews: number;
 };
+
+/** Plain money in and out, for a store with stock but no books. */
+export type CashFlowEntry = {
+  type: "in" | "out";
+  at: string;
+  amount: number;
+  orderId: string;
+  orderNumber: number;
+  returnId?: string;
+  returnNumber?: number;
+};
+
+export type CashFlowReport = {
+  days: DashboardPeriod;
+  timeZone: string;
+  periodStart: string;
+  totals: { in: number; out: number; net: number; orders: number; returns: number };
+  /** One row per calendar day, oldest first, zero days included. */
+  series: { date: string; in: number; out: number; net: number }[];
+  /** Newest first, at most 100. */
+  entries: CashFlowEntry[];
+};

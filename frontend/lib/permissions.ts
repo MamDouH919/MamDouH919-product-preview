@@ -17,6 +17,7 @@ const ROUTE_RESOURCES: [string, string][] = [
     ["/admin/orders", "orders"],
     ["/admin/returns", "orders"],
     ["/admin/refunds", "refunds"],
+    ["/admin/cash-flow", "finance-reports"],
     ["/admin/coupons", "coupons"],
     ["/admin/customers", "customers"],
     ["/admin/products", "products"],

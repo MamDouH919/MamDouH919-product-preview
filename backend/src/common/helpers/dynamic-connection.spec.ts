@@ -100,4 +100,11 @@ describe('TenantConnectionService', () => {
     expect(service.hasModule('c.com', StoreModule.INVENTORY)).toBe(false);
     expect(service.hasModule('c.com', StoreModule.FINANCE)).toBe(false);
   });
+
+  it('gives an orders-with-stock store orders and stock without the books', () => {
+    process.env.TENANT_MAP = JSON.stringify({ 'd.com': store('d', { plan: StorePlan.STOCK }) });
+    const service = new TenantConnectionService();
+    expect(service.getModules('d.com')).toEqual([StoreModule.ORDERS, StoreModule.INVENTORY]);
+    expect(service.hasModule('d.com', StoreModule.FINANCE)).toBe(false);
+  });
 });

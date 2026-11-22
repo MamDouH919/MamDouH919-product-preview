@@ -6,7 +6,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Alert,
-  Box,
   Button,
   Dialog,
   DialogActions,
@@ -14,10 +13,8 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
-  MenuItem,
   Stack,
   Switch,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -25,16 +22,27 @@ import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
 import {
   DELIVERY_AREAS_QUERY_KEY,
   PRICE_LIST_QUERY_KEY,
   useDeliveryPricesQuery,
   useZonesQuery,
 } from "@/backend-api/price-list/hooks";
-import { deleteDeliveryPrice, updateDeliveryPrice } from "@/backend-api/price-list/mutations";
+import {
+  deleteDeliveryPrice,
+  updateDeliveryPrice,
+} from "@/backend-api/price-list/mutations";
 import { DeliveryPrice } from "@/backend-api/price-list/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import PageActions, {
+  PageActionButton,
+  PagePrimaryButton,
+} from "@/components/PageActions";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import FlatPriceCard from "@/features/PriceList/FlatPriceCard";
 import PriceFormDialog from "@/features/PriceList/PriceFormDialog";
@@ -50,7 +58,10 @@ const PriceListPage = () => {
   const [zoneFilter, setZoneFilter] = useState("");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [form, setForm] = useState<{ mode: "single" | "zone"; row: DeliveryPrice | null } | null>(null);
+  const [form, setForm] = useState<{
+    mode: "single" | "zone";
+    row: DeliveryPrice | null;
+  } | null>(null);
   const [deleting, setDeleting] = useState<DeliveryPrice | null>(null);
 
   useEffect(() => {
@@ -59,13 +70,24 @@ const PriceListPage = () => {
   }, [search]);
 
   const { data: zones, isLoading: zonesLoading } = useZonesQuery();
-  const { data, isLoading } = useDeliveryPricesQuery({ zone: zoneFilter, search: debounced });
+  const { data, isLoading } = useDeliveryPricesQuery({
+    zone: zoneFilter,
+    search: debounced,
+  });
   // Every priced subzone, not just the filtered ones, so the add dialog can't duplicate a row.
   const { data: all } = useDeliveryPricesQuery();
-  const pricedSubZones = useMemo(() => new Set((all ?? []).map((r) => r.subZone._id)), [all]);
+  const pricedSubZones = useMemo(
+    () => new Set((all ?? []).map((r) => r.subZone._id)),
+    [all],
+  );
 
   useEffect(() => {
-    dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("priceList") }], breadCrumbBtns: [] }));
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [{ title: t("priceList") }],
+        breadCrumbBtns: [],
+      }),
+    );
     return () => {
       dispatch(resetBreadCrumbActions());
     };
@@ -76,10 +98,12 @@ const PriceListPage = () => {
     queryClient.invalidateQueries({ queryKey: [PRICE_LIST_QUERY_KEY] });
     queryClient.invalidateQueries({ queryKey: [DELIVERY_AREAS_QUERY_KEY] });
   };
-  const onError = (error: any) => toast.error(error?.response?.data?.message ?? t("somethingWentWrong"));
+  const onError = (error: any) =>
+    toast.error(error?.response?.data?.message ?? t("somethingWentWrong"));
 
   const toggleMutation = useMutation({
-    mutationFn: (row: DeliveryPrice) => updateDeliveryPrice({ id: row._id, data: { isActive: !row.isActive } }),
+    mutationFn: (row: DeliveryPrice) =>
+      updateDeliveryPrice({ id: row._id, data: { isActive: !row.isActive } }),
     onSuccess: refresh,
     onError,
   });
@@ -113,7 +137,8 @@ const PriceListPage = () => {
       {
         id: "price",
         header: t("deliveryPrice"),
-        render: (row: DeliveryPrice) => (row.price > 0 ? formatMoney(row.price, currency) : t("free")),
+        render: (row: DeliveryPrice) =>
+          row.price > 0 ? formatMoney(row.price, currency) : t("free"),
       },
       {
         id: "active",
@@ -133,12 +158,19 @@ const PriceListPage = () => {
         render: (row: DeliveryPrice) => (
           <Stack direction="row" spacing={0.5}>
             <Tooltip title={t("edit")}>
-              <IconButton size="small" onClick={() => setForm({ mode: "single", row })}>
+              <IconButton
+                size="small"
+                onClick={() => setForm({ mode: "single", row })}
+              >
                 <Edit fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title={t("delete")}>
-              <IconButton size="small" color="error" onClick={() => setDeleting(row)}>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setDeleting(row)}
+              >
                 <Delete fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -146,7 +178,7 @@ const PriceListPage = () => {
         ),
       },
     ],
-    [t, lang, currency, toggleMutation]
+    [t, lang, currency, toggleMutation],
   );
 
   // No zones means no country has been picked (and seeded) yet.
@@ -158,44 +190,68 @@ const PriceListPage = () => {
     <Stack spacing={2} height="100%">
       <FlatPriceCard />
 
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between">
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          <TextField
-            select
-            size="small"
+      <PageActions>
+        <PageActionButton onClick={() => setForm({ mode: "zone", row: null })}>
+          {t("setZonePrice")}
+        </PageActionButton>
+        <PagePrimaryButton
+          startIcon={<Add />}
+          onClick={() => setForm({ mode: "single", row: null })}
+        >
+          {t("addDeliveryPrice")}
+        </PagePrimaryButton>
+      </PageActions>
+      <FilterLayout
+        search={{ value: search, onChange: setSearch }}
+        activeCount={(zoneFilter ? 1 : 0) + (search ? 1 : 0)}
+        chips={[
+          ...(zoneFilter
+            ? [
+                {
+                  key: "zone",
+                  label:
+                    localized(
+                      zones?.find((z) => z._id === zoneFilter)?.name,
+                      lang,
+                    ) || t("zone"),
+                  onDelete: () => setZoneFilter(""),
+                },
+              ]
+            : []),
+          ...(search
+            ? [
+                {
+                  key: "search",
+                  label: `${t("search")}: ${search}`,
+                  onDelete: () => setSearch(""),
+                },
+              ]
+            : []),
+        ]}
+        onClear={() => {
+          setSearch("");
+          setZoneFilter("");
+        }}
+        filters={
+          <FilterSelect
             label={t("zone")}
-            value={zoneFilter}
-            onChange={(e) => setZoneFilter(e.target.value)}
-            sx={{ minWidth: 200 }}
-          >
-            <MenuItem value="">{t("all")}</MenuItem>
-            {(zones ?? []).map((z) => (
-              <MenuItem key={z._id} value={z._id}>
-                {localized(z.name, lang)}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            size="small"
-            label={t("search")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: 220 }}
+            value={zoneFilter || undefined}
+            onChange={(z) => setZoneFilter(z ?? "")}
+            options={(zones ?? []).map((z) => ({
+              value: z._id,
+              label: localized(z.name, lang),
+            }))}
           />
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={() => setForm({ mode: "zone", row: null })}>
-            {t("setZonePrice")}
-          </Button>
-          <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ mode: "single", row: null })}>
-            {t("addDeliveryPrice")}
-          </Button>
-        </Stack>
-      </Stack>
-
-      <Box flex={1} minHeight={0}>
-        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
-      </Box>
+        }
+      >
+        <SimpleTable
+          clientPagination
+          columns={columns}
+          data={data ?? []}
+          height="100%"
+          loading={isLoading}
+        />
+      </FilterLayout>
 
       {form && (
         <PriceFormDialog
@@ -207,9 +263,16 @@ const PriceListPage = () => {
         />
       )}
 
-      <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>
-          {t("deleteDeliveryPriceConfirm", { area: deleting ? localized(deleting.subZone.name, lang) : "" })}
+          {t("deleteDeliveryPriceConfirm", {
+            area: deleting ? localized(deleting.subZone.name, lang) : "",
+          })}
         </DialogTitle>
         <DialogContent>
           <DialogContentText>{t("deleteDeliveryPriceHint")}</DialogContentText>

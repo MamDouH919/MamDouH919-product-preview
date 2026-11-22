@@ -5,14 +5,13 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TablePagination,
+  Skeleton,
   TableRow,
 } from "@mui/material";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { alpha, styled } from "@mui/material/styles";
-import EmptyTablePlaceHolderMessage from "./EmptyTablePlaceHolderMessage";
-import TableLoading from "./TableLoading";
-
+import Pager, { PagerProps } from "./Pager";
 
 // export const StyledTableCell = styled(TableCell)(() => ({
 //   [`&.FixedTableCell`]: {
@@ -81,8 +80,13 @@ const SimpleTable = ({
   loading,
   pagination,
   clientPagination,
+  onRowClick,
 }: {
-  columns: { id: string; header: string; render?: (row: any) => React.ReactNode }[];
+  columns: {
+    id: string;
+    header: string;
+    render?: (row: any) => React.ReactNode;
+  }[];
   data: any[];
   borderRadius?: number;
   height?: string;
@@ -91,49 +95,55 @@ const SimpleTable = ({
   pagination?: SimpleTablePagination;
   /** Client-side pagination: `data` is the full list and the table slices it. */
   clientPagination?: boolean | { rowsPerPageOptions?: number[] };
+  /** Makes rows clickable (pointer cursor + keyboard focus). */
+  onRowClick?: (row: any) => void;
 }) => {
+  const { t } = useTranslation();
   const clientOptions =
-    (typeof clientPagination === "object" && clientPagination.rowsPerPageOptions) ||
+    (typeof clientPagination === "object" &&
+      clientPagination.rowsPerPageOptions) ||
     DEFAULT_ROWS_PER_PAGE_OPTIONS;
   const [clientPage, setClientPage] = useState(0);
   const [clientRowsPerPage, setClientRowsPerPage] = useState(clientOptions[0]);
 
   const rows = data ?? [];
-  const lastClientPage = Math.max(0, Math.ceil(rows.length / clientRowsPerPage) - 1);
+  const lastClientPage = Math.max(
+    0,
+    Math.ceil(rows.length / clientRowsPerPage) - 1,
+  );
   // The list can shrink under us (a delete, a new filter); don't strand the user on an empty page.
   const currentClientPage = Math.min(clientPage, lastClientPage);
 
-  if (loading) return <TableLoading />;
-  if (rows.length === 0) return <EmptyTablePlaceHolderMessage />;
-
   const useClient = !pagination && !!clientPagination;
   const visibleRows = useClient
-    ? rows.slice(currentClientPage * clientRowsPerPage, (currentClientPage + 1) * clientRowsPerPage)
+    ? rows.slice(
+        currentClientPage * clientRowsPerPage,
+        (currentClientPage + 1) * clientRowsPerPage,
+      )
     : rows;
 
   // A short list doesn't need a pager.
-  const footer: React.ComponentProps<typeof TablePagination> | null = pagination
+  const footer: PagerProps | null = pagination
     ? {
-        count: pagination.count,
-        page: pagination.page,
-        rowsPerPage: pagination.rowsPerPage,
-        onPageChange: (_, p) => pagination.onPageChange(p),
-        onRowsPerPageChange: (e) => pagination.onRowsPerPageChange(parseInt(e.target.value, 10)),
-        rowsPerPageOptions: pagination.rowsPerPageOptions ?? DEFAULT_ROWS_PER_PAGE_OPTIONS,
+        ...pagination,
+        rowsPerPageOptions:
+          pagination.rowsPerPageOptions ?? DEFAULT_ROWS_PER_PAGE_OPTIONS,
       }
     : useClient && rows.length > Math.min(...clientOptions)
       ? {
           count: rows.length,
           page: currentClientPage,
           rowsPerPage: clientRowsPerPage,
-          onPageChange: (_, p) => setClientPage(p),
-          onRowsPerPageChange: (e) => {
-            setClientRowsPerPage(parseInt(e.target.value, 10));
+          onPageChange: setClientPage,
+          onRowsPerPageChange: (n) => {
+            setClientRowsPerPage(n);
             setClientPage(0);
           },
           rowsPerPageOptions: clientOptions,
         }
       : null;
+
+  const empty = !loading && rows.length === 0;
 
   return (
     <Paper
@@ -146,7 +156,7 @@ const SimpleTable = ({
         borderRadius: borderRadius ?? 3,
         height: height ?? "100%",
         borderColor: "divider",
-        boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+        boxShadow: "0 1px 3px rgba(16, 24, 40, 0.06)",
       }}
     >
       <Box sx={{ flex: 1, overflow: "auto" }}>
@@ -156,27 +166,37 @@ const SimpleTable = ({
             borderCollapse: "separate",
             borderSpacing: 0,
             "& .MuiTableCell-root": {
-              px: 2.5,
-              py: 1.75,
+              px: 2,
+              py: 1.5,
               borderBottom: "1px solid",
               borderColor: "divider",
+              fontSize: 13.5,
             },
+            "& .MuiTableCell-root:first-of-type": { ps: 3 },
+            "& .MuiTableCell-root:last-of-type": { pe: 3 },
             "& .MuiTableHead-root .MuiTableCell-root": {
-              backgroundColor: (t) => alpha(t.palette.text.primary, 0.035),
-              backdropFilter: "blur(6px)",
+              backgroundColor: "background.paper",
               color: "text.secondary",
-              fontSize: 12,
+              fontSize: 12.5,
               fontWeight: 600,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
               whiteSpace: "nowrap",
+              py: 1.25,
+              borderBottom: "2px solid",
+              borderColor: "divider",
             },
             "& .MuiTableBody-root .MuiTableRow-root": {
-              transition: "background-color 0.15s ease",
+              transition: "background-color 0.12s ease",
               "&:hover": {
-                backgroundColor: (t) => alpha(t.palette.primary.main, 0.05),
+                backgroundColor: (t) => alpha(t.palette.primary.main, 0.045),
               },
               "&:last-of-type .MuiTableCell-root": { borderBottom: 0 },
+              ...(onRowClick && {
+                cursor: "pointer",
+                "&:focus-visible": {
+                  outline: (t) => `2px solid ${t.palette.primary.main}`,
+                  outlineOffset: -2,
+                },
+              }),
             },
           }}
         >
@@ -188,38 +208,75 @@ const SimpleTable = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {visibleRows.map((row, i) => (
-              <TableRow key={row.id ?? row._id ?? i}>
-                {columns.map((col) => (
-                  <StyledTableCell key={col.id}>
-                    <div className={classes.cellWidth}>
-                      {col.render ? col.render(row) : row[col.id]}
-                    </div>
-                  </StyledTableCell>
-
+            {loading
+              ? Array.from({ length: 8 }).map((_, r) => (
+                  <TableRow key={`sk${r}`}>
+                    {columns.map((col) => (
+                      <TableCell key={col.id}>
+                        {col.header ? (
+                          <Skeleton
+                            variant="text"
+                            width={`${55 + ((r * 7 + col.id.length * 11) % 40)}%`}
+                          />
+                        ) : null}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : visibleRows.map((row, i) => (
+                  <TableRow
+                    key={row.id ?? row._id ?? i}
+                    hover={false}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={
+                      onRowClick
+                        ? (e) => {
+                            // Buttons and links inside a row keep their own behaviour.
+                            if (
+                              (e.target as HTMLElement).closest(
+                                "button, a, input, [role=button]",
+                              )
+                            )
+                              return;
+                            onRowClick(row);
+                          }
+                        : undefined
+                    }
+                    onKeyDown={
+                      onRowClick
+                        ? (e) => e.key === "Enter" && onRowClick(row)
+                        : undefined
+                    }
+                  >
+                    {columns.map((col) => (
+                      <StyledTableCell key={col.id}>
+                        <div className={classes.cellWidth}>
+                          {col.render ? col.render(row) : row[col.id]}
+                        </div>
+                      </StyledTableCell>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
           </TableBody>
         </Table>
+        {empty && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 260,
+              height: "calc(100% - 48px)",
+              color: "text.disabled",
+              fontSize: 18,
+              fontWeight: 600,
+            }}
+          >
+            {t("noResult")}
+          </Box>
+        )}
       </Box>
-      {footer && (
-        <TablePagination
-          component="div"
-          {...footer}
-          sx={{
-            flexShrink: 0,
-            borderTop: "1px solid",
-            borderColor: "divider",
-            "& .MuiTablePagination-toolbar": { minHeight: 52 },
-            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
-              color: "text.secondary",
-              fontSize: 13,
-              m: 0,
-            },
-          }}
-        />
-      )}
+      {footer && !loading && <Pager {...footer} />}
     </Paper>
   );
 };

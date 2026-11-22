@@ -7,6 +7,7 @@ import { Review, ReviewSchema } from '../reviews/schemas/review.schema';
 import { AuthModule } from '../auth/auth.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 import { Setting, SettingSchema } from '../settings/schemas/setting.schema';
+import { ReturnRequest, ReturnRequestSchema } from '../returns/schemas/return-request.schema';
 import { FinanceModule } from '../finance/finance.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { FinanceModule } from '../finance/finance.module';
     tenantModelProvider(Customer.name, CustomerSchema),
     tenantModelProvider(Review.name, ReviewSchema),
     tenantModelProvider(Setting.name, SettingSchema),
+    tenantModelProvider(ReturnRequest.name, ReturnRequestSchema),
   ],
 })
 export class ReportsModule {}

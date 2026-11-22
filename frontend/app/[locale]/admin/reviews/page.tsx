@@ -6,7 +6,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Avatar,
-  Box,
   Button,
   Chip,
   ChipProps,
@@ -15,12 +14,8 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  MenuItem,
   Rating,
   Stack,
-  Tab,
-  TablePagination,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -30,11 +25,26 @@ import HighlightOff from "@mui/icons-material/HighlightOff";
 import ReplyOutlined from "@mui/icons-material/ReplyOutlined";
 import Delete from "@mui/icons-material/Delete";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
-import { REVIEWS_QUERY_KEY, useReviewsQuery } from "@/backend-api/reviews/hooks";
-import { deleteReview, replyToReview, setReviewStatus } from "@/backend-api/reviews/mutations";
-import { AdminReview, REVIEW_STATUSES, ReviewFilters, ReviewStatus } from "@/backend-api/reviews/types";
-import FilterLayout from "@/components/FilterLayout";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
+import {
+  REVIEWS_QUERY_KEY,
+  useReviewsQuery,
+} from "@/backend-api/reviews/hooks";
+import {
+  deleteReview,
+  replyToReview,
+  setReviewStatus,
+} from "@/backend-api/reviews/mutations";
+import {
+  AdminReview,
+  REVIEW_STATUSES,
+  ReviewFilters,
+  ReviewStatus,
+} from "@/backend-api/reviews/types";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import { formatDateTime, localized } from "@/features/Order/format";
 import { getBackendUri } from "@/utils/helperFunctions";
@@ -47,7 +57,7 @@ const STATUS_COLORS: Record<ReviewStatus, ChipProps["color"]> = {
 
 const errorMessage = (error: any, fallback: string): string => {
   const message = error?.response?.data?.message;
-  return Array.isArray(message) ? message.join(", ") : message ?? fallback;
+  return Array.isArray(message) ? message.join(", ") : (message ?? fallback);
 };
 
 const ReviewsPage = () => {
@@ -57,7 +67,11 @@ const ReviewsPage = () => {
   const queryClient = useQueryClient();
 
   // Pending first: that's the queue someone opens this page to work through.
-  const [filters, setFilters] = useState<ReviewFilters>({ status: "pending", page: 1, limit: 25 });
+  const [filters, setFilters] = useState<ReviewFilters>({
+    status: "pending",
+    page: 1,
+    limit: 25,
+  });
   const [search, setSearch] = useState("");
   const [replying, setReplying] = useState<AdminReview | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -65,8 +79,13 @@ const ReviewsPage = () => {
 
   useEffect(() => {
     const timer = setTimeout(
-      () => setFilters((prev) => ({ ...prev, search: search || undefined, page: 1 })),
-      350
+      () =>
+        setFilters((prev) => ({
+          ...prev,
+          search: search || undefined,
+          page: 1,
+        })),
+      350,
     );
     return () => clearTimeout(timer);
   }, [search]);
@@ -74,21 +93,30 @@ const ReviewsPage = () => {
   const { data, isLoading } = useReviewsQuery(filters);
 
   useEffect(() => {
-    dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("reviews") }], breadCrumbBtns: [] }));
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [{ title: t("reviews") }],
+        breadCrumbBtns: [],
+      }),
+    );
     return () => {
       dispatch(resetBreadCrumbActions());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onError = (error: unknown) => toast.error(errorMessage(error, t("somethingWentWrong")));
-  const refresh = () => queryClient.invalidateQueries({ queryKey: [REVIEWS_QUERY_KEY] });
+  const onError = (error: unknown) =>
+    toast.error(errorMessage(error, t("somethingWentWrong")));
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: [REVIEWS_QUERY_KEY] });
 
   const statusMutation = useMutation({
     mutationFn: setReviewStatus,
     onSuccess: (_, { status }) => {
       refresh();
-      toast.success(t(status === "approved" ? "reviewApproved" : "reviewRejected"));
+      toast.success(
+        t(status === "approved" ? "reviewApproved" : "reviewRejected"),
+      );
     },
     onError,
   });
@@ -119,14 +147,25 @@ const ReviewsPage = () => {
         id: "product",
         header: t("product"),
         render: (row: AdminReview) => (
-          <Stack direction="row" spacing={1.5} alignItems="center" minWidth={180}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            minWidth={180}
+          >
             <Avatar
               variant="rounded"
-              src={row.product?.images?.[0] ? getBackendUri(row.product.images[0]) : undefined}
+              src={
+                row.product?.images?.[0]
+                  ? getBackendUri(row.product.images[0])
+                  : undefined
+              }
               sx={{ width: 40, height: 40 }}
             />
             <Typography variant="body2" fontWeight={600}>
-              {row.product ? localized(row.product.name, lang) : t("deletedProduct")}
+              {row.product
+                ? localized(row.product.name, lang)
+                : t("deletedProduct")}
             </Typography>
           </Stack>
         ),
@@ -136,7 +175,9 @@ const ReviewsPage = () => {
         header: t("customer"),
         render: (row: AdminReview) => (
           <Stack>
-            <Typography variant="body2">{row.customer?.name ?? row.authorName}</Typography>
+            <Typography variant="body2">
+              {row.customer?.name ?? row.authorName}
+            </Typography>
             <Typography variant="caption" color="text.secondary">
               {row.customer?.email}
             </Typography>
@@ -155,7 +196,11 @@ const ReviewsPage = () => {
               </Typography>
             )}
             {row.reply && (
-              <Typography variant="caption" color="text.secondary" sx={{ borderInlineStart: 2, borderColor: "divider", ps: 1 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ borderInlineStart: 2, borderColor: "divider", ps: 1 }}
+              >
                 {t("storeReply")}: {row.reply}
               </Typography>
             )}
@@ -169,7 +214,11 @@ const ReviewsPage = () => {
         id: "status",
         header: t("status"),
         render: (row: AdminReview) => (
-          <Chip size="small" color={STATUS_COLORS[row.status]} label={t(`reviewStatus.${row.status}`)} />
+          <Chip
+            size="small"
+            color={STATUS_COLORS[row.status]}
+            label={t(`reviewStatus.${row.status}`)}
+          />
         ),
       },
       {
@@ -183,7 +232,9 @@ const ReviewsPage = () => {
                   size="small"
                   color="success"
                   disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate({ id: row._id, status: "approved" })}
+                  onClick={() =>
+                    statusMutation.mutate({ id: row._id, status: "approved" })
+                  }
                 >
                   <CheckCircleOutline fontSize="small" />
                 </IconButton>
@@ -194,7 +245,9 @@ const ReviewsPage = () => {
                 <IconButton
                   size="small"
                   disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate({ id: row._id, status: "rejected" })}
+                  onClick={() =>
+                    statusMutation.mutate({ id: row._id, status: "rejected" })
+                  }
                 >
                   <HighlightOff fontSize="small" />
                 </IconButton>
@@ -212,7 +265,11 @@ const ReviewsPage = () => {
               </IconButton>
             </Tooltip>
             <Tooltip title={t("delete")}>
-              <IconButton size="small" color="error" onClick={() => setDeleting(row)}>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setDeleting(row)}
+              >
                 <Delete fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -220,91 +277,114 @@ const ReviewsPage = () => {
         ),
       },
     ],
-    [t, lang, statusMutation]
+    [t, lang, statusMutation],
   );
+
+  const chips = [
+    ...(filters.status
+      ? [
+          {
+            key: "status",
+            label: t(`reviewStatus.${filters.status}`),
+            onDelete: () =>
+              setFilters((p) => ({ ...p, status: undefined, page: 1 })),
+          },
+        ]
+      : []),
+    ...(filters.rating
+      ? [
+          {
+            key: "rating",
+            label: "★".repeat(filters.rating),
+            onDelete: () =>
+              setFilters((p) => ({ ...p, rating: undefined, page: 1 })),
+          },
+        ]
+      : []),
+    ...(search
+      ? [
+          {
+            key: "search",
+            label: `${t("search")}: ${search}`,
+            onDelete: () => setSearch(""),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Stack spacing={2} height="100%">
-      <Tabs
-        value={filters.status ?? "all"}
-        onChange={(_, value: ReviewStatus | "all") =>
-          setFilters((prev) => ({ ...prev, status: value === "all" ? undefined : value, page: 1 }))
-        }
-        variant="scrollable"
-        allowScrollButtonsMobile
-      >
-        {REVIEW_STATUSES.map((status) => (
-          <Tab
-            key={status}
-            value={status}
-            label={`${t(`reviewStatus.${status}`)}${data ? ` (${data.statusCounts[status]})` : ""}`}
-          />
-        ))}
-        <Tab value="all" label={t("all")} />
-      </Tabs>
-
       <FilterLayout
-        activeCount={[search, filters.rating].filter(Boolean).length}
+        search={{ value: search, onChange: setSearch }}
+        activeCount={chips.length}
+        chips={chips}
+        onClear={() => {
+          setSearch("");
+          setFilters((prev) => ({ page: 1, limit: prev.limit }));
+        }}
         filters={
           <>
-        <TextField
-          size="small"
-          label={t("search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 260 }}
-        />
-        <TextField
-          select
-          size="small"
-          label={t("rating")}
-          value={filters.rating ?? ""}
-          onChange={(e) =>
-            setFilters((prev) => ({ ...prev, rating: e.target.value ? Number(e.target.value) : undefined, page: 1 }))
-          }
-          sx={{ minWidth: 160 }}
-        >
-          <MenuItem value="">{t("all")}</MenuItem>
-          {[5, 4, 3, 2, 1].map((n) => (
-            <MenuItem key={n} value={n}>
-              {"★".repeat(n)}
-            </MenuItem>
-          ))}
-        </TextField>
+            <FilterSelect
+              label={t("status")}
+              value={filters.status}
+              onChange={(status) =>
+                setFilters((prev) => ({ ...prev, status, page: 1 }))
+              }
+              options={REVIEW_STATUSES.map((st) => ({
+                value: st,
+                label: `${t(`reviewStatus.${st}`)}${data ? ` (${data.statusCounts[st]})` : ""}`,
+              }))}
+            />
+            <FilterSelect
+              label={t("rating")}
+              value={filters.rating ? String(filters.rating) : undefined}
+              onChange={(r) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  rating: r ? Number(r) : undefined,
+                  page: 1,
+                }))
+              }
+              options={[5, 4, 3, 2, 1].map((n) => ({
+                value: String(n),
+                label: "★".repeat(n),
+              }))}
+            />
           </>
         }
       >
-        <Stack flex={1} minHeight={0}>
-      <Box flex={1} minHeight={0}>
         <SimpleTable
           columns={columns}
           data={data?.data ?? []}
-          borderRadius={0}
           height="100%"
           loading={isLoading}
+          pagination={{
+            count: data?.total ?? 0,
+            page: (filters.page ?? 1) - 1,
+            rowsPerPage: filters.limit ?? 25,
+            onPageChange: (page) =>
+              setFilters((prev) => ({ ...prev, page: page + 1 })),
+            onRowsPerPageChange: (limit) =>
+              setFilters((prev) => ({ ...prev, limit, page: 1 })),
+          }}
         />
-      </Box>
-
-      <TablePagination
-        component="div"
-        count={data?.total ?? 0}
-        page={(filters.page ?? 1) - 1}
-        onPageChange={(_, page) => setFilters((prev) => ({ ...prev, page: page + 1 }))}
-        rowsPerPage={filters.limit ?? 25}
-        onRowsPerPageChange={(e) =>
-          setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))
-        }
-        rowsPerPageOptions={[25, 50, 100]}
-      />
-        </Stack>
       </FilterLayout>
 
-      <Dialog open={!!replying} onClose={() => setReplying(null)} fullWidth maxWidth="sm">
+      <Dialog
+        open={!!replying}
+        onClose={() => setReplying(null)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>{t("replyToReview")}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} pt={1}>
             {replying?.comment && (
-              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-line" }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ whiteSpace: "pre-line" }}
+              >
                 “{replying.comment}”
               </Typography>
             )}
@@ -325,7 +405,13 @@ const ReviewsPage = () => {
           <Button
             variant="contained"
             disabled={replyMutation.isPending}
-            onClick={() => replying && replyMutation.mutate({ id: replying._id, reply: replyText.trim() })}
+            onClick={() =>
+              replying &&
+              replyMutation.mutate({
+                id: replying._id,
+                reply: replyText.trim(),
+              })
+            }
           >
             {t("save")}
           </Button>

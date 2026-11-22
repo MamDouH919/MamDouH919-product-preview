@@ -1,12 +1,20 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, QueryFilter, Types } from 'mongoose';
+import { ClientSession, Connection, Model, QueryFilter, Types } from 'mongoose';
+import { STORE_MODULES, TENANT_CONNECTION } from '../common/tenant/tenant.module';
+import { StoreModule } from '../common/tenant/store-plan';
+import { withTransaction } from '../common/tenant/with-transaction';
+import { InventoryService } from '../inventory/inventory.service';
+import { MovementType } from '../inventory/enums/movement-type.enum';
+import { priceToMinor, toMajor } from '../finance/order-money';
 import {
   RETURN_TRANSITIONS,
   ReturnItem,
@@ -19,7 +27,7 @@ import { OrderStatus } from '../orders/enums/order-status.enum';
 import { Counter } from '../orders/schemas/counter.schema';
 import { Customer } from '../customers/schemas/customer.schema';
 import { Setting } from '../settings/schemas/setting.schema';
-import { CreateReturnDto, QueryReturnsDto } from './dto/return.dto';
+import { CreateReturnDto, QueryReturnsDto, SettleReturnDto } from './dto/return.dto';
 import { ReturnNotificationsService } from './return-notifications.service';
 
 const RETURN_COUNTER = 'return';
@@ -49,6 +57,9 @@ export class ReturnsService {
     @InjectModel(Customer.name) private customerModel: Model<Customer>,
     @InjectModel(Setting.name) private settingModel: Model<Setting>,
     private readonly notifications: ReturnNotificationsService,
+    private readonly inventory: InventoryService,
+    @Inject(TENANT_CONNECTION) private connection: Connection,
+    @Inject(STORE_MODULES) private readonly modules: readonly StoreModule[],
   ) {}
 
   // ── Customer ────────────────────────────────────────────────────────────────
@@ -104,6 +115,12 @@ export class ReturnsService {
     const limit = num(query.limit) ?? 25;
     const filter: QueryFilter<ReturnRequest> = {};
     if (query.status) filter.status = query.status;
+    if (query.reason) filter.reason = query.reason;
+    if (query.from || query.to) {
+      filter.createdAt = {};
+      if (query.from) filter.createdAt.$gte = new Date(`${query.from}T00:00:00.000Z`);
+      if (query.to) filter.createdAt.$lt = new Date(new Date(`${query.to}T00:00:00.000Z`).getTime() + 86_400_000);
+    }
     const term = query.search?.trim().replace(/^#/, '');
     if (term && /^\d+$/.test(term)) filter.$or = [{ returnNumber: Number(term) }, { orderNumber: Number(term) }];
 
@@ -156,6 +173,90 @@ export class ReturnsService {
 
   async reject(id: string, note: string | undefined, userId: string | undefined, host: string) {
     return this.transition(id, ReturnStatus.REJECTED, { note, userId, host });
+  }
+
+  /**
+   * Closes a return in a store without books: records the money that went
+   * back (taken as given — it left the till outside the system) and, where the
+   * store keeps stock, puts the chosen lines back on the shelf. A store with books refunds
+   * through the refunds service instead, which posts the entries.
+   */
+  async settle(id: string, dto: SettleReturnDto, userId: string | undefined, host: string): Promise<ReturnRequest> {
+    if (this.modules.includes(StoreModule.FINANCE)) {
+      throw new NotFoundException('Not found');
+    }
+    const ret = await withTransaction(this.connection, async (session) => {
+      const at = new Date();
+      const from = [ReturnStatus.REQUESTED, ReturnStatus.APPROVED, ReturnStatus.RECEIVED];
+      // Claimed first so two clicks can't restock twice.
+      const claimed = await this.returnModel
+        .findOneAndUpdate(
+          { _id: this.oid(id, 'Return not found'), status: { $in: from } },
+          {
+            $set: { status: ReturnStatus.REFUNDED, refundAmount: dto.refundAmount, settledAt: at },
+            $push: { history: { status: ReturnStatus.REFUNDED, note: dto.note, by: this.userOid(userId), at } },
+          },
+          { returnDocument: 'after', session },
+        )
+        .exec();
+      if (!claimed) {
+        const exists = await this.returnModel.findById(id).select('status').session(session).lean().exec();
+        if (!exists) throw new NotFoundException('Return not found');
+        throw new BadRequestException(`A ${exists.status} return can't be settled`);
+      }
+
+      const order = await this.orderModel.findById(claimed.order).session(session).exec();
+      if (!order) throw new NotFoundException('Order not found');
+      const left = priceToMinor(order.total) - priceToMinor(order.refundedTotal ?? 0);
+      if (priceToMinor(dto.refundAmount) > left) {
+        throw new BadRequestException(`Only ${toMajor(left)} of this order is left to give back`);
+      }
+
+      const restock = new Set(dto.restockLines);
+      for (const lineIndex of restock) {
+        if (!claimed.items.some((item) => item.lineIndex === lineIndex)) {
+          throw new BadRequestException(`This return has no line ${lineIndex + 1}`);
+        }
+      }
+      const flags: Record<string, boolean> = {};
+      for (const [k, item] of claimed.items.entries()) {
+        const source = order.items[item.lineIndex];
+        if (!restock.has(item.lineIndex) || !source?.stockDeducted) continue;
+        try {
+          await this.inventory.adjust(
+            {
+              productId: String(item.product),
+              variantId: item.variantId ? String(item.variantId) : undefined,
+              type: MovementType.RETURN,
+              quantity: item.quantity,
+              reference: `Return #${claimed.returnNumber} (Order #${order.orderNumber})`,
+            },
+            userId,
+            session,
+          );
+          flags[`items.${k}.restocked`] = true;
+        } catch (error) {
+          // A product that stopped tracking stock has nothing to put back into.
+          if (!(error instanceof BadRequestException || error instanceof NotFoundException)) throw error;
+          this.logger.warn(`Return #${claimed.returnNumber}: line ${item.lineIndex + 1} not restocked — ${error.message}`);
+        }
+      }
+      if (Object.keys(flags).length) await this.returnModel.updateOne({ _id: claimed._id }, { $set: flags }, { session }).exec();
+      if (dto.refundAmount > 0) await this.addRefunded(order, dto.refundAmount, session);
+      return (await this.returnModel.findById(claimed._id).session(session).exec())!;
+    });
+
+    const order = await this.orderModel.findById(ret.order).exec();
+    if (order) this.notify(ret, order, host, dto.note);
+    return ret;
+  }
+
+  /** What the order has given back so far; the order page and the customer's invoice read it. */
+  private async addRefunded(order: Order, amount: number, session: ClientSession) {
+    const result = await this.orderModel
+      .updateOne({ _id: order._id, refundedTotal: order.refundedTotal ?? 0 }, { $set: { refundedTotal: toMajor(priceToMinor(order.refundedTotal ?? 0) + priceToMinor(amount)) } }, { session })
+      .exec();
+    if (!result.modifiedCount) throw new ConflictException('The order changed meanwhile; reload it');
   }
 
   // ── Internals ───────────────────────────────────────────────────────────────

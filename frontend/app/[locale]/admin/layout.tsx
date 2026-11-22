@@ -1,7 +1,7 @@
 "use client";
 
 
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { Breadcrumbs, BREADCRUMB_HEIGHT } from "@/components/breadcrumbs";
 import { DashboardProvider } from "@/context/Dashboard";
 import Header from "@/layouts/Dashboard/Header";
 import Main from "@/layouts/Dashboard/Main";
@@ -52,7 +52,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <Stack
             p={{ xs: 1, sm: 2 }}
             flexGrow={1}
-            height={isAdminDashboard ? "100%" : "calc(100% - 40px)"}
+            height={isAdminDashboard ? "100%" : `calc(100% - ${BREADCRUMB_HEIGHT}px)`}
             overflow="auto"
           >
             <ModuleRouteGate area="admin">{children}</ModuleRouteGate>

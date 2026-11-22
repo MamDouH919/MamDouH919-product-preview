@@ -198,18 +198,61 @@ export class ProductsService {
     // Coerced here as well: the controller is handed the raw query strings.
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(200, Math.max(1, Number(query.limit) || 25));
+    const filter = this.buildAdminFilter(query);
     const [data, total] = await Promise.all([
       this.productModel
-        .find()
+        .find(filter)
         .populate('category', 'name slug')
         .populate('subCategory', 'name slug')
         .sort({ order: 1, createdAt: -1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .exec(),
-      this.productModel.countDocuments().exec(),
+      this.productModel.countDocuments(filter).exec(),
     ]);
     return { data, total, page, limit };
+  }
+
+  /** Filters for the dashboard list. Unlike the storefront search, inactive products are included. */
+  private buildAdminFilter(query: ListProductsDto): Record<string, unknown> {
+    const filter: Record<string, unknown> = {};
+    const and: Record<string, unknown>[] = [];
+    if (query.categoryId) filter.category = new Types.ObjectId(query.categoryId);
+    if (query.subCategoryId) filter.subCategory = new Types.ObjectId(query.subCategoryId);
+    if (query.status) filter.isActive = query.status === 'active';
+
+    const term = query.q?.trim();
+    if (term) {
+      const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      and.push({
+        $or: [{ 'name.en': pattern }, { 'name.ar': pattern }, { tags: pattern }, { sku: pattern }, { 'variants.sku': pattern }],
+      });
+    }
+
+    // Same notion of "sellable now" as the storefront's in-stock filter.
+    if (query.stock) {
+      const sellable = {
+        $or: [
+          { $eq: ['$trackStock', false] },
+          { $eq: ['$allowBackorder', true] },
+          { $gt: ['$stock', 0] },
+          { $gt: [{ $max: '$variants.stock' }, 0] },
+        ],
+      };
+      and.push({ $expr: query.stock === 'in' ? sellable : { $not: [sellable] } });
+    }
+
+    const min = query.minPrice === undefined ? undefined : Number(query.minPrice);
+    const max = query.maxPrice === undefined ? undefined : Number(query.maxPrice);
+    if (min !== undefined || max !== undefined) {
+      // What the list shows: the cheapest variant, or the product price.
+      const price = { $ifNull: [{ $min: '$variants.price' }, '$price'] };
+      if (min !== undefined && !Number.isNaN(min)) and.push({ $expr: { $gte: [price, min] } });
+      if (max !== undefined && !Number.isNaN(max)) and.push({ $expr: { $lte: [price, max] } });
+    }
+
+    if (and.length) filter.$and = and;
+    return filter;
   }
 
   async findActive(): Promise<Product[]> {

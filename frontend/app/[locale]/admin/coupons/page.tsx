@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Box,
   Button,
   Chip,
   Dialog,
@@ -15,7 +14,6 @@ import {
   DialogTitle,
   IconButton,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -23,17 +21,34 @@ import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
 import Edit from "@mui/icons-material/Edit";
 import { useAppDispatch } from "@/Store/store";
-import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
-import { COUPONS_QUERY_KEY, useCouponsQuery } from "@/backend-api/coupons/hooks";
+import {
+  changeBreadCrumbActions,
+  resetBreadCrumbActions,
+} from "@/Store/slices/bread-crumb";
+import {
+  COUPONS_QUERY_KEY,
+  useCouponsQuery,
+} from "@/backend-api/coupons/hooks";
 import { deleteCoupon } from "@/backend-api/coupons/mutations";
 import { Coupon } from "@/backend-api/coupons/types";
 import { useCurrency } from "@/Hooks/useCurrency";
+import PageActions, { PageActionButton } from "@/components/PageActions";
+import FilterLayout, { FilterSelect } from "@/components/FilterLayout";
 import SimpleTable from "@/components/Table/SimpleTable";
 import CouponFormDialog from "@/features/Coupon/CouponFormDialog";
 import { formatMoney } from "@/features/Order/format";
 
 /** Where a coupon stands right now, from its switch, dates and usage. */
-const couponState = (c: Coupon): "active" | "inactive" | "scheduled" | "expired" | "used_up" => {
+const COUPON_STATES = [
+  "active",
+  "scheduled",
+  "inactive",
+  "expired",
+  "used_up",
+] as const;
+type CouponState = (typeof COUPON_STATES)[number];
+
+const couponState = (c: Coupon): CouponState => {
   const now = Date.now();
   if (!c.isActive) return "inactive";
   if (c.expiresAt && new Date(c.expiresAt).getTime() < now) return "expired";
@@ -50,6 +65,8 @@ const CouponsPage = () => {
   const currency = useCurrency();
 
   const [search, setSearch] = useState("");
+  const [state, setState] = useState<CouponState>();
+  const [type, setType] = useState<"percentage" | "fixed">();
   const [debounced, setDebounced] = useState("");
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -63,7 +80,12 @@ const CouponsPage = () => {
   const { data, isLoading } = useCouponsQuery(debounced);
 
   useEffect(() => {
-    dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("coupons") }], breadCrumbBtns: [] }));
+    dispatch(
+      changeBreadCrumbActions({
+        breadCrumb: [{ title: t("coupons") }],
+        breadCrumbBtns: [],
+      }),
+    );
     return () => {
       dispatch(resetBreadCrumbActions());
     };
@@ -77,12 +99,15 @@ const CouponsPage = () => {
       setDeleting(null);
       toast.success(t("deletedSuccessfully"));
     },
-    onError: (error: any) => toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.message ?? t("somethingWentWrong")),
   });
 
   const columns = useMemo(() => {
     const date = (iso?: string | null) =>
-      iso ? new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB") : "—";
+      iso
+        ? new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")
+        : "—";
 
     const stateColor = {
       active: "success",
@@ -98,7 +123,12 @@ const CouponsPage = () => {
         header: t("couponCode"),
         render: (row: Coupon) => (
           <Stack>
-            <Typography variant="body2" fontWeight={700} dir="ltr" sx={{ textAlign: "start" }}>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              dir="ltr"
+              sx={{ textAlign: "start" }}
+            >
               {row.code}
             </Typography>
             {row.description && (
@@ -115,13 +145,19 @@ const CouponsPage = () => {
         render: (row: Coupon) => (
           <Stack>
             <Typography variant="body2" fontWeight={600}>
-              {row.type === "percentage" ? `${row.value}%` : formatMoney(row.value, currency)}
+              {row.type === "percentage"
+                ? `${row.value}%`
+                : formatMoney(row.value, currency)}
             </Typography>
             {(row.minSubtotal != null || row.maxDiscount != null) && (
               <Typography variant="caption" color="text.secondary">
                 {[
-                  row.minSubtotal != null ? `${t("min")} ${formatMoney(row.minSubtotal, currency)}` : "",
-                  row.maxDiscount != null ? `${t("max")} ${formatMoney(row.maxDiscount, currency)}` : "",
+                  row.minSubtotal != null
+                    ? `${t("min")} ${formatMoney(row.minSubtotal, currency)}`
+                    : "",
+                  row.maxDiscount != null
+                    ? `${t("max")} ${formatMoney(row.maxDiscount, currency)}`
+                    : "",
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -134,21 +170,31 @@ const CouponsPage = () => {
         id: "validity",
         header: t("validity"),
         render: (row: Coupon) =>
-          row.startsAt || row.expiresAt ? `${date(row.startsAt)} → ${date(row.expiresAt)}` : t("noExpiry"),
+          row.startsAt || row.expiresAt
+            ? `${date(row.startsAt)} → ${date(row.expiresAt)}`
+            : t("noExpiry"),
       },
       {
         id: "usage",
         header: t("usage"),
         render: (row: Coupon) =>
           `${row.usedCount} / ${row.usageLimit ?? "∞"}` +
-          (row.perCustomerLimit != null ? ` · ${t("perCustomerShort", { count: row.perCustomerLimit })}` : ""),
+          (row.perCustomerLimit != null
+            ? ` · ${t("perCustomerShort", { count: row.perCustomerLimit })}`
+            : ""),
       },
       {
         id: "status",
         header: t("status"),
         render: (row: Coupon) => {
           const state = couponState(row);
-          return <Chip size="small" color={stateColor[state]} label={t(`couponState.${state}`)} />;
+          return (
+            <Chip
+              size="small"
+              color={stateColor[state]}
+              label={t(`couponState.${state}`)}
+            />
+          );
         },
       },
       {
@@ -168,7 +214,11 @@ const CouponsPage = () => {
               </IconButton>
             </Tooltip>
             <Tooltip title={t("delete")}>
-              <IconButton size="small" color="error" onClick={() => setDeleting(row)}>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setDeleting(row)}
+              >
                 <Delete fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -178,36 +228,127 @@ const CouponsPage = () => {
     ];
   }, [t, lang, currency]);
 
+  const visible = useMemo(
+    () =>
+      (data ?? []).filter(
+        (c) =>
+          (!state || couponState(c) === state) && (!type || c.type === type),
+      ),
+    [data, state, type],
+  );
+
+  const chips = [
+    ...(state
+      ? [
+          {
+            key: "state",
+            label: t(`couponState.${state}`),
+            onDelete: () => setState(undefined),
+          },
+        ]
+      : []),
+    ...(type
+      ? [
+          {
+            key: "type",
+            label: t(`couponType.${type}`),
+            onDelete: () => setType(undefined),
+          },
+        ]
+      : []),
+    ...(search
+      ? [
+          {
+            key: "search",
+            label: `${t("search")}: ${search}`,
+            onDelete: () => setSearch(""),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <Stack spacing={2} height="100%">
-      <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
-        <TextField
-          size="small"
-          label={t("search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 240 }}
-        />
-        <Button
+      <PageActions>
+        <PageActionButton
           variant="contained"
+          color="primary"
+          disableElevation
           startIcon={<Add />}
           onClick={() => {
             setEditing(null);
             setFormOpen(true);
           }}
+          sx={{ borderColor: "transparent" }}
         >
           {t("addCoupon")}
-        </Button>
-      </Stack>
+        </PageActionButton>
+      </PageActions>
 
-      <Box flex={1} minHeight={0}>
-        <SimpleTable clientPagination columns={columns} data={data ?? []} borderRadius={0} height="100%" loading={isLoading} />
-      </Box>
+      <FilterLayout
+        search={{ value: search, onChange: setSearch }}
+        activeCount={chips.length}
+        chips={chips}
+        onClear={() => {
+          setSearch("");
+          setState(undefined);
+          setType(undefined);
+        }}
+        filters={
+          <>
+            <FilterSelect
+              label={t("status")}
+              value={state}
+              onChange={setState}
+              options={COUPON_STATES.map((s) => ({
+                value: s,
+                label: t(`couponState.${s}`),
+              }))}
+            />
+            <FilterSelect
+              label={t("type")}
+              value={type}
+              onChange={setType}
+              options={[
+                {
+                  value: "percentage",
+                  label: t("couponType.percentage"),
+                },
+                {
+                  value: "fixed",
+                  label: t("couponType.fixed"),
+                },
+              ]}
+            />
+          </>
+        }
+      >
+        <SimpleTable
+          clientPagination
+          columns={columns}
+          data={visible}
+          height="100%"
+          loading={isLoading}
+        />
+      </FilterLayout>
 
-      {formOpen && <CouponFormDialog open coupon={editing} onClose={() => setFormOpen(false)} />}
+      {formOpen && (
+        <CouponFormDialog
+          open
+          coupon={editing}
+          onClose={() => setFormOpen(false)}
+        />
+      )}
 
-      <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{t("deleteCouponConfirm", { code: deleting?.code })}</DialogTitle>
+      <Dialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {t("deleteCouponConfirm", { code: deleting?.code })}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>{t("deleteCouponHint")}</DialogContentText>
         </DialogContent>

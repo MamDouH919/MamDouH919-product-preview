@@ -4,16 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Box,
-  Chip,
-  Stack,
-  Switch,
-  TablePagination,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Chip, Stack, Switch, Tooltip, Typography } from "@mui/material";
 import { useAppDispatch } from "@/Store/store";
 import {
   changeBreadCrumbActions,
@@ -34,13 +25,21 @@ const CustomersPage = () => {
   const queryClient = useQueryClient();
   const lang = i18n.language;
 
-  const [filters, setFilters] = useState<CustomerFilters>({ page: 1, limit: 25 });
+  const [filters, setFilters] = useState<CustomerFilters>({
+    page: 1,
+    limit: 25,
+  });
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(
-      () => setFilters((prev) => ({ ...prev, search: search || undefined, page: 1 })),
-      350
+      () =>
+        setFilters((prev) => ({
+          ...prev,
+          search: search || undefined,
+          page: 1,
+        })),
+      350,
     );
     return () => clearTimeout(timer);
   }, [search]);
@@ -62,7 +61,7 @@ const CustomersPage = () => {
       changeBreadCrumbActions({
         breadCrumb: [{ title: t("customers") }],
         breadCrumbBtns: [],
-      })
+      }),
     );
     return () => {
       dispatch(resetBreadCrumbActions());
@@ -81,7 +80,12 @@ const CustomersPage = () => {
               <Typography variant="body2">{row.name}</Typography>
               {row.isGuest && (
                 <Tooltip title={t("guestCustomerHint")}>
-                  <Chip label={t("guestCustomer")} size="small" variant="outlined" color="warning" />
+                  <Chip
+                    label={t("guestCustomer")}
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                  />
                 </Tooltip>
               )}
             </Stack>
@@ -100,7 +104,11 @@ const CustomersPage = () => {
         id: "addresses",
         header: t("addresses"),
         render: (row: Customer) => (
-          <Chip label={row.addresses?.length ?? 0} size="small" variant="outlined" />
+          <Chip
+            label={row.addresses?.length ?? 0}
+            size="small"
+            variant="outlined"
+          />
         ),
       },
       {
@@ -109,7 +117,7 @@ const CustomersPage = () => {
         render: (row: Customer) =>
           row.createdAt
             ? new Date(row.createdAt).toLocaleDateString(
-                lang === "ar" ? "ar-EG" : "en-GB"
+                lang === "ar" ? "ar-EG" : "en-GB",
               )
             : "—",
       },
@@ -118,11 +126,16 @@ const CustomersPage = () => {
         header: t("active"),
         render: (row: Customer) => (
           // Blocking an account keeps its history — it only stops new sign-ins.
-          <Tooltip title={row.isActive ? t("blockCustomer") : t("unblockCustomer")}>
+          <Tooltip
+            title={row.isActive ? t("blockCustomer") : t("unblockCustomer")}
+          >
             <Switch
               checked={row.isActive}
               onChange={(e) =>
-                activeMutation.mutate({ id: row._id, isActive: e.target.checked })
+                activeMutation.mutate({
+                  id: row._id,
+                  isActive: e.target.checked,
+                })
               }
               disabled={activeMutation.isPending}
               size="small"
@@ -131,48 +144,42 @@ const CustomersPage = () => {
         ),
       },
     ],
-    [t, lang, activeMutation]
+    [t, lang, activeMutation],
   );
 
   return (
     <Stack spacing={2} height="100%">
       <FilterLayout
+        search={{ value: search, onChange: setSearch }}
         activeCount={search ? 1 : 0}
-        filters={
-          <>
-        <TextField
-          size="small"
-          label={t("search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 260 }}
-        />
-          </>
+        chips={
+          search
+            ? [
+                {
+                  key: "search",
+                  label: `${t("search")}: ${search}`,
+                  onDelete: () => setSearch(""),
+                },
+              ]
+            : []
         }
+        onClear={() => setSearch("")}
       >
-        <Stack flex={1} minHeight={0}>
-      <Box flex={1} minHeight={0}>
         <SimpleTable
           columns={columns}
           data={data?.data ?? []}
-          borderRadius={0}
           height="100%"
           loading={isLoading}
+          pagination={{
+            count: data?.total ?? 0,
+            page: (filters.page ?? 1) - 1,
+            rowsPerPage: filters.limit ?? 25,
+            onPageChange: (page) =>
+              setFilters((prev) => ({ ...prev, page: page + 1 })),
+            onRowsPerPageChange: (limit) =>
+              setFilters((prev) => ({ ...prev, limit, page: 1 })),
+          }}
         />
-      </Box>
-
-      <TablePagination
-        component="div"
-        count={data?.total ?? 0}
-        page={(filters.page ?? 1) - 1}
-        onPageChange={(_, page) => setFilters((prev) => ({ ...prev, page: page + 1 }))}
-        rowsPerPage={filters.limit ?? 25}
-        onRowsPerPageChange={(e) =>
-          setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value, 10), page: 1 }))
-        }
-        rowsPerPageOptions={[25, 50, 100]}
-      />
-        </Stack>
       </FilterLayout>
     </Stack>
   );

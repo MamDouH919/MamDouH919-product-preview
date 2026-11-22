@@ -1,4 +1,10 @@
-import { useState, useMemo, useCallback, useEffect, CSSProperties } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  CSSProperties,
+} from "react";
 import {
   DndContext,
   useSensor,
@@ -23,19 +29,23 @@ import {
   TableRow,
   Paper,
   IconButton,
+  Skeleton,
 } from "@mui/material";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import {
   restrictToVerticalAxis,
   restrictToParentElement,
 } from "@dnd-kit/modifiers";
-import { styled } from "@mui/material/styles";
-import EmptyTablePlaceHolderMessage from "./EmptyTablePlaceHolderMessage";
-import TableLoading from "./TableLoading";
+import { alpha, styled } from "@mui/material/styles";
+import { useTranslation } from "react-i18next";
 
 const DragHandle = (props: any) => (
-  <IconButton {...props}>
-    <DragIndicatorIcon />
+  <IconButton
+    size="small"
+    {...props}
+    sx={{ cursor: "grab", color: "text.disabled", touchAction: "none" }}
+  >
+    <DragIndicatorIcon fontSize="small" />
   </IconButton>
 );
 
@@ -76,7 +86,9 @@ const DraggableTableRow = ({ row, columns, disableDragAndDrop }: any) => {
   } = useSortable({ id: row.id, disabled: disableDragAndDrop });
 
   const style: CSSProperties = {
-    opacity: isDragging ? 0.4 : undefined,
+    opacity: isDragging ? 0.5 : undefined,
+    position: "relative",
+    zIndex: isDragging ? 1 : undefined,
     transform: CSS.Translate.toString(transform),
     transition,
   };
@@ -97,16 +109,25 @@ const DraggableTableRow = ({ row, columns, disableDragAndDrop }: any) => {
   );
 };
 
-const DragAndDropTable = ({ columns, data, borderRadius, height, onReorder, loading, disableDragAndDrop }: {
-  columns: any[],
-  data: any[],
-  setData?: any,
-  borderRadius?: number
-  onReorder?: (newData: any[], draggedId: string) => void
-  height?: string
-  loading?: boolean
-  disableDragAndDrop?: boolean
+const DragAndDropTable = ({
+  columns,
+  data,
+  borderRadius,
+  height,
+  onReorder,
+  loading,
+  disableDragAndDrop,
+}: {
+  columns: any[];
+  data: any[];
+  setData?: any;
+  borderRadius?: number;
+  onReorder?: (newData: any[], draggedId: string) => void;
+  height?: string;
+  loading?: boolean;
+  disableDragAndDrop?: boolean;
 }) => {
+  const { t } = useTranslation();
   const [internalData, setInternalData] = useState(data);
 
   // Sync internal state when prop data changes (e.g. after fetch)
@@ -114,14 +135,17 @@ const DragAndDropTable = ({ columns, data, borderRadius, height, onReorder, load
     setInternalData(data);
   }, [data]);
 
-  const items = useMemo(() => internalData?.map((item) => item.id), [internalData]);
+  const items = useMemo(
+    () => internalData?.map((item) => item.id),
+    [internalData],
+  );
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, {
       activationConstraint: { delay: 250, tolerance: 5 },
     }),
-    useSensor(KeyboardSensor)
+    useSensor(KeyboardSensor),
   );
 
   const handleDragStart = useCallback(({ active }: any) => {
@@ -141,7 +165,7 @@ const DragAndDropTable = ({ columns, data, borderRadius, height, onReorder, load
       }
       // setActiveId(null);
     },
-    [onReorder]
+    [onReorder],
   );
 
   // const activeRow = useMemo(
@@ -149,12 +173,8 @@ const DragAndDropTable = ({ columns, data, borderRadius, height, onReorder, load
   //   [activeId, data]
   // );
 
-  if (loading) return <TableLoading />;
-  if (!internalData || internalData.length === 0)
-    return (
-      <EmptyTablePlaceHolderMessage
-      />
-    );
+  const empty = !loading && (!internalData || internalData.length === 0);
+
   return (
     <DndContext
       sensors={sensors}
@@ -163,53 +183,108 @@ const DragAndDropTable = ({ columns, data, borderRadius, height, onReorder, load
       onDragEnd={handleDragEnd}
     >
       <Paper
+        variant="outlined"
         sx={{
           display: "flex",
           flexDirection: "column",
           width: "100%",
           overflow: "hidden",
-          borderRadius: borderRadius ?? 0,
+          borderRadius: borderRadius ?? 3,
           height: height ?? "100%",
+          borderColor: "divider",
+          boxShadow: "0 1px 3px rgba(16, 24, 40, 0.06)",
         }}
       >
-        <Box
-          sx={{
-            flex: 1,
-            overflow: "auto",
-          }}
-        >
-          <Table stickyHeader size="small">
-            <TableHead
-              sx={{
-                backgroundColor: (theme) => theme.palette.background.paper,
-              }}
-            >
-              <TableRow
-                sx={{
-                  backgroundColor: (theme) => theme.palette.background.paper,
-                }}
-              >
-                <TableCell
-                  sx={{ backgroundColor: "background.paper" }}
-                />
+        <Box sx={{ flex: 1, overflow: "auto" }}>
+          <Table
+            stickyHeader
+            sx={{
+              borderCollapse: "separate",
+              borderSpacing: 0,
+              "& .MuiTableCell-root": {
+                px: 2,
+                py: 1.5,
+                fontSize: 13.5,
+                borderBottom: "1px solid",
+                borderColor: "divider",
+              },
+              "& .MuiTableCell-root:first-of-type": { ps: 2, width: 48 },
+              "& .MuiTableCell-root:last-of-type": { pe: 3 },
+              "& .MuiTableHead-root .MuiTableCell-root": {
+                backgroundColor: "background.paper",
+                color: "text.secondary",
+                fontSize: 12.5,
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                py: 1.25,
+                borderBottom: "2px solid",
+                borderColor: "divider",
+              },
+              "& .MuiTableBody-root .MuiTableRow-root": {
+                transition: "background-color 0.12s ease",
+                "&:hover": {
+                  backgroundColor: (th) =>
+                    alpha(th.palette.primary.main, 0.045),
+                },
+                "&:last-of-type .MuiTableCell-root": { borderBottom: 0 },
+              },
+            }}
+          >
+            <TableHead>
+              <TableRow>
+                <TableCell />
                 {columns.map((col) => (
-                  <TableCell
-                    key={col.id}
-                    sx={{ backgroundColor: "background.paper" }}
-                  >
-                    {col.header}
-                  </TableCell>
+                  <TableCell key={col.id}>{col.header}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
-              <SortableContext items={items} strategy={verticalListSortingStrategy}>
-                {internalData.map((row) => (
-                  <DraggableTableRow key={row.id} row={row} columns={columns}  />
-                ))}
-              </SortableContext>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, r) => (
+                  <TableRow key={`sk${r}`}>
+                    <TableCell />
+                    {columns.map((col) => (
+                      <TableCell key={col.id}>
+                        {col.header ? (
+                          <Skeleton variant="text" width="60%" />
+                        ) : null}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <SortableContext
+                  items={items ?? []}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {(internalData ?? []).map((row) => (
+                    <DraggableTableRow
+                      key={row.id}
+                      row={row}
+                      columns={columns}
+                      disableDragAndDrop={disableDragAndDrop}
+                    />
+                  ))}
+                </SortableContext>
+              )}
             </TableBody>
           </Table>
+          {empty && (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 260,
+                height: "calc(100% - 48px)",
+                color: "text.disabled",
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              {t("noResult")}
+            </Box>
+          )}
         </Box>
       </Paper>
     </DndContext>

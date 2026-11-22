@@ -192,8 +192,14 @@ describe('Tenant registry', () => {
 
   it('never moves an orders-only store to the full shop', async () => {
     await service.update('shop.test', { plan: StorePlan.ORDERS });
-    await expect(service.update('shop.test', { plan: StorePlan.FULL })).rejects.toThrow(/orders-only/);
+    await expect(service.update('shop.test', { plan: StorePlan.FULL })).rejects.toThrow(/without books/);
     expect(tenants.getPlan('shop.test')).toBe(StorePlan.ORDERS);
+  });
+
+  it('never moves an orders-with-stock store to the full shop', async () => {
+    await service.update('shop.test', { plan: StorePlan.STOCK });
+    await expect(service.update('shop.test', { plan: StorePlan.FULL })).rejects.toThrow(/without books/);
+    expect(tenants.getPlan('shop.test')).toBe(StorePlan.STOCK);
   });
 
   it('refuses to delete a store that still has aliases', async () => {

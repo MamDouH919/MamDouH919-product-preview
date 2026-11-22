@@ -8,6 +8,7 @@ import { PaymentsService } from '../../src/finance/payments.service';
 import { FinanceReportsService } from '../../src/finance/finance-reports.service';
 import { ReconciliationService } from '../../src/finance/reconciliation.service';
 import { ReportsService } from '../../src/reports/reports.service';
+import { ReturnsService } from '../../src/returns/returns.service';
 import { RefundsService } from '../../src/refunds/refunds.service';
 import { PurchasingService } from '../../src/purchasing/purchasing.service';
 import { CouriersService } from '../../src/couriers/couriers.service';
@@ -99,7 +100,7 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     model('CourierSettlement'),
     journal,
   );
-  const dashboard = new ReportsService(model('Order'), model('Customer'), model('Review'), finance, modules);
+  const dashboard = new ReportsService(model('Order'), model('Customer'), model('Review'), finance, modules, model('ReturnRequest'));
   const purchasing = new PurchasingService(
     model('Supplier'),
     model('Purchase'),
@@ -134,6 +135,18 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     { statusChanged: () => undefined } as never,
     // Gateway refunds are tested with a stand-in that replaces this.
     { sendRefund: async () => undefined, notifyRefunded: async () => undefined } as never,
+  );
+
+  const returns = new ReturnsService(
+    model('ReturnRequest'),
+    model('Order'),
+    model('Counter'),
+    model('Customer'),
+    model('Setting'),
+    { statusChanged: () => undefined } as never,
+    inventory,
+    db,
+    modules,
   );
 
   let n = 0;
@@ -175,7 +188,7 @@ export function buildStore(db: Connection, modules: readonly StoreModule[] = PLA
     },
   };
 
-  return { db, delivery, journal, inventory, warehouses, coupons, orders, payments, finance, reconciliation, dashboard, refunds, purchasing, couriers, expenses, statements, periods, moneyAccounts, chart, ledger, ...helpers };
+  return { db, delivery, journal, inventory, warehouses, coupons, orders, payments, finance, reconciliation, dashboard, refunds, returns, purchasing, couriers, expenses, statements, periods, moneyAccounts, chart, ledger, ...helpers };
 }
 
 export type Store = ReturnType<typeof buildStore>;

@@ -14,16 +14,19 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Checkbox,
   Divider,
+  FormControlLabel,
   Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { CASH_FLOW_QUERY_KEY } from "@/backend-api/reports/hooks";
 import { useAppDispatch } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
 import { RETURNS_QUERY_KEY, useReturnQuery } from "@/backend-api/returns/hooks";
-import { approveReturn, receiveReturn, rejectReturn } from "@/backend-api/returns/mutations";
+import { approveReturn, receiveReturn, rejectReturn, settleReturn } from "@/backend-api/returns/mutations";
 import { REFUNDS_QUERY_KEY, useRefundsQuery } from "@/backend-api/refunds/hooks";
 import RefundRequestDialog from "@/features/Refund/RefundRequestDialog";
 import RefundsCard from "@/features/Refund/RefundsCard";
@@ -51,7 +54,14 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   // Bumped to open a fresh refund dialog each time.
   const [refundDialog, setRefundDialog] = useState(0);
   // Refunds live in the books; a store without them settles returns outside the system.
-  const keepsBooks = useStoreModules().has("finance");
+  const { has } = useStoreModules();
+  const keepsBooks = has("finance");
+  // Without books the store records what it gave back (and restocks, if it keeps stock) here, since refunds need the books.
+  const settlesHere = !keepsBooks;
+  const keepsStock = has("inventory");
+  const [settleOpen, setSettleOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [restock, setRestock] = useState<number[]>([]);
   const { data: refunds } = useRefundsQuery({ returnId: id, limit: 50 }, keepsBooks);
 
   useEffect(() => {
@@ -82,6 +92,22 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
     toast.error(Array.isArray(message) ? message[0] : message ?? t("somethingWentWrong"));
   };
 
+  const settleMutation = useMutation({
+    mutationFn: () =>
+      settleReturn({
+        id,
+        refundAmount: Number(amount) || 0,
+        restockLines: restock,
+        note: note.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CASH_FLOW_QUERY_KEY] });
+      setSettleOpen(false);
+      done(t("returnSettled"));
+    },
+    onError,
+  });
+
   const mutation = useMutation({
     mutationFn: async (kind: Decision) => {
       const trimmed = note.trim() || undefined;
@@ -109,6 +135,16 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const hasRefund = (refunds?.data ?? []).some((r) => ["requested", "approved", "executed"].includes(r.status));
   // Refunds live in the books, so only orders delivered after they started can be refunded here.
   const canRefund = keepsBooks && open && !hasRefund && !!ret.orderSummary?.bookedAt;
+
+  const openSettle = () => {
+    // What the customer paid for these lines is the natural refund; the store can change it.
+    const lines = ret.items.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
+    setAmount(String(Math.round(lines * 100) / 100));
+    // Damaged goods are written off, not put back on the shelf.
+    setRestock(!keepsStock || ret.reason === "damaged" ? [] : ret.items.map((item) => item.lineIndex));
+    setNote("");
+    setSettleOpen(true);
+  };
 
   const openDialog = (kind: Decision) => {
     setNote("");
@@ -172,7 +208,7 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Paper>
 
-          {open && !keepsBooks && <Alert severity="info">{t("returnOutsideSystem")}</Alert>}
+          {open && settlesHere && <Alert severity="info">{t(keepsStock ? "returnSettleHint" : "returnSettleHintNoStock")}</Alert>}
           {open && keepsBooks && !ret.orderSummary?.bookedAt && (
             <Alert severity="info">{t("refundOutsideBooks")}</Alert>
           )}
@@ -190,6 +226,11 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
                 {ret.status === "approved" && (
                   <Button variant="contained" onClick={() => openDialog("receive")}>
                     {t("markReceived")}
+                  </Button>
+                )}
+                {settlesHere && (
+                  <Button variant={ret.status === "received" ? "contained" : "outlined"} onClick={openSettle}>
+                    {t("settleReturn")}
                   </Button>
                 )}
                 {canRefund && (
@@ -284,6 +325,58 @@ const AdminReturnPage = ({ params }: { params: Promise<{ id: string }> }) => {
             disabled={mutation.isPending}
             onClick={() => decision && mutation.mutate(decision)}
           >
+            {t("confirm")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={settleOpen} onClose={() => setSettleOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{t("settleReturn")}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} pt={1}>
+            <TextField
+              label={t("refundAmountGiven", { currency })}
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              helperText={t("refundAmountGivenHint")}
+              slotProps={{ htmlInput: { min: 0, step: "0.01" } }}
+            />
+            {keepsStock && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700}>
+                {t("putBackOnShelf")}
+              </Typography>
+              {ret.items.map((item) => (
+                <FormControlLabel
+                  key={item.lineIndex}
+                  sx={{ display: "flex" }}
+                  control={
+                    <Checkbox
+                      checked={restock.includes(item.lineIndex)}
+                      onChange={(e) =>
+                        setRestock((prev) => (e.target.checked ? [...prev, item.lineIndex] : prev.filter((i) => i !== item.lineIndex)))
+                      }
+                    />
+                  }
+                  label={`${item.quantity} × ${localized(item.name, lang)}${item.variantLabel ? ` (${item.variantLabel})` : ""}`}
+                />
+              ))}
+            </Box>
+            )}
+            <TextField
+              label={t("noteToCustomer")}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              multiline
+              minRows={2}
+              slotProps={{ htmlInput: { maxLength: 1000 } }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSettleOpen(false)}>{t("back")}</Button>
+          <Button variant="contained" disabled={settleMutation.isPending || amount === "" || Number(amount) < 0} onClick={() => settleMutation.mutate()}>
             {t("confirm")}
           </Button>
         </DialogActions>

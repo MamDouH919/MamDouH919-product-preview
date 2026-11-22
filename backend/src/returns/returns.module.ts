@@ -10,10 +10,11 @@ import { Setting, SettingSchema } from '../settings/schemas/setting.schema';
 import { AuthModule } from '../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
 import { CustomerAuthGuard } from '../guards/customer-auth.guard';
+import { InventoryModule } from '../inventory/inventory.module';
 import { tenantModelProvider } from '../common/tenant/tenant-model.provider';
 
 @Module({
-  imports: [AuthModule, MailModule],
+  imports: [AuthModule, MailModule, InventoryModule],
   // Customer routes first, so `returns/me/...` is never read as a return id.
   controllers: [CustomerReturnsController, ReturnsController],
   providers: [
