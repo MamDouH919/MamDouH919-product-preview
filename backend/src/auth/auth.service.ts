@@ -19,6 +19,9 @@ import { ResetToken } from './schemas/reset-token.schema';
 import { RolesService } from '../roles/roles.service';
 import { TenantConnectionService } from '../common/helpers/dynamic-connection';
 
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 const ACCESS_TOKEN_TTL = '12h';
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** How long a just-rotated refresh token is still accepted (concurrent tabs). */
@@ -40,7 +43,8 @@ export class AuthService {
   ) { }
 
   async create(createAuthDto: SignupDto) {
-    const { email, password, name } = createAuthDto;
+    const { password, name } = createAuthDto;
+    const email = normalizeEmail(createAuthDto.email);
     // Check if email is already in use by a verified user
     const existingUser = await this.UserModel.findOne({ email });
     if (existingUser && existingUser.isVerified) {
@@ -75,7 +79,8 @@ export class AuthService {
   }
 
   async verifyOtp(verifyOtpDto: VerifyOtpDto) {
-    const { email, otp } = verifyOtpDto;
+    const { otp } = verifyOtpDto;
+    const email = normalizeEmail(verifyOtpDto.email);
 
     const otpRecord = await this.OtpModel.findOne({
       email,
@@ -97,7 +102,7 @@ export class AuthService {
   }
 
   async resendOtp(resendOtpDto: ResendOtpDto) {
-    const { email } = resendOtpDto;
+    const email = normalizeEmail(resendOtpDto.email);
 
     // Check if there is a pending OTP record for this email
     const existingOtp = await this.OtpModel.findOne({ email });
@@ -120,11 +125,10 @@ export class AuthService {
   }
 
   async login(createAuthDto: LoginDto, tenant: string) {
-    const { email, password } = createAuthDto;
+    const { password } = createAuthDto;
+    const email = normalizeEmail(createAuthDto.email);
     const user = await this.UserModel.findOne({ email });
 
-    console.log({ email, password });
-    
     if (!user) {
       throw new BadRequestException('wrong credentials');
     }
@@ -227,7 +231,8 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
-  async forgetPassword(email: string, host: string) {
+  async forgetPassword(rawEmail: string, host: string) {
+    const email = normalizeEmail(rawEmail);
     const user = await this.UserModel.findOne({ email });
     if (user) {
       const resetToken = nanoid(64);
