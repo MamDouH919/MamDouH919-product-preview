@@ -886,7 +886,8 @@
     "deliveryCountry": "Delivery country",
     "deliveryCountryHint": "Saving loads this country's governorates and cities into the price list. Prices you already set are kept.",
     "countries": {
-        "EG": "Egypt"
+        "EG": "Egypt",
+        "US": "United States"
     },
     "noDeliveryAreas": "Delivery isn't available yet. Please contact the store.",
     "chooseZoneFirst": "Choose the governorate first",

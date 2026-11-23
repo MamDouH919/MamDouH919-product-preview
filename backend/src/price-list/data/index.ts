@@ -1,9 +1,11 @@
 import { CountryZones } from './types';
 import { EGYPT } from './egypt';
+import { USA } from './usa';
 
 /** Countries a super admin can pick, keyed by ISO 3166-1 alpha-2 code. */
 export const COUNTRY_ZONES: Record<string, CountryZones> = {
   EG: EGYPT,
+  US: USA,
 };
 
 export const SUPPORTED_COUNTRIES = Object.keys(COUNTRY_ZONES);

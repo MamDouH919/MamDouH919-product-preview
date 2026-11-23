@@ -1,7 +1,7 @@
 import { LocalizedField } from "../globalTypes";
 
 /** Countries a super admin can pick — mirrors COUNTRY_ZONES on the server. */
-export const SUPPORTED_COUNTRIES = ["EG"] as const;
+export const SUPPORTED_COUNTRIES = ["EG", "US"] as const;
 
 export type NamedRef = { _id: string; name: LocalizedField };
 
