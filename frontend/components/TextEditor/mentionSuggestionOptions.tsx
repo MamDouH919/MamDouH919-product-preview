@@ -8,7 +8,7 @@ import type { SubCategory } from "@/backend-api/sub-categories/types";
 import { mentionHref, type MentionKind } from "@/lib/mentions";
 import SuggestionList, { type SuggestionListRef } from "./SuggestionList";
 
-export type EditorLang = "ar" | "en";
+export type EditorLang = "ar" | "en" | "es";
 
 /** One thing the `@` menu offers: a product, category or sub-category of this store. */
 export type MentionSuggestion = {

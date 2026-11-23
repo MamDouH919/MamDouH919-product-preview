@@ -17,10 +17,10 @@ import {
 import { BlockStyle, PageBlock, PageBlockType } from "@/backend-api/pages/types";
 import { LocalizedField } from "@/backend-api/globalTypes";
 
-export const LANGS = ["ar", "en"] as const;
+export const LANGS = ["ar", "en", "es"] as const;
 export type Lang = (typeof LANGS)[number];
 
-export const emptyL = (): LocalizedField => ({ ar: "", en: "" });
+export const emptyL = (): LocalizedField => ({ ar: "", en: "", es: "" });
 
 /** Reads a localized field, falling back to whichever language has text. */
 export const loc = (field: LocalizedField | undefined, lang: string): string =>

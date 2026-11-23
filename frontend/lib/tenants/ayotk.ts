@@ -9,12 +9,22 @@ const en = {
   productsHeading: "Shop Perfumes & Fragrances",
 };
 
-// US-targeted, English-only store. `ar` is required by the type but never
-// served (the store publishes English only), so it mirrors `en`.
+const es = {
+  title: "AYOTK | Perfumes y Fragancias de Lujo en Línea",
+  titleTemplate: "%s | AYOTK",
+  description:
+    "Compra perfumes y fragancias AYOTK para hombre y mujer. Descubre aromas exclusivos, eau de parfum y fragancias ideales para regalar. Tu aroma... tu identidad.",
+  h1: "Perfumes AYOTK: Tu aroma, tu identidad",
+  productsHeading: "Compra perfumes y fragancias",
+};
+
+// US-targeted store published in English and Spanish. `ar` is required by the
+// type but never served, so it mirrors `en`.
 const ayotk: TenantSeo = {
   siteName: "AYOTK",
   siteUrl: "https://ayotk.com",
   en,
+  es,
   ar: en,
   // Assets live under /public/ayotk/
   icons: {

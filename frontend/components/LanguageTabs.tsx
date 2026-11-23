@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useStoreLocales } from "@/lib/storeLocalesContext";
 import type { Locale } from "@/lib/locales";
 
-const TAB_LABEL: Record<Locale, string> = { ar: "arabic", en: "english" };
+const TAB_LABEL: Record<Locale, string> = { ar: "arabic", en: "english", es: "spanish" };
 
 type Props = {
   /** The fields for one language; every language's stay mounted so the form validates them all. */

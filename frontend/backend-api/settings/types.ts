@@ -12,9 +12,9 @@ export type BannerStyle = "peek" | "fade";
 export const BANNER_STYLES: BannerStyle[] = ["peek", "fade"];
 
 /** Which languages staff type product and category texts in; one language is saved under every language. */
-export type ContentLanguages = "both" | "ar" | "en";
+export type ContentLanguages = "both" | "ar" | "en" | "es";
 
-export const CONTENT_LANGUAGES: ContentLanguages[] = ["both", "ar", "en"];
+export const CONTENT_LANGUAGES: ContentLanguages[] = ["both", "ar", "en", "es"];
 
 export type Setting = {
   _id: string;

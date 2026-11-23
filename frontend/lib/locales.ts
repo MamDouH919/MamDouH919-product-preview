@@ -5,7 +5,7 @@ import config from "@/config.json";
  * them, set on the platform dashboard (GET /settings/languages). Mirrors the
  * API's SUPPORTED_LANGUAGES.
  */
-export const SUPPORTED_LOCALES = ["en", "ar"] as const;
+export const SUPPORTED_LOCALES = ["en", "ar", "es"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 const RTL_LOCALES: readonly string[] = config.app.rtlLanguages;
@@ -37,7 +37,9 @@ export function isRtl(locale: string): boolean {
 
 /** Open Graph locale: Facebook knows Arabic only as ar_AR. */
 export function ogLocale(locale: string): string {
-  return locale === "ar" ? "ar_AR" : "en_US";
+  if (locale === "ar") return "ar_AR";
+  if (locale === "es") return "es_ES";
+  return "en_US";
 }
 
 /**

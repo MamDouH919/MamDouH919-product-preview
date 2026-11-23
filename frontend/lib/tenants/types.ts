@@ -16,6 +16,8 @@ export type TenantSeo = {
   siteUrl: string;
   ar: LocaleSeo;
   en: LocaleSeo;
+  /** Optional: Spanish pages fall back to the English copy. */
+  es?: LocaleSeo;
   icons: Metadata["icons"];
   manifest: string;
   /** Open Graph / Twitter share image. */

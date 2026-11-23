@@ -12,4 +12,9 @@ export class LocalizedFieldDto {
   @IsString()
   en?: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  es?: string;
+
 }

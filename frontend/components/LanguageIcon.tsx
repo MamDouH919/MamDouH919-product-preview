@@ -8,6 +8,7 @@ import type { Locale } from "@/lib/locales";
 const LABELS: Record<Locale, string> = {
   ar: "العربية",
   en: "English",
+  es: "Español",
 };
 
 type Props = {

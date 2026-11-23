@@ -3,7 +3,7 @@
  * these it is published in; adding one here also needs its translation file
  * in the frontend and the platform dashboard's list.
  */
-export const SUPPORTED_LANGUAGES = ['en', 'ar'] as const;
+export const SUPPORTED_LANGUAGES = ['en', 'ar', 'es'] as const;
 export type StoreLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 /**

@@ -109,7 +109,7 @@ type PageSeo = {
 export async function pageMetadata({ locale, path, title: baseTitle, titleExtras = [], description, image, index = true }: PageSeo): Promise<Metadata> {
   const [h, origin, locales] = await Promise.all([headers(), requestOrigin(), getStoreLocales()]);
   const tenant = resolveTenantSeo(h.get("x-forwarded-host") ?? h.get("host"));
-  const seo = tenant[locale === "ar" ? "ar" : "en"];
+  const seo = (locale === "ar" ? tenant.ar : locale === "es" ? tenant.es ?? tenant.en : tenant.en);
   const title = baseTitle && fitTitle(baseTitle, titleExtras, seo.titleTemplate);
   const url = `${origin}/${locale}${path}`;
   const shareTitle = title ? seo.titleTemplate.replace("%s", title) : seo.title;

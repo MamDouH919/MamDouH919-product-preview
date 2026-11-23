@@ -10,10 +10,10 @@ import { SUPPORTED_LOCALES } from "@/lib/locales"
 
 export type MentionKind = "product" | "category" | "subCategory"
 
-export const MENTION_KIND_LABEL: Record<MentionKind, { ar: string; en: string }> = {
-  product: { ar: "منتج", en: "Product" },
-  category: { ar: "قسم", en: "Category" },
-  subCategory: { ar: "قسم فرعي", en: "Sub-category" },
+export const MENTION_KIND_LABEL: Record<MentionKind, { ar: string; en: string; es: string }> = {
+  product: { ar: "منتج", en: "Product", es: "Producto" },
+  category: { ar: "قسم", en: "Category", es: "Categoría" },
+  subCategory: { ar: "قسم فرعي", en: "Sub-category", es: "Subcategoría" },
 }
 
 /** Where a mention points, without the locale. A sub-category has no page of its own: it opens the filtered product list. */

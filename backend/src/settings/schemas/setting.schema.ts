@@ -38,6 +38,7 @@ export enum ContentLanguages {
   BOTH = 'both',
   AR = 'ar',
   EN = 'en',
+  ES = 'es',
 }
 
 /** One change to the store's finance rules, with what it was and what it became. */

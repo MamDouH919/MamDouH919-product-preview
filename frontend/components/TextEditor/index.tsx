@@ -21,7 +21,7 @@ interface EditorProps {
   /** Uploads an image and resolves to its public URL. Without it images stay local blob URLs. */
   onUploadImage?: (file: File) => Promise<string>;
   /** Language of the text; the `@` menu lists products and categories by their name in it. */
-  lang?: "ar" | "en";
+  lang?: "ar" | "en" | "es";
 }
 
 function fileListToImageFiles(fileList: FileList): File[] {
