@@ -14,11 +14,15 @@ const COPY = {
     title: "All products",
     description: "Every product in one place, with prices, photos and details. Browse by category, sort by price or newest, and order easily.",
   },
+  es: {
+    title: "Todos los productos",
+    description: "Todos nuestros productos en un solo lugar, con precios, fotos y detalles. Explora por categoría, ordena por precio o novedad y haz tu pedido fácilmente.",
+  },
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
-  const copy = COPY[locale === "ar" ? "ar" : "en"]
+  const copy = COPY[locale === "ar" ? "ar" : locale === "es" ? "es" : "en"]
   // Filters and search live in the query string; the canonical leaves it out.
   return pageMetadata({ locale, path: "/products", ...copy })
 }
@@ -43,7 +47,7 @@ export default async function ProductsPage({
 
   return (
     <Prefetched entries={entries}>
-      <JsonLd data={breadcrumbLd(origin, locale, [{ name: COPY[locale === "ar" ? "ar" : "en"].title, path: "/products" }])} />
+      <JsonLd data={breadcrumbLd(origin, locale, [{ name: COPY[locale === "ar" ? "ar" : locale === "es" ? "es" : "en"].title, path: "/products" }])} />
       <ProductsClient />
     </Prefetched>
   )

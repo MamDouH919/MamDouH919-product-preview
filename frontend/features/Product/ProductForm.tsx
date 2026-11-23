@@ -139,9 +139,9 @@ const ProductForm = ({ defaultData }: ProductFormProps) => {
   const { control, handleSubmit, watch, setValue, getValues, formState: { errors } } =
     useForm<ProductFormValues>({
       defaultValues: {
-        name: { ar: defaultData?.name?.ar ?? "", en: defaultData?.name?.en ?? "" },
-        description: { ar: defaultData?.description?.ar ?? "", en: defaultData?.description?.en ?? "" },
-        shortDescription: { ar: defaultData?.shortDescription?.ar ?? "", en: defaultData?.shortDescription?.en ?? "" },
+        name: { ar: defaultData?.name?.ar ?? "", en: defaultData?.name?.en ?? "", es: defaultData?.name?.es ?? "" },
+        description: { ar: defaultData?.description?.ar ?? "", en: defaultData?.description?.en ?? "", es: defaultData?.description?.es ?? "" },
+        shortDescription: { ar: defaultData?.shortDescription?.ar ?? "", en: defaultData?.shortDescription?.en ?? "", es: defaultData?.shortDescription?.es ?? "" },
         images: (defaultData?.images ?? []).map((src) => ({ file: getBackendUri(src) })),
         variants: (defaultData?.variants ?? []).map((v) => ({
           _id: v._id,

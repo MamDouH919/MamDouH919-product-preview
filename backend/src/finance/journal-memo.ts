@@ -6,7 +6,7 @@
  */
 
 export type MemoParams = Record<string, string | number>;
-export type LocalText = { en: string; ar: string };
+export type LocalText = { en: string; ar: string; es: string };
 
 /** Stock movement kinds, as the Arabic memo names them. English keeps the raw kind. */
 const MOVEMENT_AR: Record<string, string> = {
@@ -20,6 +20,19 @@ const MOVEMENT_AR: Record<string, string> = {
   adjustment_out: 'تسوية بالخصم',
   purchase_return: 'مرتجع للمورد',
   cost_set: 'تحديد التكلفة',
+};
+
+const MOVEMENT_ES: Record<string, string> = {
+  opening: 'saldo inicial',
+  purchase: 'compra',
+  sale: 'venta',
+  return: 'devolución',
+  damage: 'daño',
+  order_cancelled: 'pedido cancelado',
+  adjustment_in: 'ajuste (añadir)',
+  adjustment_out: 'ajuste (retirar)',
+  purchase_return: 'devolución al proveedor',
+  cost_set: 'coste definido',
 };
 
 const withReason = (text: string, reason: unknown) => (reason ? `${text}: ${reason}` : text);
@@ -107,6 +120,30 @@ const TEMPLATES = {
   },
 } satisfies Record<string, { en: (p: MemoParams) => string; ar: (p: MemoParams) => string }>;
 
+/** The same sentences in Spanish. */
+const TEMPLATES_ES: Record<keyof typeof TEMPLATES, (p: MemoParams) => string> = {
+  opening_stock: (p) => `Valor del stock inicial, ${p.qty} unidad(es)`,
+  opening_cost_corrected: (p) => `Coste inicial corregido, ${p.qty} unidad(es)`,
+  stock_movement: (p) => withReason(`Movimiento de stock: ${MOVEMENT_ES[String(p.type)] ?? p.type}`, p.reason),
+  purchase: (p) => `Compra n.º ${p.number}`,
+  purchase_return: (p) => `Mercancía devuelta al proveedor, compra n.º ${p.number}`,
+  supplier_payment: (p) => `Pago a ${p.supplier}`,
+  courier_settled: (p) => `Liquidación con ${p.courier}`,
+  collection: (p) => `Cobro n.º ${p.payment} del pedido n.º ${p.order}`,
+  online_payment: (p) => `Pago en línea n.º ${p.payment} del pedido n.º ${p.order}`,
+  online_payment_applied: (p) => `Pago en línea n.º ${p.payment} aplicado al pedido entregado n.º ${p.order}`,
+  online_payment_refunded: (p) => `Pago en línea n.º ${p.payment} reembolsado por el pedido cancelado n.º ${p.order}`,
+  gateway_payout: (p) => `Transferencia de la pasarela de pago n.º ${p.payout}`,
+  write_off: (p) => `Pedido n.º ${p.order} dado de baja: ${p.reason}`,
+  refund: (p) => `Reembolso n.º ${p.refund} del pedido n.º ${p.order}`,
+  order_placed: (p) => `Pedido n.º ${p.order} realizado: mercancía reservada al coste`,
+  order_delivered: (p) => `Pedido n.º ${p.order} entregado`,
+  order_cancelled: (p) => `Pedido n.º ${p.order} cancelado: el stock vuelve a la estantería`,
+  transfer: () => 'Transferencia entre cuentas',
+  opening_balance: () => 'Saldo inicial',
+  reversal: (p) => withReason(`Revierte el asiento n.º ${p.entry}`, p.reason),
+};
+
 export type MemoKey = keyof typeof TEMPLATES;
 
 /** A system memo: which sentence, and the values that go in it. */
@@ -125,7 +162,7 @@ export function memoText(e: { memo?: string; memoKey?: string; memoParams?: Memo
   const template = e.memoKey ? TEMPLATES[e.memoKey as MemoKey] : undefined;
   if (template) {
     const params = e.memoParams ?? {};
-    return { en: template.en(params), ar: template.ar(params) };
+    return { en: template.en(params), ar: template.ar(params), es: TEMPLATES_ES[e.memoKey as MemoKey](params) };
   }
-  return e.memo ? { en: e.memo, ar: e.memo } : undefined;
+  return e.memo ? { en: e.memo, ar: e.memo, es: e.memo } : undefined;
 }

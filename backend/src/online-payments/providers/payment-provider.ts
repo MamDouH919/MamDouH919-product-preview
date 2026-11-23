@@ -13,11 +13,11 @@ export enum GatewayId {
 /** One credential the store must give a gateway. The settings form is drawn from these. */
 export interface CredentialField {
   key: string;
-  label: { en: string; ar: string };
+  label: { en: string; ar: string; es: string };
   /** Encrypted at rest and never sent back to the dashboard (only whether it is set). */
   secret: boolean;
   required: boolean;
-  hint?: { en: string; ar: string };
+  hint?: { en: string; ar: string; es: string };
   placeholder?: string;
 }
 

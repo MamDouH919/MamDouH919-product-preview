@@ -174,7 +174,7 @@ const PagesList = () => {
         render: (row: Page) =>
           row.updatedAt
             ? new Date(row.updatedAt).toLocaleDateString(
-                lang === "ar" ? "ar-EG" : "en-GB",
+                lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB",
               )
             : "",
       },

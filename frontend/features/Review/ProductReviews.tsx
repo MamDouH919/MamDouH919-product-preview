@@ -27,7 +27,7 @@ const errorMessage = (error: any, fallback: string): string => {
 }
 
 const formatDate = (iso: string, lang: string) =>
-  new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium" })
+  new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB", { dateStyle: "medium" })
 
 function Summary({ summary }: { summary: RatingSummary }) {
   const { t } = useTranslation()

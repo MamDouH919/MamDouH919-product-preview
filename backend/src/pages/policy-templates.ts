@@ -14,7 +14,8 @@ import { DeliveryFeeRefundPolicy } from '../settings/schemas/setting.schema';
 export const SHIPPING_POLICY_SLUG = 'shipping-policy';
 export const RETURN_POLICY_SLUG = 'return-policy';
 
-type Localized = { ar: string; en: string };
+type Localized = { ar: string; en: string; es: string };
+type Lang = 'ar' | 'en' | 'es';
 
 export type PolicyInput = {
   /** The store's name in each language; empty falls back to "our store". */
@@ -35,33 +36,34 @@ export type PolicyInput = {
 };
 
 const COUNTRIES: Record<string, Localized> = {
-  EG: { ar: 'مصر', en: 'Egypt' },
-  SA: { ar: 'السعودية', en: 'Saudi Arabia' },
-  AE: { ar: 'الإمارات', en: 'the UAE' },
-  KW: { ar: 'الكويت', en: 'Kuwait' },
-  QA: { ar: 'قطر', en: 'Qatar' },
-  BH: { ar: 'البحرين', en: 'Bahrain' },
-  OM: { ar: 'عُمان', en: 'Oman' },
-  JO: { ar: 'الأردن', en: 'Jordan' },
+  EG: { ar: 'مصر', en: 'Egypt', es: 'Egipto' },
+  SA: { ar: 'السعودية', en: 'Saudi Arabia', es: 'Arabia Saudita' },
+  AE: { ar: 'الإمارات', en: 'the UAE', es: 'los Emiratos Árabes Unidos' },
+  KW: { ar: 'الكويت', en: 'Kuwait', es: 'Kuwait' },
+  QA: { ar: 'قطر', en: 'Qatar', es: 'Catar' },
+  BH: { ar: 'البحرين', en: 'Bahrain', es: 'Baréin' },
+  OM: { ar: 'عُمان', en: 'Oman', es: 'Omán' },
+  JO: { ar: 'الأردن', en: 'Jordan', es: 'Jordania' },
 };
 
 const esc = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Every way to reach the store that it has set, as one sentence fragment. */
-function contactLine(input: PolicyInput, lang: 'ar' | 'en'): string {
+function contactLine(input: PolicyInput, lang: Lang): string {
+  const pick = <T,>(ar: T, en: T, es: T) => (lang === 'ar' ? ar : lang === 'es' ? es : en);
   const parts: string[] = [];
-  if (input.whatsapp) parts.push(lang === 'ar' ? `واتساب ${esc(input.whatsapp)}` : `WhatsApp ${esc(input.whatsapp)}`);
+  if (input.whatsapp) parts.push(pick(`واتساب ${esc(input.whatsapp)}`, `WhatsApp ${esc(input.whatsapp)}`, `WhatsApp ${esc(input.whatsapp)}`));
   if (input.phone && input.phone !== input.whatsapp)
-    parts.push(lang === 'ar' ? `تليفون ${esc(input.phone)}` : `phone ${esc(input.phone)}`);
-  if (input.email) parts.push(lang === 'ar' ? `إيميل ${esc(input.email)}` : `email ${esc(input.email)}`);
-  const contactPage = `<a href="/${lang}/contact">${lang === 'ar' ? 'صفحة تواصل معنا' : 'our contact page'}</a>`;
+    parts.push(pick(`تليفون ${esc(input.phone)}`, `phone ${esc(input.phone)}`, `teléfono ${esc(input.phone)}`));
+  if (input.email) parts.push(pick(`إيميل ${esc(input.email)}`, `email ${esc(input.email)}`, `correo electrónico ${esc(input.email)}`));
+  const contactPage = `<a href="/${lang}/contact">${pick('صفحة تواصل معنا', 'our contact page', 'nuestra página de contacto')}</a>`;
   if (!parts.length) return contactPage;
-  return lang === 'ar' ? `${parts.join(' أو ')}، أو من ${contactPage}` : `${parts.join(', ')}, or through ${contactPage}`;
+  return pick(`${parts.join(' أو ')}، أو من ${contactPage}`, `${parts.join(', ')}, or through ${contactPage}`, `${parts.join(', ')} o a través de ${contactPage}`);
 }
 
-function money(amount: number, input: PolicyInput, lang: 'ar' | 'en'): string {
-  const label = input.currency?.[lang] || input.currency?.ar || input.currency?.en || '';
+function money(amount: number, input: PolicyInput, lang: Lang): string {
+  const label = input.currency?.[lang] || input.currency?.ar || input.currency?.en || input.currency?.es || '';
   return `${amount.toLocaleString('en')} ${esc(label)}`.trim();
 }
 
@@ -76,8 +78,29 @@ const block = (type: PageBlockType, data: Record<string, unknown>) => ({
 
 function shippingPage(input: PolicyInput) {
   const country = COUNTRIES[input.country?.toUpperCase() ?? ''];
-  const where = { ar: country?.ar ?? 'كل المحافظات', en: country?.en ?? 'every governorate we serve' };
+  const where = { ar: country?.ar ?? 'كل المحافظات', en: country?.en ?? 'every governorate we serve', es: country?.es ?? 'todas las provincias a las que enviamos' };
   const flat = input.flatDeliveryPrice != null;
+
+  const htmlEs = () => {
+    const fee = flat
+      ? `<p>El envío cuesta <strong>${money(input.flatDeliveryPrice!, input, 'es')}</strong> a cualquier punto de ${where.es}.</p>`
+      : '<p>El coste de envío depende de tu zona, y al finalizar la compra verás el importe exacto antes de confirmar.</p>';
+    const tracking = input.sellsOnline
+      ? '<h2>Seguimiento de tu pedido</h2><p>Sigue tu pedido en cualquier momento en la página de <a href="/es/track">seguimiento de pedidos</a> o en Mis pedidos de tu cuenta.</p>'
+      : '';
+    return [
+      '<h2>Dónde entregamos</h2>',
+      `<p>Entregamos en la puerta de tu casa en ${where.es}.</p>`,
+      '<h2>Coste de envío</h2>',
+      fee,
+      '<h2>Plazos de preparación y entrega</h2>',
+      '<p>Preparamos tu pedido en <strong>1–2 días laborables</strong> y normalmente llega en <strong>2–5 días laborables</strong>, según tu zona.</p>',
+      '<p>Los artículos hechos especialmente para ti (con un nombre o un diseño personalizado) pueden tardar más; te indicamos el plazo antes de confirmar el pedido.</p>',
+      tracking,
+      '<h2>Si tu pedido se retrasa o llega con algún problema</h2>',
+      `<p>Contáctanos por ${contactLine(input, 'es')} y lo resolveremos cuanto antes.</p>`,
+    ].join('');
+  };
 
   const html = (lang: 'ar' | 'en') => {
     const ar = lang === 'ar';
@@ -123,36 +146,40 @@ function shippingPage(input: PolicyInput) {
 
   return {
     slug: SHIPPING_POLICY_SLUG,
-    title: { ar: 'سياسة الشحن والتوصيل', en: 'Shipping policy' },
-    metaTitle: { ar: 'سياسة الشحن والتوصيل', en: 'Shipping & delivery policy' },
+    title: { ar: 'سياسة الشحن والتوصيل', en: 'Shipping policy', es: 'Política de envíos' },
+    metaTitle: { ar: 'سياسة الشحن والتوصيل', en: 'Shipping & delivery policy', es: 'Política de envíos y entregas' },
     metaDescription: {
       ar: `أماكن التوصيل في ${where.ar}، المصاريف ومدة التجهيز والتوصيل، وإزاي تتابع طلبك.`,
       en: `Where we deliver in ${where.en}, delivery fees and times, and how to track your order.`,
+      es: `Dónde entregamos en ${where.es}, costes y plazos de envío, y cómo seguir tu pedido.`,
     },
     blocks: [
-      block(PageBlockType.RICH_TEXT, { content: { ar: html('ar'), en: html('en') } }),
+      block(PageBlockType.RICH_TEXT, { content: { ar: html('ar'), en: html('en'), es: htmlEs() } }),
       block(PageBlockType.FAQ, {
-        title: { ar: 'أسئلة شائعة', en: 'Frequently asked questions' },
+        title: { ar: 'أسئلة شائعة', en: 'Frequently asked questions', es: 'Preguntas frecuentes' },
         items: [
           {
-            question: { ar: 'إمتى هيوصلني الطلب؟', en: 'When will my order arrive?' },
+            question: { ar: 'إمتى هيوصلني الطلب؟', en: 'When will my order arrive?', es: '¿Cuándo llegará mi pedido?' },
             answer: {
               ar: 'عادةً خلال 2 إلى 5 أيام عمل من تأكيد الطلب، حسب منطقتك.',
               en: 'Usually within 2–5 business days of confirming the order, depending on your area.',
+              es: 'Normalmente en 2–5 días laborables desde la confirmación del pedido, según tu zona.',
             },
           },
           {
-            question: { ar: 'ممكن أغيّر العنوان بعد ما أطلب؟', en: 'Can I change the address after ordering?' },
+            question: { ar: 'ممكن أغيّر العنوان بعد ما أطلب؟', en: 'Can I change the address after ordering?', es: '¿Puedo cambiar la dirección después de hacer el pedido?' },
             answer: {
               ar: 'أيوه، طالما الطلب لسه ما خرجش للشحن. كلمنا في أسرع وقت.',
               en: "Yes, as long as the order hasn't been shipped yet. Contact us as soon as you can.",
+              es: 'Sí, mientras el pedido aún no se haya enviado. Contáctanos lo antes posible.',
             },
           },
           {
-            question: { ar: 'إيه اللي يحصل لو ماكنتش موجود وقت التوصيل؟', en: "What if I'm not home when it arrives?" },
+            question: { ar: 'إيه اللي يحصل لو ماكنتش موجود وقت التوصيل؟', en: "What if I'm not home when it arrives?", es: '¿Qué pasa si no estoy en casa cuando llegue?' },
             answer: {
               ar: 'المندوب بيتواصل معاك قبل ما يوصل، ولو ما اتقابلتوش بنتفق معاك على ميعاد تاني.',
               en: "The courier calls ahead, and if you miss each other we'll arrange another time with you.",
+              es: 'El mensajero llama antes de llegar y, si no logran encontrarse, acordaremos otro momento contigo.',
             },
           },
         ],
@@ -164,39 +191,68 @@ function shippingPage(input: PolicyInput) {
 function returnPage(input: PolicyInput) {
   const days = input.returnWindowDays ?? 14;
 
-  const html = (lang: 'ar' | 'en') => {
+  const html = (lang: 'ar' | 'en' | 'es') => {
     const ar = lang === 'ar';
+    const es = lang === 'es';
     const window =
       days > 0
         ? ar
           ? `<p>تقدر ترجّع أو تستبدل المنتج خلال <strong>${days} يوم</strong> من يوم استلامه.</p>`
-          : `<p>You can return or exchange an item within <strong>${days} days</strong> of receiving it.</p>`
+          : es
+            ? `<p>Puedes devolver o cambiar un artículo en un plazo de <strong>${days} días</strong> desde que lo recibes.</p>`
+            : `<p>You can return or exchange an item within <strong>${days} days</strong> of receiving it.</p>`
         : ar
           ? '<p>المنتجات المباعة مش بتترجع، إلا لو وصلتك تالفة أو غلط أو مختلفة عن الوصف.</p>'
-          : '<p>Items sold are not returnable, unless they arrive damaged, wrong or not as described.</p>';
+          : es
+            ? '<p>Los artículos vendidos no se pueden devolver, salvo que lleguen dañados, equivocados o distintos de lo descrito.</p>'
+            : '<p>Items sold are not returnable, unless they arrive damaged, wrong or not as described.</p>';
 
     const feeRule = {
       [DeliveryFeeRefundPolicy.FULL_RETURN]: {
         ar: 'لما الطلب كله يرجع، بنرجّعلك مصاريف التوصيل كمان، أيًا كان السبب.',
         en: 'When the whole order comes back, we refund the delivery fee too, whatever the reason.',
+        es: 'Cuando se devuelve el pedido completo, reembolsamos también el coste de envío, sea cual sea el motivo.',
       },
       [DeliveryFeeRefundPolicy.STORE_FAULT_FULL_RETURN]: {
         ar: 'لو المنتج وصل تالف أو غلط أو مختلف عن الوصف أو اتأخر، بنتحمّل مصاريف الشحن ونرجّعلك مصاريف التوصيل. في غير كده مصاريف التوصيل الأصلية مش بترجع.',
         en: "If an item arrives damaged, wrong, not as described or late, we cover the shipping and refund the delivery fee. Otherwise the original delivery fee isn't refunded.",
+        es: 'Si un artículo llega dañado, equivocado, distinto de lo descrito o con retraso, asumimos el envío y reembolsamos el coste de envío. En otros casos, el coste de envío original no se reembolsa.',
       },
       [DeliveryFeeRefundPolicy.NEVER]: {
         ar: 'مصاريف التوصيل الأصلية مش بترجع.',
         en: "The original delivery fee isn't refunded.",
+        es: 'El coste de envío original no se reembolsa.',
       },
     }[input.deliveryFeeRefund ?? DeliveryFeeRefundPolicy.STORE_FAULT_FULL_RETURN];
 
     const how = input.sellsOnline
-      ? ar
+      ? es
+        ? `<p>En tu cuenta, abre el pedido en Mis pedidos, pulsa <strong>Solicitar una devolución</strong> y elige los artículos y el motivo. O contáctanos por ${contactLine(input, 'es')}.</p>`
+        : ar
         ? `<p>من حسابك ← طلباتي، افتح الطلب واضغط <strong>طلب استرجاع</strong> واختار المنتجات والسبب. أو كلمنا على ${contactLine(input, 'ar')}.</p>`
         : `<p>In your account, open the order under My orders, tap <strong>Request a return</strong> and choose the items and the reason. Or reach us by ${contactLine(input, 'en')}.</p>`
+      : es
+        ? `<p>Contáctanos por ${contactLine(input, 'es')} indicando tu número de pedido y el motivo.</p>`
       : ar
         ? `<p>كلمنا على ${contactLine(input, 'ar')} وقولنا رقم الطلب والسبب.</p>`
         : `<p>Reach us by ${contactLine(input, 'en')} with your order number and the reason.</p>`;
+
+    if (es)
+      return [
+        '<h2>Plazo de devolución</h2>',
+        window,
+        '<h2>Condiciones</h2>',
+        '<ul><li>El artículo está en su estado original, sin usar y en su embalaje original.</li><li>Tienes el número de pedido o el recibo.</li></ul>',
+        '<h2>Artículos que no se pueden devolver</h2>',
+        '<ul><li>Artículos hechos o modificados especialmente para ti (con un nombre o un diseño personalizado).</li><li>Artículos que se han usado, o abierto cuando no se pueden revender una vez abiertos.</li></ul>',
+        '<p>Esto no se aplica a un artículo que llega dañado o equivocado: lo sustituimos o reembolsamos en todos los casos.</p>',
+        '<h2>Cómo solicitar una devolución</h2>',
+        how,
+        '<h2>Costes de envío</h2>',
+        `<p>${feeRule.es}</p>`,
+        '<h2>Reembolsos</h2>',
+        '<p>Una vez que recibimos y revisamos el artículo, te reembolsamos por el mismo método de pago en un plazo de <strong>7–14 días laborables</strong>.</p>',
+      ].join('');
 
     return ar
       ? [
@@ -233,8 +289,8 @@ function returnPage(input: PolicyInput) {
 
   return {
     slug: RETURN_POLICY_SLUG,
-    title: { ar: 'سياسة الاسترجاع والاستبدال', en: 'Returns & refunds policy' },
-    metaTitle: { ar: 'سياسة الاسترجاع والاستبدال', en: 'Returns & refunds policy' },
+    title: { ar: 'سياسة الاسترجاع والاستبدال', en: 'Returns & refunds policy', es: 'Política de devoluciones y reembolsos' },
+    metaTitle: { ar: 'سياسة الاسترجاع والاستبدال', en: 'Returns & refunds policy', es: 'Política de devoluciones y reembolsos' },
     metaDescription: {
       ar:
         days > 0
@@ -244,8 +300,12 @@ function returnPage(input: PolicyInput) {
         days > 0
           ? `Return or exchange within ${days} days of delivery: conditions, how to request, shipping costs and refunds.`
           : 'When items can be returned, how to request it, shipping costs and refunds.',
+      es:
+        days > 0
+          ? `Devolución o cambio en un plazo de ${days} días desde la entrega: condiciones, cómo solicitarlo, costes de envío y reembolsos.`
+          : 'Cuándo se pueden devolver los artículos, cómo solicitarlo, costes de envío y reembolsos.',
     },
-    blocks: [block(PageBlockType.RICH_TEXT, { content: { ar: html('ar'), en: html('en') } })],
+    blocks: [block(PageBlockType.RICH_TEXT, { content: { ar: html('ar'), en: html('en'), es: html('es') } })],
   };
 }
 

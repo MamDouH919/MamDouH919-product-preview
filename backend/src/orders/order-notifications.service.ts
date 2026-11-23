@@ -8,7 +8,7 @@ import { escapeHtml } from '../common/helpers/escape-html';
 import { Order } from './schemas/order.schema';
 import { OrderStatus, PaymentMethod } from './enums/order-status.enum';
 
-type Lang = 'en' | 'ar';
+type Lang = 'en' | 'ar' | 'es';
 
 /** What a message needs beyond the order itself. */
 export interface NotificationContext {
@@ -109,6 +109,50 @@ const COPY: Record<Lang, Record<string, string>> = {
     activateTitle: 'احفظ بياناتك للمرة القادمة',
     activateBody: 'أنشئ حسابًا لمتابعة هذا الطلب وإتمام الشراء بشكل أسرع.',
     activate: 'إنشاء حساب',
+  },
+  es: {
+    placedSubject: 'Pedido n.º {n} recibido',
+    placedTitle: '¡Gracias por tu pedido!',
+    placedBody: 'Hemos recibido el pedido n.º {n} y lo confirmaremos en breve. Pagarás en efectivo cuando llegue.',
+    placedBodyOnline: 'Hemos recibido el pedido n.º {n}. Lo confirmaremos en cuanto se complete tu pago en línea; si aún no has pagado, puedes terminar desde la página de tu pedido.',
+    paidSubject: 'Pago recibido del pedido n.º {n}',
+    paidTitle: 'Hemos recibido tu pago',
+    paidBody: '¡Gracias! Hemos recibido tu pago de {amount} del pedido n.º {n}.',
+    refundedSubject: 'Reembolso enviado del pedido n.º {n}',
+    refundedTitle: 'Tu reembolso está en camino',
+    refundedBody: 'Hemos devuelto {amount} a la tarjeta o monedero con el que pagaste el pedido n.º {n}. Según tu banco, puede tardar unos días en reflejarse.',
+    confirmedSubject: 'Pedido n.º {n} confirmado',
+    confirmedTitle: 'Tu pedido está confirmado',
+    confirmedBody: 'Estamos preparando el pedido n.º {n}.',
+    shippedSubject: 'El pedido n.º {n} está en camino',
+    shippedTitle: 'Tu pedido está en camino',
+    shippedBody: 'El pedido n.º {n} se ha entregado al servicio de reparto.',
+    deliveredSubject: 'Pedido n.º {n} entregado',
+    deliveredTitle: 'Tu pedido ha sido entregado',
+    deliveredBody: 'El pedido n.º {n} ha sido entregado. ¡Gracias por comprar con nosotros!',
+    cancelledSubject: 'Pedido n.º {n} cancelado',
+    cancelledTitle: 'Tu pedido fue cancelado',
+    cancelledBody: 'El pedido n.º {n} ha sido cancelado.',
+    alertSubject: 'Nuevo pedido n.º {n} — {total}',
+    alertTitle: 'Nuevo pedido n.º {n}',
+    alertCancelledSubject: 'Pedido n.º {n} cancelado por el cliente',
+    alertCancelledTitle: 'El cliente canceló el pedido n.º {n}',
+    item: 'Artículo',
+    qty: 'Cant.',
+    lineTotal: 'Total',
+    subtotal: 'Subtotal',
+    discount: 'Descuento',
+    delivery: 'Envío',
+    free: 'Gratis',
+    total: 'Total',
+    address: 'Dirección de entrega',
+    notes: 'Notas del cliente',
+    note: 'Nota',
+    viewOrder: 'Ver tu pedido',
+    openInDashboard: 'Abrir en el panel',
+    activateTitle: 'Guarda tus datos para la próxima vez',
+    activateBody: 'Crea una cuenta para seguir este pedido y pagar más rápido.',
+    activate: 'Crear cuenta',
   },
 };
 
@@ -252,7 +296,7 @@ export class OrderNotificationsService {
   // ── Building blocks ─────────────────────────────────────────────────────────
 
   private lang(order: Order): Lang {
-    return order.locale === 'en' ? 'en' : 'ar';
+    return order.locale === 'en' || order.locale === 'es' ? order.locale : 'ar';
   }
 
   private t(lang: Lang, key: string, vars: Record<string, string> = {}): string {
@@ -267,7 +311,7 @@ export class OrderNotificationsService {
   }
 
   private localized(field: LocalizedField | undefined, lang: Lang): string {
-    return field?.[lang] || field?.ar || field?.en || '';
+    return field?.[lang] || field?.ar || field?.en || field?.es || '';
   }
 
   private money(amount: number, lang: Lang, ctx: NotificationContext): string {

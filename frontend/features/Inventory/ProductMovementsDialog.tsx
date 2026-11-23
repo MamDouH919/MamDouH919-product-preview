@@ -110,7 +110,7 @@ const ProductMovementsDialog = ({ row, onClose }: ProductMovementsDialogProps) =
                   <TableRow key={movement._id}>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {new Date(movement.createdAt).toLocaleString(
-                        lang === "ar" ? "ar-EG" : "en-GB"
+                        lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB"
                       )}
                     </TableCell>
                     <TableCell>

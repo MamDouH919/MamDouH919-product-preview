@@ -47,7 +47,7 @@ export default function MyOrderReturns({ orderId, currency }: { orderId: string;
             </Typography>
             {view.eligible && view.deadline && (
               <Typography variant="caption" color="text.secondary">
-                {t("returnUntil", { date: new Date(view.deadline).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium" }) })}
+                {t("returnUntil", { date: new Date(view.deadline).toLocaleDateString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB", { dateStyle: "medium" }) })}
               </Typography>
             )}
           </Box>

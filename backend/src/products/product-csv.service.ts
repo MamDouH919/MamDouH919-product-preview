@@ -22,8 +22,10 @@ export const PRODUCT_CSV_COLUMNS = [
   'slug',
   'name_en',
   'name_ar',
+  'name_es',
   'short_description_en',
   'short_description_ar',
+  'short_description_es',
   'category',
   'sub_category',
   'tags',
@@ -103,8 +105,10 @@ export class ProductCsvService {
         p.slug,
         p.name?.en ?? '',
         p.name?.ar ?? '',
+        p.name?.es ?? '',
         p.shortDescription?.en ?? '',
         p.shortDescription?.ar ?? '',
+        p.shortDescription?.es ?? '',
         p.category?.slug ?? '',
         p.subCategory?.slug ?? '',
         (p.tags ?? []).join('|'),
@@ -165,7 +169,7 @@ export class ProductCsvService {
     const header = table[0].map((h) => h.trim().toLowerCase());
     const unknown = header.filter((h) => h && !PRODUCT_CSV_COLUMNS.includes(h as Column));
     if (unknown.length) throw new BadRequestException(`Unknown column(s): ${unknown.join(', ')}`);
-    if (!header.some((h) => ['product_id', 'slug', 'name_en', 'name_ar'].includes(h))) {
+    if (!header.some((h) => ['product_id', 'slug', 'name_en', 'name_ar', 'name_es'].includes(h))) {
       throw new BadRequestException('The file needs a product_id, slug or name column');
     }
     if (table.length - 1 > MAX_ROWS) {
@@ -209,9 +213,9 @@ export class ProductCsvService {
     const byId = new Map(products.map((p) => [String(p._id), p]));
     const bySlug = new Map(products.map((p) => [p.slug.toLowerCase(), p]));
 
-    const findIn = <T extends { slug: string; name?: { en?: string; ar?: string } }>(list: T[], value: string) => {
+    const findIn = <T extends { slug: string; name?: { en?: string; ar?: string; es?: string } }>(list: T[], value: string) => {
       const v = value.toLowerCase();
-      return list.find((x) => x.slug.toLowerCase() === v || x.name?.en?.toLowerCase() === v || x.name?.ar === value);
+      return list.find((x) => x.slug.toLowerCase() === v || x.name?.en?.toLowerCase() === v || x.name?.ar === value || x.name?.es?.toLowerCase() === v);
     };
 
     return [...groups.values()].map((group) => this.planProduct(group, byId, bySlug, (v) => findIn(categories, v), (v) => findIn(subCategories, v)));
@@ -232,7 +236,7 @@ export class ProductCsvService {
     const existing = first.product_id ? byId.get(first.product_id) : first.slug ? bySlug.get(first.slug.toLowerCase()) : undefined;
     if (first.product_id && !existing) err(group[0].line, `no product with id ${first.product_id}`);
 
-    const label = first.name_en || first.name_ar || existing?.name?.en || existing?.name?.ar || first.slug || first.product_id || '?';
+    const label = first.name_en || first.name_ar || first.name_es || existing?.name?.en || existing?.name?.ar || first.slug || first.product_id || '?';
     const plan: Plan = {
       report: { line: group[0].line, product: label, action: 'unchanged', changes, errors },
       existing,
@@ -283,8 +287,10 @@ export class ProductCsvService {
     if (first.slug && existing && first.slug !== existing.slug && first.product_id) wanted.slug = first.slug.toLowerCase();
     if (first.name_en) wanted['name.en'] = first.name_en;
     if (first.name_ar) wanted['name.ar'] = first.name_ar;
+    if (first.name_es) wanted['name.es'] = first.name_es;
     if (first.short_description_en) wanted['shortDescription.en'] = first.short_description_en;
     if (first.short_description_ar) wanted['shortDescription.ar'] = first.short_description_ar;
+    if (first.short_description_es) wanted['shortDescription.es'] = first.short_description_es;
     if (first.tags) wanted.tags = first.tags.split(/[|;]/).map((t) => t.trim()).filter(Boolean);
     if (first.sku) wanted.sku = first.sku;
     const price = money(first.price, 'price');
@@ -373,13 +379,16 @@ export class ProductCsvService {
 
     // ── Create or update ──
     if (!existing) {
-      if (!first.name_en && !first.name_ar) err(line, 'a new product needs name_en or name_ar');
+      if (!first.name_en && !first.name_ar && !first.name_es) err(line, 'a new product needs name_en, name_ar or name_es');
       if (!wanted.category) err(line, 'a new product needs a category');
       plan.create = {
-        name: { en: first.name_en || first.name_ar || '', ar: first.name_ar || first.name_en || '' },
+        name: (() => {
+          const any = first.name_en || first.name_ar || first.name_es || '';
+          return { en: first.name_en || any, ar: first.name_ar || any, ...(first.name_es ? { es: first.name_es } : {}) };
+        })(),
         shortDescription:
-          first.short_description_en || first.short_description_ar
-            ? { en: first.short_description_en ?? '', ar: first.short_description_ar ?? '' }
+          first.short_description_en || first.short_description_ar || first.short_description_es
+            ? { en: first.short_description_en ?? '', ar: first.short_description_ar ?? '', es: first.short_description_es ?? '' }
             : undefined,
         slug: first.slug?.toLowerCase() || undefined,
         category: String(wanted.category ?? ''),

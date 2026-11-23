@@ -35,6 +35,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const generic =
     locale === "ar"
       ? `تسوّق ${name} من ${siteName}: تصفّح كل المنتجات بالأسعار والصور والتفاصيل الكاملة، واختر المناسب لك واطلبه أونلاين بسهولة.`
+      : locale === "es"
+      ? `Compra ${name} en ${siteName}: explora todos los productos con precios, fotos y todos los detalles, elige el que más te convenga y pídelo en línea con facilidad.`
       : `Shop ${name} at ${siteName}: browse every product with prices, photos and full details, then pick what suits you and order online with ease.`
   const description = own.length >= DESCRIPTION_MIN ? own : [own && `${own.replace(/[.،,]$/, "")}.`, generic].filter(Boolean).join(" ")
 
@@ -89,7 +91,7 @@ async function CategoryJsonLd({ category, locale }: { category: Category; locale
     <JsonLd
       data={[
         breadcrumbLd(origin, locale, [
-          { name: locale === "ar" ? "الأقسام" : "Categories", path: "/categories" },
+          { name: locale === "ar" ? "الأقسام" : locale === "es" ? "Categorías" : "Categories", path: "/categories" },
           { name, path },
         ]),
         {

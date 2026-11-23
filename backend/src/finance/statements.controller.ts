@@ -29,8 +29,8 @@ class StatementQueryDto {
   format?: string;
 
   @IsOptional()
-  @Matches(/^(en|ar)$/)
-  lang?: 'en' | 'ar';
+  @Matches(/^(en|ar|es)$/)
+  lang?: 'en' | 'ar' | 'es';
 }
 
 class LockPeriodDto {
@@ -51,8 +51,8 @@ class ReopenPeriodDto {
 
 type AdminRequest = Request & { userId?: string };
 const money = (minor: number) => formatMinor(minor);
-const named = (name: Record<string, string | undefined> | undefined, lang: 'en' | 'ar') => name?.[lang] ?? name?.en ?? name?.ar ?? '';
-const TOTAL_LABEL = { en: 'Total', ar: 'الإجمالي' } as const;
+const named = (name: Record<string, string | undefined> | undefined, lang: 'en' | 'ar' | 'es') => name?.[lang] ?? name?.en ?? name?.ar ?? '';
+const TOTAL_LABEL = { en: 'Total', ar: 'الإجمالي', es: 'Total' } as const;
 
 /** The financial statements, as JSON for the dashboard or CSV for a spreadsheet. */
 @RequireModules(StoreModule.FINANCE)

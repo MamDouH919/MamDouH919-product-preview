@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!product) return {}
 
   const ar = locale === "ar"
+  const es = locale === "es"
   const name = loc(product.name, locale).replace(/\s+/g, " ").trim()
   const text = plainText(loc(product.description, locale) || loc(product.shortDescription, locale))
 
@@ -43,13 +44,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const minPrice = offers.length ? Math.min(...offers.map((o) => o.price)) : undefined
   const currency = settings?.currency?.[locale]?.trim() || isoCurrency(settings)
   const amount = minPrice && currency ? `${minPrice} ${currency}` : ""
-  const price = amount && (ar ? `من ${amount}` : `From ${amount}`)
+  const price = amount && (ar ? `من ${amount}` : es ? `Desde ${amount}` : `From ${amount}`)
   const options = [...new Set(product.variants?.map((v) => v.label?.trim()).filter(Boolean))].slice(0, 4)
 
   // Price and options lead, so they survive the clip; the product's own text fills the rest.
   const facts = [
-    amount && (ar ? `${name} بسعر يبدأ من ${amount}` : `${name}, from ${amount}`),
-    options.length && (ar ? `متوفر بـ ${options.join(" و")}` : `available in ${options.join(", ")}`),
+    amount && (ar ? `${name} بسعر يبدأ من ${amount}` : es ? `${name}, desde ${amount}` : `${name}, from ${amount}`),
+    options.length && (ar ? `متوفر بـ ${options.join(" و")}` : es ? `disponible en ${options.join(", ")}` : `available in ${options.join(", ")}`),
   ].filter(Boolean).join(ar ? "، " : ", ")
   const description = metaDescription([facts && `${facts}.`, text].filter(Boolean).join(" ") || name)
   const firstImage = product.images?.[0]
@@ -169,7 +170,7 @@ async function ProductJsonLd({ slug, locale }: { slug: string; locale: string })
   const category = product.category
   const crumbs = category?.slug
     ? [{ name: loc(category.name, locale), path: `/categories/${encodeURIComponent(category.slug)}` }]
-    : [{ name: locale === "ar" ? "المنتجات" : "Products", path: "/products" }]
+    : [{ name: locale === "ar" ? "المنتجات" : locale === "es" ? "Productos" : "Products", path: "/products" }]
 
   return (
     <JsonLd

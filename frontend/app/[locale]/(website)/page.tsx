@@ -34,7 +34,7 @@ const HOME = [
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const [{ tenant }, ld, faq] = await Promise.all([storeContext(), storeLd(locale), faqLd("home-faq", locale)]);
-  const seo = tenant[locale === "ar" ? "ar" : "en"];
+  const seo = (locale === "ar" ? tenant.ar : locale === "es" ? tenant.es ?? tenant.en : tenant.en);
 
   // The layout already wraps every page in <main>; a second one confuses screen readers and crawlers.
   return (

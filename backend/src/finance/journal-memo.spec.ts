@@ -1,10 +1,11 @@
 import { memoText } from './journal-memo';
 
 describe('memoText', () => {
-  it('writes a system memo in both languages', () => {
+  it('writes a system memo in every language', () => {
     expect(memoText({ memoKey: 'opening_stock', memoParams: { qty: 23 } })).toEqual({
       en: 'Opening stock value, 23 unit(s)',
       ar: 'قيمة مخزون أول المدة، 23 وحدة',
+      es: 'Valor del stock inicial, 23 unidad(es)',
     });
   });
 
@@ -14,7 +15,7 @@ describe('memoText', () => {
   });
 
   it('shows staff-typed and older entries as they were stored', () => {
-    expect(memoText({ memo: 'Rent' })).toEqual({ en: 'Rent', ar: 'Rent' });
+    expect(memoText({ memo: 'Rent' })).toEqual({ en: 'Rent', ar: 'Rent', es: 'Rent' });
     expect(memoText({})).toBeUndefined();
   });
 });

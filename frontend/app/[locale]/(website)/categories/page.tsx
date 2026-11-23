@@ -6,18 +6,19 @@ import { breadcrumbLd, JsonLd } from "@/lib/jsonLd"
 const COPY = {
   ar: { title: "الأقسام", description: "تصفّح كل أقسام المتجر واختار اللي يناسبك، وكل قسم فيه منتجاته بالأسعار والتفاصيل." },
   en: { title: "Categories", description: "Browse every category in the store and find what suits you, each with its products, prices and details." },
+  es: { title: "Categorías", description: "Explora todas las categorías de la tienda y encuentra lo que más te conviene, cada una con sus productos, precios y detalles." },
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
-  return pageMetadata({ locale, path: "/categories", ...COPY[locale === "ar" ? "ar" : "en"] })
+  return pageMetadata({ locale, path: "/categories", ...COPY[locale === "ar" ? "ar" : locale === "es" ? "es" : "en"] })
 }
 
 export default async function CategoriesPage({ params }: { params: Promise<{ locale: string }> }) {
   const [{ locale }, origin] = await Promise.all([params, requestOrigin()])
   return (
     <>
-      <JsonLd data={breadcrumbLd(origin, locale, [{ name: COPY[locale === "ar" ? "ar" : "en"].title, path: "/categories" }])} />
+      <JsonLd data={breadcrumbLd(origin, locale, [{ name: COPY[locale === "ar" ? "ar" : locale === "es" ? "es" : "en"].title, path: "/categories" }])} />
       <CategoriesClient />
     </>
   )

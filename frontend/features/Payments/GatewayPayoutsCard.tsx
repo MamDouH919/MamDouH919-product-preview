@@ -85,7 +85,7 @@ const GatewayPayoutsCard = () => {
   const grossOk = AMOUNT.test(gross) && Number(gross) > 0;
   const feeOk = fee === "" || (AMOUNT.test(fee) && Number(fee) <= Number(gross));
   const net = grossOk && feeOk ? (Number(gross) - Number(fee || 0)).toFixed(2) : null;
-  const dateLabel = (iso: string) => new Date(iso).toLocaleDateString(i18n.language === "ar" ? "ar-EG" : "en-GB");
+  const dateLabel = (iso: string) => new Date(iso).toLocaleDateString(i18n.language === "ar" ? "ar-EG" : i18n.language === "es" ? "es-ES" : "en-GB");
 
   return (
     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>

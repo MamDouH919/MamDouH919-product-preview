@@ -39,9 +39,9 @@ export class SaveCartDto {
   @Type(() => SavedCartItemDto)
   items!: SavedCartItemDto[];
 
-  @ApiProperty({ required: false, enum: ['en', 'ar'] })
+  @ApiProperty({ required: false, enum: ['en', 'ar', 'es'] })
   @IsOptional()
-  @IsIn(['en', 'ar'])
+  @IsIn(['en', 'ar', 'es'])
   locale?: string;
 }
 

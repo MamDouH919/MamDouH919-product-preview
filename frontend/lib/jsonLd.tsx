@@ -30,7 +30,7 @@ export function JsonLd({ data }: { data: object | object[] }) {
 
 /** Home → … → here. `path` is after the locale; the last crumb is the page itself. */
 export function breadcrumbLd(origin: string, locale: string, crumbs: { name: string; path: string }[]) {
-  const home = { name: locale === "ar" ? "الرئيسية" : "Home", path: "" }
+  const home = { name: locale === "ar" ? "الرئيسية" : locale === "es" ? "Inicio" : "Home", path: "" }
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -109,7 +109,7 @@ export function shippingLd(settings: StoreSettings | null, currency: string | un
 /** The store itself and its site, for the home page. */
 export async function storeLd(locale: string) {
   const { origin, backendUrl, settings, tenant, pages } = await storeContext()
-  const seo = tenant[locale === "ar" ? "ar" : "en"]
+  const seo = locale === "ar" ? tenant.ar : locale === "es" ? tenant.es ?? tenant.en : tenant.en
   const logo = settings?.logo ? withBackend(backendUrl, settings.logo) : `${origin}${tenant.ogImage}`
   // The store's own profiles (see profileUrl for what is left out), once each.
   const sameAs = [

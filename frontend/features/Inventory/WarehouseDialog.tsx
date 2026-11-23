@@ -17,6 +17,7 @@ const WarehouseDialog = ({ warehouse, onClose }: { warehouse?: Warehouse; onClos
   const [form, setForm] = useState({
     nameAr: warehouse?.name.ar ?? "",
     nameEn: warehouse?.name.en ?? "",
+    nameEs: warehouse?.name.es ?? "",
     code: warehouse?.code ?? "",
     address: warehouse?.address ?? "",
     notes: warehouse?.notes ?? "",
@@ -27,7 +28,7 @@ const WarehouseDialog = ({ warehouse, onClose }: { warehouse?: Warehouse; onClos
   const mutation = useMutation({
     mutationFn: () => {
       const body = {
-        name: { ar: form.nameAr.trim() || undefined, en: form.nameEn.trim() || undefined },
+        name: { ar: form.nameAr.trim() || undefined, en: form.nameEn.trim() || undefined, es: form.nameEs.trim() || undefined },
         code: form.code.trim().toUpperCase(),
         address: form.address.trim() || undefined,
         notes: form.notes.trim() || undefined,
@@ -43,7 +44,7 @@ const WarehouseDialog = ({ warehouse, onClose }: { warehouse?: Warehouse; onClos
   });
 
   const codeValid = /^[A-Za-z0-9-]{1,12}$/.test(form.code.trim());
-  const canSave = (form.nameAr.trim() || form.nameEn.trim()) && codeValid && !mutation.isPending;
+  const canSave = (form.nameAr.trim() || form.nameEn.trim() || form.nameEs.trim()) && codeValid && !mutation.isPending;
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="xs">
@@ -52,6 +53,7 @@ const WarehouseDialog = ({ warehouse, onClose }: { warehouse?: Warehouse; onClos
         <Stack spacing={2} pt={1}>
           <TextField label={t("nameAr")} value={form.nameAr} onChange={set("nameAr")} autoFocus />
           <TextField label={t("nameEn")} value={form.nameEn} onChange={set("nameEn")} slotProps={{ htmlInput: { dir: "ltr" } }} />
+          <TextField label={t("nameEs")} value={form.nameEs} onChange={set("nameEs")} slotProps={{ htmlInput: { dir: "ltr" } }} />
           <TextField
             label={t("warehouseCode")}
             value={form.code}

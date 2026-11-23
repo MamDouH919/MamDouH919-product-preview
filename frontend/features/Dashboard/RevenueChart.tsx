@@ -36,7 +36,7 @@ const RevenueChart = ({ series, currency, height = 220 }: { series: Point[]; cur
 
   const dayLabel = (date: string, withWeekday = false) =>
     // Noon UTC keeps the label on the right day in every zone.
-    new Date(`${date}T12:00:00Z`).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", {
+    new Date(`${date}T12:00:00Z`).toLocaleDateString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB", {
       day: "numeric",
       month: "short",
       ...(withWeekday ? { weekday: "short" } : {}),

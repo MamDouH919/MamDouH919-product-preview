@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -34,6 +34,12 @@ export class AccountNameDto {
   @IsNotEmpty()
   @MaxLength(120)
   ar!: string;
+
+  @ApiPropertyOptional({ example: 'Préstamo bancario' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  es?: string;
 }
 
 export class CreateLedgerAccountDto {
@@ -212,6 +218,6 @@ export class AccountStatementQueryDto {
   format?: string;
 
   @IsOptional()
-  @IsIn(['en', 'ar'])
-  lang?: 'en' | 'ar';
+  @IsIn(['en', 'ar', 'es'])
+  lang?: 'en' | 'ar' | 'es';
 }

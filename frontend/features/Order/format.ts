@@ -1,7 +1,7 @@
 import { LocalizedField } from "@/backend-api/globalTypes";
 
 export const localized = (field: LocalizedField | undefined, lang: string): string =>
-  field?.[lang] || field?.["ar"] || field?.["en"] || "";
+  field?.[lang] || (lang === "es" ? field?.["en"] || field?.["ar"] : field?.["ar"] || field?.["en"]) || "";
 
 /** "Street, building, area, subzone, zone" — falls back to the legacy free-text city. */
 export const formatAddress = (
@@ -37,7 +37,7 @@ export const formatMinorMoney = (minor: number, currency: string): string =>
 export const minorToInput = (minor: number): string => (minor / 100).toFixed(2);
 
 export const formatDateTime = (iso: string, lang: string): string =>
-  new Date(iso).toLocaleString(lang === "ar" ? "ar-EG" : "en-GB", {
+  new Date(iso).toLocaleString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
   });

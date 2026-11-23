@@ -225,7 +225,7 @@ export class ProductsService {
     if (term) {
       const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       and.push({
-        $or: [{ 'name.en': pattern }, { 'name.ar': pattern }, { tags: pattern }, { sku: pattern }, { 'variants.sku': pattern }],
+        $or: [{ 'name.en': pattern }, { 'name.ar': pattern }, { 'name.es': pattern }, { tags: pattern }, { sku: pattern }, { 'variants.sku': pattern }],
       });
     }
 
@@ -298,6 +298,7 @@ export class ProductsService {
       match.$or = [
         { 'name.en': pattern },
         { 'name.ar': pattern },
+        { 'name.es': pattern },
         { tags: pattern },
         { sku: pattern },
         { 'variants.sku': pattern },
@@ -774,8 +775,8 @@ export class ProductsService {
   }
 
   /** Arabic-only names strip down to nothing, so those fall back to "product". */
-  private slugFromName(name: { en?: string; ar?: string } | undefined, exceptId?: string): Promise<string> {
-    const base = buildSlug(name?.en ?? '') || buildSlug(name?.ar ?? '') || 'product';
+  private slugFromName(name: { en?: string; ar?: string; es?: string } | undefined, exceptId?: string): Promise<string> {
+    const base = buildSlug(name?.en ?? '') || buildSlug(name?.ar ?? '') || buildSlug(name?.es ?? '') || 'product';
     return this.uniqueSlug(base, exceptId);
   }
 

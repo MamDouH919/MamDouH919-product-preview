@@ -231,7 +231,7 @@ export class LedgerService {
     for (const e of entries.slice(0, STATEMENT_MAX_LINES)) {
       const counterparts = [...new Set(e.lines.filter((l) => l.account !== code).map((l) => l.account))].map((c) => ({
         code: c,
-        name: chart.get(c)?.name ?? { en: c, ar: c },
+        name: chart.get(c)?.name ?? { en: c, ar: c, es: c },
       }));
       for (const l of e.lines) {
         if (l.account !== code) continue;
@@ -285,7 +285,7 @@ export class LedgerService {
       totalMinor: e.lines.reduce((t, l) => t + l.debitMinor, 0),
       lines: e.lines.map((l) => ({
         account: l.account,
-        name: chart.get(l.account)?.name ?? { en: l.account, ar: l.account },
+        name: chart.get(l.account)?.name ?? { en: l.account, ar: l.account, es: l.account },
         type: chart.get(l.account)?.type,
         debitMinor: l.debitMinor,
         creditMinor: l.creditMinor,

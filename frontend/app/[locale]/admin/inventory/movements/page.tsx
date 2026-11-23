@@ -62,7 +62,7 @@ const StockMovementsPage = () => {
         header: t("date"),
         render: (row: StockMovement) =>
           new Date(row.createdAt).toLocaleString(
-            lang === "ar" ? "ar-EG" : "en-GB",
+            lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB",
           ),
       },
       {

@@ -33,7 +33,7 @@ import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/
  */
 const PaymentSettingsForm = ({ settings }: { settings: GatewaySettings }) => {
   const { t, i18n } = useTranslation();
-  const lang = i18n.language === "ar" ? "ar" : "en";
+  const lang = i18n.language === "ar" || i18n.language === "es" ? i18n.language : "en";
   const queryClient = useQueryClient();
   const { has } = useStoreModules();
 

@@ -843,7 +843,7 @@ export class InventoryService {
     if (query.categoryId) filter.category = new Types.ObjectId(query.categoryId);
     if (query.search) {
       const term = new RegExp(this.escapeRegex(query.search), 'i');
-      filter.$or = [{ 'name.en': term }, { 'name.ar': term }, { sku: term }];
+      filter.$or = [{ 'name.en': term }, { 'name.ar': term }, { 'name.es': term }, { sku: term }];
     }
 
     const products = await this.productModel

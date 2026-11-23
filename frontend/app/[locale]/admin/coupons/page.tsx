@@ -106,7 +106,7 @@ const CouponsPage = () => {
   const columns = useMemo(() => {
     const date = (iso?: string | null) =>
       iso
-        ? new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")
+        ? new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB")
         : "—";
 
     const stateColor = {

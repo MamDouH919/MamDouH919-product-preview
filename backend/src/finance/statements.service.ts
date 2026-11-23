@@ -27,7 +27,7 @@ export type AgeBucket = (typeof AGE_BUCKETS)[number]['key'];
 
 const bucketOf = (days: number): AgeBucket => AGE_BUCKETS.find((b) => days <= b.max)!.key;
 const emptyBuckets = () => Object.fromEntries(AGE_BUCKETS.map((b) => [b.key, 0])) as Record<AgeBucket, number>;
-const nameIn = (chart: Map<string, ChartAccount>, code: string) => chart.get(code)?.name ?? { en: code, ar: code };
+const nameIn = (chart: Map<string, ChartAccount>, code: string) => chart.get(code)?.name ?? { en: code, ar: code, es: code };
 const ACTIVITIES = [CashFlowActivity.OPERATING, CashFlowActivity.INVESTING, CashFlowActivity.FINANCING];
 
 /**

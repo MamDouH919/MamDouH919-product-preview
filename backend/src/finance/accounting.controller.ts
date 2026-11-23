@@ -73,10 +73,10 @@ export class AccountingController {
     const s = await this.ledger.accountStatement(code, q);
     if (q.format !== 'csv') return res.json(s);
     const lang = q.lang ?? 'en';
-    const name = (n: { en: string; ar: string }) => n[lang] || n.en;
+    const name = (n: { en: string; ar: string; es?: string }) => n[lang] || n.en;
     const header = ['date', 'entry', 'source', 'memo', 'against', 'debit', 'credit', 'balance'];
     const rows: unknown[][] = [
-      ['', '', '', lang === 'ar' ? 'رصيد افتتاحي' : 'Opening balance', '', '', '', formatMinor(s.openingMinor)],
+      ['', '', '', lang === 'ar' ? 'رصيد افتتاحي' : lang === 'es' ? 'Saldo inicial' : 'Opening balance', '', '', '', formatMinor(s.openingMinor)],
       ...s.rows.map((r) => [
         r.date.toISOString().slice(0, 10),
         r.entryNumber,
@@ -87,7 +87,7 @@ export class AccountingController {
         formatMinor(r.creditMinor),
         formatMinor(r.balanceMinor),
       ]),
-      ['', '', '', lang === 'ar' ? 'الإجمالي / رصيد ختامي' : 'Totals / closing balance', '', formatMinor(s.debitMinor), formatMinor(s.creditMinor), formatMinor(s.closingMinor)],
+      ['', '', '', lang === 'ar' ? 'الإجمالي / رصيد ختامي' : lang === 'es' ? 'Totales / saldo final' : 'Totals / closing balance', '', formatMinor(s.debitMinor), formatMinor(s.creditMinor), formatMinor(s.closingMinor)],
     ];
     const range = [q.from, q.to].filter(Boolean).join('_to_');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

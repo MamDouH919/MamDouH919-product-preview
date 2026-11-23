@@ -130,7 +130,7 @@ const UsersPage = () => {
         header: t("team.addedOn"),
         render: (row: StaffUser) =>
           new Date(row.createdAt).toLocaleDateString(
-            lang === "ar" ? "ar-EG" : "en-GB",
+            lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB",
           ),
       },
       {

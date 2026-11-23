@@ -12,7 +12,7 @@ import { formatAddress, formatMoney, localized } from "@/features/Order/format";
 type Doc = "invoice" | "packing-slip";
 
 const formatDate = (iso: string, lang: string) =>
-  new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { dateStyle: "long" });
+  new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB", { dateStyle: "long" });
 
 /**
  * Invoice and packing slip, laid out for A4 paper. Lives outside the admin

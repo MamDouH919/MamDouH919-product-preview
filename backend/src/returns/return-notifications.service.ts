@@ -8,7 +8,7 @@ import { escapeHtml } from '../common/helpers/escape-html';
 import { Order } from '../orders/schemas/order.schema';
 import { ReturnRequest, ReturnStatus } from './schemas/return-request.schema';
 
-type Lang = 'en' | 'ar';
+type Lang = 'en' | 'ar' | 'es';
 
 export interface ReturnMailContext {
   host: string;
@@ -81,6 +81,37 @@ const COPY: Record<Lang, Record<string, string>> = {
     reason_changed_mind: 'غيرت رأيي',
     reason_other: 'سبب آخر',
   },
+  es: {
+    requestedSubject: 'Solicitud de devolución n.º {r} recibida',
+    requestedTitle: 'Hemos recibido tu solicitud de devolución',
+    requestedBody: 'Revisaremos la devolución n.º {r} del pedido n.º {n} y te avisaremos de los siguientes pasos.',
+    approvedSubject: 'Devolución n.º {r} aprobada',
+    approvedTitle: 'Tu devolución fue aprobada',
+    approvedBody: 'La devolución n.º {r} del pedido n.º {n} fue aprobada. Nos pondremos en contacto contigo para recoger los artículos.',
+    receivedSubject: 'Hemos recibido la devolución n.º {r}',
+    receivedTitle: 'Hemos recibido tus artículos',
+    receivedBody: 'Los artículos de la devolución n.º {r} del pedido n.º {n} han llegado. Procesaremos tu reembolso en breve.',
+    rejectedSubject: 'Devolución n.º {r} rechazada',
+    rejectedTitle: 'No hemos podido aceptar tu devolución',
+    rejectedBody: 'La devolución n.º {r} del pedido n.º {n} fue rechazada.',
+    refundedSubject: 'Reembolso de la devolución n.º {r}',
+    refundedTitle: 'Tu reembolso ha sido emitido',
+    refundedBody: 'Hemos reembolsado {amount} por la devolución n.º {r} del pedido n.º {n}.',
+    alertSubject: 'Solicitud de devolución n.º {r} del pedido n.º {n}',
+    alertTitle: 'Nueva solicitud de devolución n.º {r}',
+    alertBody: 'El cliente solicitó devolver artículos del pedido n.º {n}.',
+    item: 'Artículo',
+    qty: 'Cant.',
+    note: 'Nota',
+    reason: 'Motivo',
+    viewOrder: 'Ver tu pedido',
+    openInDashboard: 'Abrir en el panel',
+    reason_damaged: 'Llegó dañado',
+    reason_wrong_item: 'Artículo equivocado',
+    reason_not_as_described: 'No es como se describía',
+    reason_changed_mind: 'He cambiado de opinión',
+    reason_other: 'Otro',
+  },
 };
 
 /** Return emails. Fire-and-forget like order emails: a mail outage never fails a return. */
@@ -96,7 +127,7 @@ export class ReturnNotificationsService {
 
   /** Tells the customer where their return stands; tells the store when a customer opens one. */
   statusChanged(ret: ReturnRequest, ctx: ReturnMailContext, note?: string): void {
-    const lang: Lang = ctx.order.locale === 'en' ? 'en' : 'ar';
+    const lang: Lang = ctx.order.locale === 'en' || ctx.order.locale === 'es' ? ctx.order.locale : 'ar';
     const vars = {
       r: String(ret.returnNumber),
       n: String(ctx.order.orderNumber),
@@ -151,7 +182,7 @@ export class ReturnNotificationsService {
   }
 
   private localized(field: LocalizedField | undefined, lang: Lang): string {
-    return field?.[lang] || field?.ar || field?.en || '';
+    return field?.[lang] || field?.ar || field?.en || field?.es || '';
   }
 
   private subject(lang: Lang, key: string, vars: Record<string, string>, ctx: ReturnMailContext): string {

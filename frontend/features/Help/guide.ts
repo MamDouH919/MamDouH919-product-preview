@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import ar from "./content/ar";
 import en from "./content/en";
+import es from "./content/es";
 import { useStoreModules } from "@/Hooks/useStoreModules";
 import type { StoreModule } from "@/lib/storeModules";
 
@@ -57,7 +58,7 @@ export type HelpGuideSource = Record<
   }
 >;
 
-const sourceFor = (language: string): HelpGuideSource => (language === "ar" ? ar : en);
+const sourceFor = (language: string): HelpGuideSource => (language === "ar" ? ar : language === "es" ? es : en);
 
 /**
  * The guide for this store: topics, sections, blocks and items its plan has

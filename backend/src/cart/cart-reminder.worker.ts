@@ -12,7 +12,7 @@ import { LocalizedField } from '../common/schemas/localized-field.schema';
 import { escapeHtml } from '../common/helpers/escape-html';
 import { CartLine, CartService } from './cart.service';
 
-type Lang = 'en' | 'ar';
+type Lang = 'en' | 'ar' | 'es';
 
 /** Customers handled per store per run, so one big store can't hog a run. */
 const BATCH = 50;
@@ -41,6 +41,17 @@ const COPY: Record<Lang, Record<string, string>> = {
     cta: 'أكمل طلبك',
     optOut: 'لا تريد هذه التذكيرات؟',
     optOutLink: 'إيقاف تذكيرات السلة',
+  },
+  es: {
+    subject: 'Dejaste algo en tu carrito',
+    title: '¿Aún lo estás pensando?',
+    body: 'Hola {name}, los artículos de abajo siguen esperándote en tu carrito. Los precios y la disponibilidad pueden cambiar, así que completa tu pedido mientras haya stock.',
+    item: 'Artículo',
+    qty: 'Cant.',
+    price: 'Precio',
+    cta: 'Completa tu pedido',
+    optOut: '¿No quieres recibir estos recordatorios?',
+    optOutLink: 'Dejar de recibir recordatorios del carrito',
   },
 };
 
@@ -113,7 +124,7 @@ export class CartReminderWorker {
       const lines = await this.cartService.describe(cart.items);
       if (!lines.length) continue;
 
-      const lang: Lang = cart.locale === 'en' ? 'en' : 'ar';
+      const lang: Lang = cart.locale === 'en' || cart.locale === 'es' ? cart.locale : 'ar';
       try {
         await this.mail.send(
           {
@@ -150,7 +161,7 @@ export class CartReminderWorker {
   }
 
   private localized(field: LocalizedField | undefined, lang: Lang): string {
-    return field?.[lang] || field?.ar || field?.en || '';
+    return field?.[lang] || field?.ar || field?.en || field?.es || '';
   }
 
   private subject(lang: Lang, storeName?: LocalizedField): string {

@@ -78,9 +78,9 @@ export class CreateOrderDto extends QuoteOrderDto {
   @MaxLength(1000)
   notes?: string;
 
-  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for order emails' })
+  @ApiProperty({ required: false, enum: ['en', 'ar', 'es'], description: 'Language for order emails' })
   @IsOptional()
-  @IsIn(['en', 'ar'])
+  @IsIn(['en', 'ar', 'es'])
   locale?: string;
 }
 
@@ -150,9 +150,9 @@ export class CreateGuestOrderDto extends QuoteOrderDto {
   @MaxLength(1000)
   notes?: string;
 
-  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for order emails' })
+  @ApiProperty({ required: false, enum: ['en', 'ar', 'es'], description: 'Language for order emails' })
   @IsOptional()
-  @IsIn(['en', 'ar'])
+  @IsIn(['en', 'ar', 'es'])
   locale?: string;
 }
 
@@ -233,10 +233,10 @@ export class ExportOrdersDto {
   @IsString()
   to?: string;
 
-  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for product and area names' })
+  @ApiProperty({ required: false, enum: ['en', 'ar', 'es'], description: 'Language for product and area names' })
   @IsOptional()
-  @IsIn(['en', 'ar'])
-  lang?: 'en' | 'ar';
+  @IsIn(['en', 'ar', 'es'])
+  lang?: 'en' | 'ar' | 'es';
 }
 
 export class QueryOrdersDto {

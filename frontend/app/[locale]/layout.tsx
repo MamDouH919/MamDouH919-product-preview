@@ -17,8 +17,7 @@ export async function generateMetadata(
   const host = (await headers()).get("host");
   const tenant = resolveTenantSeo(host);
 
-  const lang = locale === "ar" ? "ar" : "en";
-  const { title, titleTemplate, description } = tenant[lang];
+  const { title, titleTemplate, description } = locale === "ar" ? tenant.ar : locale === "es" ? tenant.es ?? tenant.en : tenant.en;
   const { siteName, icons } = tenant;
   const image = await storeShareImage(await requestOrigin(), siteName);
 

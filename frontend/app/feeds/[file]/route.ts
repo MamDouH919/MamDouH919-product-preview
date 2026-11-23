@@ -60,7 +60,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ file: s
   if (!currency) return new Response("Store currency is not set", { status: 503 })
 
   const tenant = resolveTenantSeo(h.get("x-forwarded-host") ?? h.get("host"))
-  const seo = tenant[locale === "ar" ? "ar" : "en"]
+  const seo = (locale === "ar" ? tenant.ar : locale === "es" ? tenant.es ?? tenant.en : tenant.en)
 
   const brokenImages = await brokenLegacyImages(products, backendUrl)
   const skipped: string[] = []

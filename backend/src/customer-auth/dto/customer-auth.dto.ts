@@ -28,9 +28,9 @@ export class CustomerRegisterDto {
   @IsString()
   phone?: string;
 
-  @ApiProperty({ required: false, enum: ['en', 'ar'], description: 'Language for emails' })
+  @ApiProperty({ required: false, enum: ['en', 'ar', 'es'], description: 'Language for emails' })
   @IsOptional()
-  @IsIn(['en', 'ar'])
+  @IsIn(['en', 'ar', 'es'])
   locale?: string;
 }
 

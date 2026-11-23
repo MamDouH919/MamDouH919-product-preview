@@ -55,7 +55,7 @@ const today = () => {
 
 const useName = () => {
   const { i18n } = useTranslation();
-  return (name?: Partial<Record<"en" | "ar", string>>) => (i18n.language === "ar" ? name?.ar || name?.en : name?.en || name?.ar) ?? "";
+  return (name?: Partial<Record<"en" | "ar" | "es", string>>) => (name?.[i18n.language as "en" | "ar" | "es"] || (i18n.language === "ar" ? name?.ar || name?.en : name?.en || name?.ar)) ?? "";
 };
 
 /** The financial statements: every figure comes from the books, for days in the store's time zone. */

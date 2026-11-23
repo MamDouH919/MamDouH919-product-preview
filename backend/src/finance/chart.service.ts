@@ -62,7 +62,7 @@ export class ChartService {
     if (await this.accountModel.exists({ code })) throw new ConflictException(`Account ${code} already exists`);
     const account = await this.accountModel.create({
       code,
-      name: { en: dto.name.en.trim(), ar: dto.name.ar.trim() },
+      name: { en: dto.name.en.trim(), ar: dto.name.ar.trim(), es: dto.name.es?.trim() || undefined },
       type: dto.type,
       cashFlowActivity: dto.cashFlowActivity ?? this.defaultActivity(dto.type),
       description: dto.description?.trim() || undefined,

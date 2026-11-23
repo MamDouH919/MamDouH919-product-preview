@@ -56,7 +56,7 @@ export class JournalService {
     const custom = await this.ledgerAccountModel.find().session(session ?? null).lean().exec();
     const added: ChartAccount[] = custom.map((a) => ({
       code: a.code,
-      name: { en: a.name.en, ar: a.name.ar },
+      name: { en: a.name.en, ar: a.name.ar, es: a.name.es || a.name.en },
       type: a.type,
       category: CATEGORY_OF[a.type],
       normalSide: normalSideOf(a.type),

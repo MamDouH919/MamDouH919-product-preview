@@ -206,6 +206,7 @@ const AccountDialog = ({ account, onClose }: { account: ChartAccount | null; onC
   const [code, setCode] = useState(account?.code ?? "");
   const [nameEn, setNameEn] = useState(account?.name.en ?? "");
   const [nameAr, setNameAr] = useState(account?.name.ar ?? "");
+  const [nameEs, setNameEs] = useState(account?.name.es ?? "");
   const [activity, setActivity] = useState<CashFlowActivity>(account?.cashFlowActivity ?? defaultActivity("expense"));
   const [description, setDescription] = useState(account?.description ?? "");
 
@@ -221,7 +222,7 @@ const AccountDialog = ({ account, onClose }: { account: ChartAccount | null; onC
 
   const mutation = useMutation({
     mutationFn: () => {
-      const name = { en: nameEn.trim(), ar: nameAr.trim() };
+      const name = { en: nameEn.trim(), ar: nameAr.trim(), es: nameEs.trim() || undefined };
       const cashFlowActivity = usesActivity(type) ? activity : "operating";
       return account
         ? updateAccount({ code: account.code, name, cashFlowActivity, description: description.trim() })
@@ -266,6 +267,7 @@ const AccountDialog = ({ account, onClose }: { account: ChartAccount | null; onC
           />
           <TextField label={t("accounting.nameEn")} value={nameEn} onChange={(e) => setNameEn(e.target.value)} required />
           <TextField label={t("accounting.nameAr")} value={nameAr} onChange={(e) => setNameAr(e.target.value)} required slotProps={{ htmlInput: { dir: "rtl" } }} />
+          <TextField label={t("accounting.nameEs")} value={nameEs} onChange={(e) => setNameEs(e.target.value)} />
           {usesActivity(type) && (
             <TextField select label={t("accounting.cashFlowActivity")} value={activity} onChange={(e) => setActivity(e.target.value as CashFlowActivity)} helperText={t("accounting.cashFlowActivityHint")}>
               {CASH_FLOW_ACTIVITIES.map((x) => <MenuItem key={x} value={x}>{t(`accounting.activity.${x}`)}</MenuItem>)}

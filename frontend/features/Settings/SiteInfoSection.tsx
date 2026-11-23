@@ -58,7 +58,7 @@ const SiteInfoSection = ({ control }: { control: Control<SettingsFormValues> }) 
             name={`currency.${lang}`}
             label={t("currency")}
             control={control}
-            placeholder={lang === "ar" ? "ر.س" : "SAR"}
+            placeholder={lang === "ar" ? "ر.س" : lang === "es" ? "SAR" : "SAR"}
           />
         </Stack>
       ))}

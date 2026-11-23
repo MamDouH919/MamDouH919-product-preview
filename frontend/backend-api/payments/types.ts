@@ -1,11 +1,11 @@
 /** One credential a gateway needs. The settings form is drawn from these, so a new gateway needs no new form. */
 export type GatewayField = {
   key: string;
-  label: { en: string; ar: string };
+  label: { en: string; ar: string; es: string };
   /** Never sent back by the API — only whether it is set. */
   secret: boolean;
   required: boolean;
-  hint?: { en: string; ar: string };
+  hint?: { en: string; ar: string; es: string };
   placeholder?: string;
 };
 

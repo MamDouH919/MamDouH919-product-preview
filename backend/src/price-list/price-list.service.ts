@@ -11,6 +11,7 @@ import { DeliveryPrice } from './schemas/delivery-price.schema';
 import { Setting } from '../settings/schemas/setting.schema';
 import { LocalizedField } from '../common/schemas/localized-field.schema';
 import { COUNTRY_ZONES, subZoneCode } from './data';
+import { subZoneNameEs, zoneNameEs } from './data/es-names';
 import {
   CreateDeliveryPriceDto,
   QueryDeliveryPricesDto,
@@ -61,7 +62,7 @@ export class PriceListService {
       zones.map((zone, sort) => ({
         updateOne: {
           filter: { code: zone.code },
-          update: { $set: { country, name: zone.name, sort } },
+          update: { $set: { country, name: { ...zone.name, es: zoneNameEs(zone.code, zone.name.en) }, sort } },
           upsert: true,
         },
       })),
@@ -76,7 +77,7 @@ export class PriceListService {
         zone.subZones.map(([ar, en], sort) => ({
           updateOne: {
             filter: { code: subZoneCode(zone.code, en) },
-            update: { $set: { zone: ids.get(zone.code), name: { ar, en }, sort } },
+            update: { $set: { zone: ids.get(zone.code), name: { ar, en, es: subZoneNameEs(en) }, sort } },
             upsert: true,
           },
         })),
@@ -86,7 +87,8 @@ export class PriceListService {
 
   /** Whether a country's places are already in this store's database. */
   async isSeeded(country: string): Promise<boolean> {
-    return !!(await this.zoneModel.exists({ country }));
+    // A store seeded before Spanish names existed counts as not seeded, so saving its country again fills them in.
+    return !!(await this.zoneModel.exists({ country, 'name.es': { $exists: true } }));
   }
 
   // ── Storefront ──────────────────────────────────────────────────────────────
@@ -214,7 +216,7 @@ export class PriceListService {
     if (query.search?.trim()) {
       const term = new RegExp(escapeRegex(query.search.trim()), 'i');
       const matches = await this.subZoneModel
-        .find({ $or: [{ 'name.ar': term }, { 'name.en': term }] })
+        .find({ $or: [{ 'name.ar': term }, { 'name.en': term }, { 'name.es': term }] })
         .select('_id')
         .exec();
       filter.subZone = { $in: matches.map((s) => s._id) };

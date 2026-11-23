@@ -24,7 +24,7 @@ export class SubCategoriesService {
     if (!createSubCategoryDto.slug) {
       // Arabic letters strip out of a slug, so an Arabic-only name falls back to a plain word.
       createSubCategoryDto.slug = await this.uniqueSlug(
-        buildSlug(createSubCategoryDto.name?.en ?? '') || buildSlug(createSubCategoryDto.name?.ar ?? '') || 'sub-category',
+        buildSlug(createSubCategoryDto.name?.en ?? '') || buildSlug(createSubCategoryDto.name?.ar ?? '') || buildSlug(createSubCategoryDto.name?.es ?? '') || 'sub-category',
       );
     }
 

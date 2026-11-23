@@ -44,6 +44,13 @@ const ACTIVATION_COPY = {
     button: 'تفعيل الحساب',
     expiry: `تنتهي صلاحية هذا الرابط خلال ${ACTIVATION_DAYS} أيام.`,
   },
+  es: {
+    subject: 'Activa tu cuenta',
+    title: 'Tu cuenta está casi lista',
+    body: 'Crea una contraseña para seguir tus pedidos y pagar más rápido la próxima vez.',
+    button: 'Activar cuenta',
+    expiry: `Este enlace caduca en ${ACTIVATION_DAYS} días.`,
+  },
 };
 
 @Injectable()
@@ -250,12 +257,12 @@ export class CustomerAuthService {
       this.configService.get<string>('frontendUrl') ??
       ''
     ).replace(/\/+$/, '');
-    const lang = locale === 'en' ? 'en' : 'ar';
+    const lang = locale === 'en' || locale === 'es' ? locale : 'ar';
     return `${base}/${lang}/account/reset-password?token=${token}&activate=1`;
   }
 
   async sendActivationEmail(customer: Customer, host: string, locale?: string) {
-    const lang = locale === 'en' ? 'en' : 'ar';
+    const lang = locale === 'en' || locale === 'es' ? locale : 'ar';
     const copy = ACTIVATION_COPY[lang];
     const link = await this.createActivationLink(
       customer._id as Types.ObjectId,

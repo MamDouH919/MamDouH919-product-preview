@@ -5,11 +5,12 @@ import { pageMetadata } from "@/lib/seo"
 const COPY = {
   ar: { title: "تواصل معنا", description: "عندك سؤال أو طلب خاص؟ تواصل معانا بالتليفون أو الواتساب أو ابعتلنا رسالة وهنرد عليك في أقرب وقت." },
   en: { title: "Contact us", description: "Have a question or a special request? Reach us by phone or WhatsApp, or send us a message and we'll get back to you soon." },
+  es: { title: "Contáctanos", description: "¿Tienes una pregunta o una solicitud especial? Escríbenos por teléfono o WhatsApp, o envíanos un mensaje y te responderemos pronto." },
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
-  return pageMetadata({ locale, path: "/contact", ...COPY[locale === "ar" ? "ar" : "en"] })
+  return pageMetadata({ locale, path: "/contact", ...COPY[locale === "ar" ? "ar" : locale === "es" ? "es" : "en"] })
 }
 
 export default function ContactPage() {

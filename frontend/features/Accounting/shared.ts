@@ -5,7 +5,7 @@ import type { JournalSource } from "@/backend-api/accounting/api";
 /** An account or product name in the dashboard's language, falling back to the other. */
 export const useLocalName = () => {
   const { i18n } = useTranslation();
-  return (name?: Partial<AccountName>) => (i18n.language === "ar" ? name?.ar || name?.en : name?.en || name?.ar) ?? "";
+  return (name?: Partial<AccountName>) => ((name as Record<string, string | undefined> | undefined)?.[i18n.language] || (i18n.language === "ar" ? name?.ar || name?.en : name?.en || name?.ar)) ?? "";
 };
 
 /** What posted an entry, in words: "Order #1001", "Manual entry". */
@@ -19,7 +19,7 @@ export const useSourceLabel = () => {
 
 /** A calendar day as the store reads it: "1 Nov 2026". */
 export const formatDay = (iso: string, lang: string) =>
-  new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium" });
+  new Date(iso).toLocaleDateString(lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB", { dateStyle: "medium" });
 
 export const monthStartInput = () => {
   const now = new Date();

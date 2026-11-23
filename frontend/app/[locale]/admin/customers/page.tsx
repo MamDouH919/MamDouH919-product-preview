@@ -117,7 +117,7 @@ const CustomersPage = () => {
         render: (row: Customer) =>
           row.createdAt
             ? new Date(row.createdAt).toLocaleDateString(
-                lang === "ar" ? "ar-EG" : "en-GB",
+                lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB",
               )
             : "—",
       },

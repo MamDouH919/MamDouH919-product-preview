@@ -32,7 +32,7 @@ export interface WarehouseView {
 }
 
 const DEFAULT_MAIN = {
-  name: { ar: 'المخزن الرئيسي', en: 'Main warehouse' },
+  name: { ar: 'المخزن الرئيسي', en: 'Main warehouse', es: 'Almacén principal' },
   code: 'MAIN',
   isMain: true,
   isActive: true,

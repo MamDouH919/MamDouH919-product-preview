@@ -4,7 +4,7 @@ import { downloadFile } from "@/utils/downloadFile";
 
 /** All amounts are minor units; `from`/`to` are calendar days (YYYY-MM-DD) in the store's time zone. */
 export type DayRange = { from?: string; to?: string };
-export type AccountName = { en: string; ar: string };
+export type AccountName = { en: string; ar: string; es?: string };
 export type AgeBucket = "0_7" | "8_30" | "31_60" | "61_plus";
 export const AGE_BUCKETS: AgeBucket[] = ["0_7", "8_30", "31_60", "61_plus"];
 

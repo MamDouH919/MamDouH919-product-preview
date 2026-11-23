@@ -52,8 +52,8 @@ const CategoryForm = ({ defaultData }: CategoryFormProps) => {
     useForm<CategoryFormValues>({
       defaultValues: {
         image: defaultData?.image ? getBackendUri(defaultData.image) : "",
-        name: { ar: defaultData?.name?.ar ?? "", en: defaultData?.name?.en ?? "" },
-        description: { ar: defaultData?.description?.ar ?? "", en: defaultData?.description?.en ?? "" },
+        name: { ar: defaultData?.name?.ar ?? "", en: defaultData?.name?.en ?? "", es: defaultData?.name?.es ?? "" },
+        description: { ar: defaultData?.description?.ar ?? "", en: defaultData?.description?.en ?? "", es: defaultData?.description?.es ?? "" },
         slug: defaultData?.slug ?? "",
         isActive: defaultData?.isActive ?? true,
         order: defaultData?.order ?? 0,

@@ -107,10 +107,12 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
       title: {
         ar: defaultData?.title?.ar || "",
         en: defaultData?.title?.en || "",
+        es: defaultData?.title?.es || "",
       },
       description: {
         ar: defaultData?.description?.ar || "",
         en: defaultData?.description?.en || "",
+        es: defaultData?.description?.es || "",
       },
       active: defaultData?.active ?? true,
     },
@@ -140,6 +142,7 @@ const BannerForm = ({ defaultData }: BannerFormProps) => {
         const val = data[field];
         if (val.ar) formData.append(`${field}[ar]`, val.ar);
         if (val.en) formData.append(`${field}[en]`, val.en);
+        if (val.es) formData.append(`${field}[es]`, val.es);
       });
 
       if (isEditing) {

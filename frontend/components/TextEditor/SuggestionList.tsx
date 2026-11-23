@@ -56,7 +56,7 @@ const SuggestionList = forwardRef<SuggestionListRef, SuggestionListProps>((props
     <Paper elevation={5} sx={{ minWidth: 260, maxWidth: 360 }} dir={lang === "ar" ? "rtl" : "ltr"}>
       {props.items.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
-          {lang === "ar" ? "مفيش نتائج" : "No matches"}
+          {lang === "ar" ? "مفيش نتائج" : lang === "es" ? "Sin resultados" : "No matches"}
         </Typography>
       ) : (
         <List dense sx={{ overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>

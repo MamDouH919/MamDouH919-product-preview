@@ -84,9 +84,9 @@ const slugify = (value: string) =>
 
 const toPayload = (page?: Page): PagePayload => ({
   slug: page?.slug ?? "",
-  title: { ar: page?.title?.ar ?? "", en: page?.title?.en ?? "" },
-  metaTitle: { ar: page?.metaTitle?.ar ?? "", en: page?.metaTitle?.en ?? "" },
-  metaDescription: { ar: page?.metaDescription?.ar ?? "", en: page?.metaDescription?.en ?? "" },
+  title: { ar: page?.title?.ar ?? "", en: page?.title?.en ?? "", es: page?.title?.es ?? "" },
+  metaTitle: { ar: page?.metaTitle?.ar ?? "", en: page?.metaTitle?.en ?? "", es: page?.metaTitle?.es ?? "" },
+  metaDescription: { ar: page?.metaDescription?.ar ?? "", en: page?.metaDescription?.en ?? "", es: page?.metaDescription?.es ?? "" },
   ogImage: page?.ogImage ?? "",
   isPublished: page?.isPublished ?? false,
   showInHeader: page?.showInHeader ?? false,

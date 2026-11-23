@@ -51,39 +51,39 @@ export type AccountCode = (typeof ACCOUNT)[keyof typeof ACCOUNT];
 
 export interface AccountInfo {
   code: AccountCode;
-  name: { en: string; ar: string };
+  name: { en: string; ar: string; es: string };
   type: AccountType;
 }
 
 export const CHART: AccountInfo[] = [
-  { code: ACCOUNT.CASH, name: { en: 'Cash on hand', ar: 'النقدية بالصندوق' }, type: AccountType.ASSET },
-  { code: ACCOUNT.COURIER_CASH, name: { en: 'COD cash held by couriers', ar: 'نقدية التحصيل لدى المندوبين' }, type: AccountType.ASSET },
-  { code: ACCOUNT.GATEWAY_BALANCE, name: { en: 'Online payments held by the gateway', ar: 'مدفوعات أونلاين لدى بوابة الدفع' }, type: AccountType.ASSET },
-  { code: ACCOUNT.RECEIVABLES, name: { en: 'Customer receivables', ar: 'مستحقات علي العملاء' }, type: AccountType.ASSET },
-  { code: ACCOUNT.INVENTORY, name: { en: 'Inventory', ar: 'المخزون' }, type: AccountType.ASSET },
-  { code: ACCOUNT.GOODS_AWAITING_DELIVERY, name: { en: 'Goods awaiting delivery', ar: 'بضاعة بانتظار التسليم' }, type: AccountType.ASSET },
-  { code: ACCOUNT.PAYABLES, name: { en: 'Supplier payables', ar: 'مستحقات الموردين' }, type: AccountType.LIABILITY },
-  { code: ACCOUNT.REFUNDS_PAYABLE, name: { en: 'Refunds approved, not yet paid', ar: 'مرتجعات مستحقة الدفع' }, type: AccountType.LIABILITY },
-  { code: ACCOUNT.CUSTOMER_DEPOSITS, name: { en: 'Customer deposits and credits', ar: 'دفعات وأرصدة العملاء' }, type: AccountType.LIABILITY },
-  { code: ACCOUNT.TAX_PAYABLE, name: { en: 'Tax payable', ar: 'ضرائب مستحقة' }, type: AccountType.LIABILITY },
-  { code: ACCOUNT.EQUITY, name: { en: 'Owner equity and opening balances', ar: 'حقوق الملكية والأرصدة الافتتاحية' }, type: AccountType.EQUITY },
-  { code: ACCOUNT.PRODUCT_SALES, name: { en: 'Product sales', ar: 'مبيعات المنتجات' }, type: AccountType.REVENUE },
-  { code: ACCOUNT.SALES_DISCOUNTS, name: { en: 'Sales discounts', ar: 'خصومات المبيعات' }, type: AccountType.CONTRA_REVENUE },
-  { code: ACCOUNT.SALES_RETURNS, name: { en: 'Sales returns', ar: 'مردودات المبيعات' }, type: AccountType.CONTRA_REVENUE },
-  { code: ACCOUNT.DELIVERY_INCOME, name: { en: 'Delivery income', ar: 'إيرادات التوصيل' }, type: AccountType.REVENUE },
-  { code: ACCOUNT.DELIVERY_REFUNDS, name: { en: 'Delivery-fee refunds', ar: 'رد رسوم التوصيل' }, type: AccountType.CONTRA_REVENUE },
-  { code: ACCOUNT.COGS, name: { en: 'Cost of goods sold', ar: 'تكلفة البضاعة المباعة' }, type: AccountType.COST_OF_SALES },
-  { code: ACCOUNT.INVENTORY_LOSSES, name: { en: 'Inventory losses and stock-take differences', ar: 'خسائر وفروق جرد المخزون' }, type: AccountType.COST_OF_SALES },
-  { code: ACCOUNT.DELIVERY_COSTS, name: { en: 'Delivery and courier costs', ar: 'تكاليف التوصيل والمندوبين' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.RENT, name: { en: 'Rent', ar: 'الإيجار' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.SALARIES, name: { en: 'Salaries and wages', ar: 'الرواتب والأجور' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.MARKETING, name: { en: 'Marketing and advertising', ar: 'التسويق والإعلان' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.PACKAGING, name: { en: 'Packaging and supplies', ar: 'التغليف والمستلزمات' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.FEES, name: { en: 'Bank and service fees', ar: 'رسوم بنكية وخدمات' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.UTILITIES, name: { en: 'Utilities and internet', ar: 'المرافق والإنترنت' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.OTHER_EXPENSES, name: { en: 'Other operating expenses', ar: 'مصروفات تشغيل أخرى' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.UNCOLLECTIBLE, name: { en: 'Uncollectible receivables', ar: 'ديون معدومة' }, type: AccountType.EXPENSE },
-  { code: ACCOUNT.CASH_OVER_SHORT, name: { en: 'Cash over / short', ar: 'فروق النقدية' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.CASH, name: { en: 'Cash on hand', ar: 'النقدية بالصندوق', es: 'Efectivo en caja' }, type: AccountType.ASSET },
+  { code: ACCOUNT.COURIER_CASH, name: { en: 'COD cash held by couriers', ar: 'نقدية التحصيل لدى المندوبين', es: 'Efectivo de contra reembolso en poder de los mensajeros' }, type: AccountType.ASSET },
+  { code: ACCOUNT.GATEWAY_BALANCE, name: { en: 'Online payments held by the gateway', ar: 'مدفوعات أونلاين لدى بوابة الدفع', es: 'Pagos en línea retenidos por la pasarela' }, type: AccountType.ASSET },
+  { code: ACCOUNT.RECEIVABLES, name: { en: 'Customer receivables', ar: 'مستحقات علي العملاء', es: 'Cuentas por cobrar de clientes' }, type: AccountType.ASSET },
+  { code: ACCOUNT.INVENTORY, name: { en: 'Inventory', ar: 'المخزون', es: 'Inventario' }, type: AccountType.ASSET },
+  { code: ACCOUNT.GOODS_AWAITING_DELIVERY, name: { en: 'Goods awaiting delivery', ar: 'بضاعة بانتظار التسليم', es: 'Mercancía pendiente de entrega' }, type: AccountType.ASSET },
+  { code: ACCOUNT.PAYABLES, name: { en: 'Supplier payables', ar: 'مستحقات الموردين', es: 'Cuentas por pagar a proveedores' }, type: AccountType.LIABILITY },
+  { code: ACCOUNT.REFUNDS_PAYABLE, name: { en: 'Refunds approved, not yet paid', ar: 'مرتجعات مستحقة الدفع', es: 'Reembolsos aprobados, aún sin pagar' }, type: AccountType.LIABILITY },
+  { code: ACCOUNT.CUSTOMER_DEPOSITS, name: { en: 'Customer deposits and credits', ar: 'دفعات وأرصدة العملاء', es: 'Depósitos y saldos a favor de clientes' }, type: AccountType.LIABILITY },
+  { code: ACCOUNT.TAX_PAYABLE, name: { en: 'Tax payable', ar: 'ضرائب مستحقة', es: 'Impuestos por pagar' }, type: AccountType.LIABILITY },
+  { code: ACCOUNT.EQUITY, name: { en: 'Owner equity and opening balances', ar: 'حقوق الملكية والأرصدة الافتتاحية', es: 'Patrimonio del propietario y saldos iniciales' }, type: AccountType.EQUITY },
+  { code: ACCOUNT.PRODUCT_SALES, name: { en: 'Product sales', ar: 'مبيعات المنتجات', es: 'Ventas de productos' }, type: AccountType.REVENUE },
+  { code: ACCOUNT.SALES_DISCOUNTS, name: { en: 'Sales discounts', ar: 'خصومات المبيعات', es: 'Descuentos sobre ventas' }, type: AccountType.CONTRA_REVENUE },
+  { code: ACCOUNT.SALES_RETURNS, name: { en: 'Sales returns', ar: 'مردودات المبيعات', es: 'Devoluciones sobre ventas' }, type: AccountType.CONTRA_REVENUE },
+  { code: ACCOUNT.DELIVERY_INCOME, name: { en: 'Delivery income', ar: 'إيرادات التوصيل', es: 'Ingresos por envíos' }, type: AccountType.REVENUE },
+  { code: ACCOUNT.DELIVERY_REFUNDS, name: { en: 'Delivery-fee refunds', ar: 'رد رسوم التوصيل', es: 'Reembolsos de costes de envío' }, type: AccountType.CONTRA_REVENUE },
+  { code: ACCOUNT.COGS, name: { en: 'Cost of goods sold', ar: 'تكلفة البضاعة المباعة', es: 'Coste de las mercancías vendidas' }, type: AccountType.COST_OF_SALES },
+  { code: ACCOUNT.INVENTORY_LOSSES, name: { en: 'Inventory losses and stock-take differences', ar: 'خسائر وفروق جرد المخزون', es: 'Pérdidas de inventario y diferencias de recuento' }, type: AccountType.COST_OF_SALES },
+  { code: ACCOUNT.DELIVERY_COSTS, name: { en: 'Delivery and courier costs', ar: 'تكاليف التوصيل والمندوبين', es: 'Costes de envío y mensajería' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.RENT, name: { en: 'Rent', ar: 'الإيجار', es: 'Alquiler' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.SALARIES, name: { en: 'Salaries and wages', ar: 'الرواتب والأجور', es: 'Sueldos y salarios' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.MARKETING, name: { en: 'Marketing and advertising', ar: 'التسويق والإعلان', es: 'Marketing y publicidad' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.PACKAGING, name: { en: 'Packaging and supplies', ar: 'التغليف والمستلزمات', es: 'Embalaje y suministros' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.FEES, name: { en: 'Bank and service fees', ar: 'رسوم بنكية وخدمات', es: 'Comisiones bancarias y de servicios' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.UTILITIES, name: { en: 'Utilities and internet', ar: 'المرافق والإنترنت', es: 'Suministros e internet' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.OTHER_EXPENSES, name: { en: 'Other operating expenses', ar: 'مصروفات تشغيل أخرى', es: 'Otros gastos de explotación' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.UNCOLLECTIBLE, name: { en: 'Uncollectible receivables', ar: 'ديون معدومة', es: 'Cuentas incobrables' }, type: AccountType.EXPENSE },
+  { code: ACCOUNT.CASH_OVER_SHORT, name: { en: 'Cash over / short', ar: 'فروق النقدية', es: 'Sobrantes y faltantes de caja' }, type: AccountType.EXPENSE },
 ];
 
 export const ACCOUNT_CODES = CHART.map((a) => a.code);
@@ -199,7 +199,7 @@ export const MANUAL_LOCKED_ACCOUNTS: AccountCode[] = [
 /** One account as the chart lists it: built-in or added by the store. */
 export interface ChartAccount {
   code: string;
-  name: { en: string; ar: string };
+  name: { en: string; ar: string; es: string };
   type: AccountType;
   category: AccountCategory;
   normalSide: BalanceSide;

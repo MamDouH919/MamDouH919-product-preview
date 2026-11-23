@@ -92,14 +92,16 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
         title: {
           ar: defaultData?.title?.ar || "",
           en: defaultData?.title?.en || "",
+          es: defaultData?.title?.es || "",
         },
         description: {
           ar: defaultData?.description?.ar || "",
           en: defaultData?.description?.en || "",
+          es: defaultData?.description?.es || "",
         },
         type: defaultData?.type ?? "DEFAULT",
         highlights: (defaultData?.highlights ?? []).map((h) => ({
-          key: { ar: h.key?.ar || "", en: h.key?.en || "" },
+          key: { ar: h.key?.ar || "", en: h.key?.en || "", es: h.key?.es || "" },
           value: h.value,
           image: h.image ? getBackendUri(h.image) : null,
         })),
@@ -107,12 +109,12 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
           image: getBackendUri(g),
         })),
         links: (defaultData?.links ?? []).map((l) => ({
-          label: { ar: l.label?.ar || "", en: l.label?.en || "" },
+          label: { ar: l.label?.ar || "", en: l.label?.en || "", es: l.label?.es || "" },
           url: l.url,
         })),
         faqs: (defaultData?.faqs ?? []).map((f) => ({
-          question: { ar: f.question?.ar || "", en: f.question?.en || "" },
-          answer: { ar: f.answer?.ar || "", en: f.answer?.en || "" },
+          question: { ar: f.question?.ar || "", en: f.question?.en || "", es: f.question?.es || "" },
+          answer: { ar: f.answer?.ar || "", en: f.answer?.en || "", es: f.answer?.es || "" },
         })),
       },
     });
@@ -327,7 +329,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                 variant="outlined"
                 onClick={() =>
                   appendHighlight({
-                    key: { ar: "", en: "" },
+                    key: { ar: "", en: "", es: "" },
                     value: "",
                     image: null,
                   })
@@ -410,7 +412,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                 size="small"
                 startIcon={<Add />}
                 variant="outlined"
-                onClick={() => appendLink({ label: { ar: "", en: "" }, url: "" })}
+                onClick={() => appendLink({ label: { ar: "", en: "", es: "" }, url: "" })}
                 disabled={linkFields.length >= 3}
               >
                 {t("add")}
@@ -471,7 +473,7 @@ const SectionForm = ({ defaultData }: SectionFormProps) => {
                 size="small"
                 startIcon={<Add />}
                 variant="outlined"
-                onClick={() => appendFaq({ question: { ar: "", en: "" }, answer: { ar: "", en: "" } })}
+                onClick={() => appendFaq({ question: { ar: "", en: "", es: "" }, answer: { ar: "", en: "", es: "" } })}
               >
                 {t("add")}
               </Button>

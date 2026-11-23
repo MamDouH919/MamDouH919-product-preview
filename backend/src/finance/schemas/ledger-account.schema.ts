@@ -9,6 +9,9 @@ class AccountName {
 
   @Prop({ required: true, trim: true })
   ar!: string;
+
+  @Prop({ required: false, trim: true })
+  es?: string;
 }
 
 /**

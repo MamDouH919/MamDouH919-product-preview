@@ -113,7 +113,7 @@ const SubscribersPage = () => {
         header: t("subscribedOn"),
         render: (row: Subscriber) =>
           new Date(row.createdAt).toLocaleDateString(
-            lang === "ar" ? "ar-EG" : "en-GB",
+            lang === "ar" ? "ar-EG" : lang === "es" ? "es-ES" : "en-GB",
           ),
       },
       {
