@@ -6,6 +6,7 @@ import gravity from "./tenants/gravity";
 import demo from "./tenants/demo";
 import mk from "./tenants/mk";
 import nuxi from "./tenants/nuxi";
+import ayotk from "./tenants/ayotk";
 
 export type { TenantSeo, LocaleSeo } from "./tenants/types";
 
@@ -28,6 +29,8 @@ export const TENANT_SEO: Record<string, TenantSeo> = {
   "nuxi.localhost": nuxi,
   "nuxi-eg.com": nuxi,
   "www.nuxi-eg.com": nuxi,
+  "ayotk.com": ayotk,
+  "www.ayotk.com": ayotk,
 };
 
 export const DEFAULT_TENANT = "localhost";

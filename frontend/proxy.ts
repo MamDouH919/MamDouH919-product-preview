@@ -15,6 +15,7 @@ const PUBLIC_FILE = /\.(.*)$/;
 /** Alias host → canonical host, per tenant, so search engines see a single site. */
 const CANONICAL_HOST: Record<string, string> = {
   'www.nuxi-eg.com': 'nuxi-eg.com',
+  'www.ayotk.com': 'ayotk.com',
 };
 
 // ── The store's languages ──────────────────────────────────────────────────

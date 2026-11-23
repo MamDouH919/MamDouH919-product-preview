@@ -20,6 +20,8 @@ const api: Record<string, string> = {
   "nuxi-eg.com": "https://api.nuxi-eg.com",
   "www.nuxi-eg.com": "https://api.nuxi-eg.com",
   "test-shop.novaslash.com": "https://api-test-shop.novaslash.com",
+  "ayotk.com": "https://api.ayotk.com",
+  "www.ayotk.com": "https://api.ayotk.com",
 }
 
 export function getBackendUrl(): string {
