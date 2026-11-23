@@ -1,92 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm, useFieldArray, useWatch, Controller } from "react-hook-form";
+import { useEffect, useState, type ReactNode } from "react";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Divider,
-  FormControlLabel,
-  Grid,
-  IconButton,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
-  Switch,
-  Tab,
-  Tabs,
-  TextField,
-  Typography,
-} from "@mui/material";
-import Add from "@mui/icons-material/Add";
-import Delete from "@mui/icons-material/Delete";
-import TextInputComponent from "@/components/MUI/ControlMUItextField";
-import { ImageInput } from "@/components/MUI/ImageInput";
+import { Box, Button, CircularProgress, Stack, Tab, Tabs } from "@mui/material";
 import { useSettingsQuery, SETTINGS_QUERY_KEY } from "@/backend-api/settings/hooks";
 import { updateSettings } from "@/backend-api/settings/mutations";
 import { getBackendUri } from "@/utils/helperFunctions";
 import { useAppDispatch, useAppSelector } from "@/Store/store";
 import { changeBreadCrumbActions, resetBreadCrumbActions } from "@/Store/slices/bread-crumb";
-import { setSettings, updateColor } from "@/Store/slices/settings";
-import { LocalizedField } from "@/backend-api/globalTypes";
-import { CONTENT_LANGUAGES, type ContentLanguages } from "@/backend-api/settings/types";
-import { SUPPORTED_COUNTRIES } from "@/backend-api/price-list/types";
+import { setSettings } from "@/Store/slices/settings";
 import { PRICE_LIST_QUERY_KEY, ZONES_QUERY_KEY } from "@/backend-api/price-list/hooks";
-import { SUPPORTED_LOCALES } from "@/lib/locales";
 import { useStoreLocales } from "@/lib/storeLocalesContext";
 import RefundRulesCard from "@/features/Refund/RefundRulesCard";
 import { useStoreModules } from "@/Hooks/useStoreModules";
-import { SOCIAL_KEYS, isShareLink, normalizeSocialKey } from "@/lib/social";
-
-
-type SocialItem = { key: string; value: string };
-
-type SettingsFormValues = {
-  siteTitle: LocalizedField;
-  siteDescription: LocalizedField;
-  currency: LocalizedField;
-  logo: File | string | null;
-  favicon: File | string | null;
-  phone: string;
-  whatsapp: string;
-  landLine: string;
-  email: string;
-  address: string;
-  socialMedia: SocialItem[];
-  primaryColor?: string;
-  country: string;
-  returnWindowDays: string;
-  showPrices: boolean;
-  preorderEnabled: boolean;
-  contentLanguages: ContentLanguages;
-  costPlus5Percent: boolean;
-  costPlus15Percent: boolean;
-};
-
-/**
- * Texts are kept for every supported language, so turning a language off on
- * the platform and back on loses nothing; only the store's own are shown.
- */
-const ALL_LANGS: readonly string[] = SUPPORTED_LOCALES;
+import { normalizeSocialKey } from "@/lib/social";
+import { ALL_LANGS, type SettingsFormValues } from "@/features/Settings/types";
+import SiteInfoSection from "@/features/Settings/SiteInfoSection";
+import SiteImagesSection from "@/features/Settings/SiteImagesSection";
+import DeliveryCountrySection from "@/features/Settings/DeliveryCountrySection";
+import ReturnsSection from "@/features/Settings/ReturnsSection";
+import PreordersSection from "@/features/Settings/PreordersSection";
+import AppearanceSection from "@/features/Settings/AppearanceSection";
+import StorefrontSection from "@/features/Settings/StorefrontSection";
+import CostPercentagesSection from "@/features/Settings/CostPercentagesSection";
+import ContentLanguagesSection from "@/features/Settings/ContentLanguagesSection";
+import ContactInfoSection from "@/features/Settings/ContactInfoSection";
+import SocialMediaSection from "@/features/Settings/SocialMediaSection";
 
 const SettingsPage = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const isSuper = useAppSelector((s) => s.auth.isSuper);
-  const [activeTab, setActiveTab] = useState(0);
-  const { languages: LANGS, multilingual } = useStoreLocales();
+  const { multilingual } = useStoreLocales();
   const { data: settings, isLoading } = useSettingsQuery();
   // Delivery, returns and refunds only mean something to a store that takes orders.
   const { has } = useStoreModules();
   const sells = has("orders");
+  const [tab, setTab] = useState("general");
 
-  const { control, handleSubmit, reset, register, formState: { errors } } = useForm<SettingsFormValues>({
+  const { control, handleSubmit, reset, register } = useForm<SettingsFormValues>({
     defaultValues: {
       siteTitle: Object.fromEntries(ALL_LANGS.map((l) => [l, ""])),
       siteDescription: Object.fromEntries(ALL_LANGS.map((l) => [l, ""])),
@@ -110,14 +66,12 @@ const SettingsPage = () => {
     },
   });
 
-  const { fields: socialFields, append: appendSocial, remove: removeSocial } =
-    useFieldArray({ control, name: "socialMedia" });
-  const socialValues = useWatch({ control, name: "socialMedia" });
 
   useEffect(() => {
     dispatch(changeBreadCrumbActions({ breadCrumb: [{ title: t("settings") }] }));
     return () => { dispatch(resetBreadCrumbActions()); };
   }, [dispatch, t]);
+
 
   useEffect(() => {
     if (settings) {
@@ -151,9 +105,6 @@ const SettingsPage = () => {
       });
     }
   }, [settings, reset]);
-
-  const tabHasError = (lang: string) =>
-    !!(errors as any).siteTitle?.[lang] || !!(errors as any).siteDescription?.[lang];
 
   const { mutate, isPending } = useMutation({
     mutationFn: (data: SettingsFormValues) => {
@@ -211,401 +162,67 @@ const SettingsPage = () => {
     );
   }
 
+
+  const hasRefunds = isSuper && sells && has("finance");
+
+  // Groups with nothing to show for this admin are left out.
+  const groups: { key: string; label: string; content: ReactNode[] }[] = [
+    {
+      key: "general",
+      label: t("general"),
+      content: [
+        isSuper && <SiteInfoSection key="info" control={control} />,
+        isSuper && <SiteImagesSection key="images" control={control} logo={settings?.logo} favicon={settings?.favicon} />,
+        isSuper && <AppearanceSection key="appearance" control={control} />,
+        multilingual && <ContentLanguagesSection key="langs" control={control} />,
+      ].filter(Boolean),
+    },
+    {
+      key: "store",
+      label: t("storefront"),
+      content: [
+        isSuper && sells && <DeliveryCountrySection key="country" control={control} />,
+        isSuper && sells && <ReturnsSection key="returns" control={control} />,
+        isSuper && sells && has("inventory") && <PreordersSection key="preorders" control={control} />,
+        !sells && <StorefrontSection key="storefront" control={control} />,
+        isSuper && <CostPercentagesSection key="cost" control={control} />,
+      ].filter(Boolean),
+    },
+    {
+      key: "contact",
+      label: t("contactInfo"),
+      // Contact and social links are visible to all admins.
+      content: [
+        <ContactInfoSection key="contact" control={control} register={register} />,
+        <SocialMediaSection key="social" control={control} register={register} />,
+      ],
+    },
+  ].filter((g) => g.content.length > 0 || (g.key === "store" && hasRefunds));
+
+  const current = groups.some((g) => g.key === tab) ? tab : groups[0].key;
+
   return (
     <Stack spacing={3}>
+      <Tabs
+        value={current}
+        onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        allowScrollButtonsMobile
+        sx={{ borderBottom: 1, borderColor: "divider" }}
+      >
+        {groups.map((g) => (
+          <Tab key={g.key} value={g.key} label={g.label} />
+        ))}
+      </Tabs>
+
+      {/* All groups stay mounted so one Save covers every tab. */}
       <Box component="form" onSubmit={handleSubmit((d) => mutate(d))}>
         <Stack spacing={3}>
-
-          {/* ── Super admin only ── */}
-          {isSuper && (
-            <>
-              {/* Site Info */}
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  {t("siteInfo")}
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-
-                {multilingual && <Tabs
-                  value={activeTab}
-                  onChange={(_, v) => setActiveTab(v)}
-                  variant="fullWidth"
-                  sx={{ mb: 2 }}
-                >
-                  {LANGS.map((lang) => (
-                    <Tab
-                      key={lang}
-                      label={t(lang)}
-                      iconPosition="end"
-                      icon={tabHasError(lang) ? (
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 8, height: 8, borderRadius: "50%",
-                            bgcolor: "error.main", display: "inline-block", ml: 0.5,
-                          }}
-                        />
-                      ) : undefined}
-                    />
-                  ))}
-                </Tabs>}
-
-                {LANGS.map((lang, i) => (
-                  <Stack
-                    key={lang}
-                    spacing={2}
-                    sx={{ display: activeTab === i ? "flex" : "none" }}
-                  >
-                    <TextInputComponent
-                      name={`siteTitle.${lang}`}
-                      label={t("siteTitle")}
-                      control={control}
-                    />
-                    <TextInputComponent
-                      name={`siteDescription.${lang}`}
-                      label={t("siteDescription")}
-                      control={control}
-                      multiline
-                      rows={3}
-                    />
-                    <TextInputComponent
-                      name={`currency.${lang}`}
-                      label={t("currency")}
-                      control={control}
-                      placeholder={lang === "ar" ? "ر.س" : "SAR"}
-                    />
-                  </Stack>
-                ))}
-              </Paper>
-
-              {/* Images */}
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  {t("siteImages")}
-                </Typography>
-                <Divider sx={{ mb: 3 }} />
-                <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Typography variant="body2" color="text.secondary" mb={1}>
-                      {t("logo")}
-                    </Typography>
-                    <ImageInput
-                      name="logo"
-                      control={control as any}
-                      imagePath={settings?.logo ? getBackendUri(settings.logo) ?? undefined : undefined}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Typography variant="body2" color="text.secondary" mb={1}>
-                      {t("favicon")}
-                    </Typography>
-                    <ImageInput
-                      name="favicon"
-                      control={control as any}
-                      imagePath={settings?.favicon ? getBackendUri(settings.favicon) ?? undefined : undefined}
-                      accept={{ "image/*": [], "image/x-icon": [".ico"] }}
-                    />
-                  </Grid>
-                </Grid>
-              </Paper>
-
-              {/* Delivery country */}
-              {sells && (
-                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                    {t("deliveryCountry")}
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Controller
-                    name="country"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        select
-                        size="small"
-                        label={t("country")}
-                        value={field.value}
-                        onChange={field.onChange}
-                        helperText={t("deliveryCountryHint")}
-                        sx={{ maxWidth: 360 }}
-                        fullWidth
-                      >
-                        {SUPPORTED_COUNTRIES.map((code) => (
-                          <MenuItem key={code} value={code}>
-                            {t(`countries.${code}`)}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-                  />
-                </Paper>
-              )}
-
-              {/* Returns */}
-              {sells && (
-                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                    {t("returns")}
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Controller
-                    name="returnWindowDays"
-                    control={control}
-                    rules={{ validate: (v) => v === "" || (/^\d+$/.test(v) && Number(v) <= 365) }}
-                    render={({ field, fieldState }) => (
-                      <TextField
-                        {...field}
-                        type="number"
-                        size="small"
-                        label={t("returnWindowDays")}
-                        error={!!fieldState.error}
-                        helperText={t("returnWindowDaysHint")}
-                        slotProps={{ htmlInput: { min: 0, max: 365 } }}
-                        sx={{ maxWidth: 360 }}
-                        fullWidth
-                      />
-                    )}
-                  />
-                </Paper>
-              )}
-
-              {/* Pre-orders — sell what another warehouse still holds */}
-              {sells && has("inventory") && (
-                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                    {t("preorders")}
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Controller
-                    name="preorderEnabled"
-                    control={control}
-                    render={({ field }) => (
-                      <FormControlLabel
-                        control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
-                        label={
-                          <Stack>
-                            <Typography variant="body2" fontWeight={600}>{t("preorderEnabled")}</Typography>
-                            <Typography variant="caption" color="text.secondary">{t("preorderEnabledHint")}</Typography>
-                          </Stack>
-                        }
-                      />
-                    )}
-                  />
-                </Paper>
-              )}
-
-              {/* Appearance */}
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  {t("appearance")}
-                </Typography>
-                <Divider sx={{ mb: 3 }} />
-                <Controller
-                  name="primaryColor"
-                  control={control}
-                  render={({ field }) => (
-                    <Stack spacing={1.5}>
-                      <Typography variant="body2" fontWeight={600} color="text.secondary">
-                        {t("primaryColor")}
-                      </Typography>
-                      <Stack direction="row" alignItems="center" spacing={2}>
-                        <Box
-                          sx={{
-                            width: 44, height: 44, borderRadius: 1.5,
-                            border: "2px solid", borderColor: "divider",
-                            overflow: "hidden", cursor: "pointer", flexShrink: 0,
-                            "& input[type='color']": {
-                              width: "200%", height: "200%",
-                              border: "none", padding: 0, cursor: "pointer",
-                              transform: "translate(-25%, -25%)",
-                            },
-                          }}
-                        >
-                          <input
-                            type="color"
-                            value={field.value ?? "#1976d2"}
-                            onChange={(e) => {
-                              field.onChange(e.target.value);
-                              dispatch(updateColor(e.target.value));
-                            }}
-                          />
-                        </Box>
-                        <TextField
-                          size="small"
-                          value={field.value ?? "#1976d2"}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            dispatch(updateColor(e.target.value));
-                          }}
-                          sx={{ width: 140 }}
-                          placeholder="#1976d2"
-                        />
-                        <Box
-                          sx={{
-                            flex: 1, height: 44, borderRadius: 1.5,
-                            background: field.value ?? "#1976d2",
-                            border: "1px solid", borderColor: "divider",
-                          }}
-                        />
-                      </Stack>
-                    </Stack>
-                  )}
-                />
-              </Paper>
-            </>
-          )}
-
-          {/* Storefront — a store that takes no orders may sell on enquiry, without prices */}
-          {!sells && (
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("storefront")}
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Controller
-                name="showPrices"
-                control={control}
-                render={({ field }) => (
-                  <FormControlLabel
-                    control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
-                    label={
-                      <Stack>
-                        <Typography variant="body2" fontWeight={600}>{t("showPrices")}</Typography>
-                        <Typography variant="caption" color="text.secondary">{t("showPricesHint")}</Typography>
-                      </Stack>
-                    }
-                  />
-                )}
-              />
-            </Paper>
-          )}
-
-          {/* Cost percentages — shown beside every unit cost typed; display only */}
-          {isSuper && (
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={0.5}>
-                {t("costPercentages")}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" component="p" mb={2}>
-                {t("costPercentagesHint")}
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Stack>
-                {(["costPlus5Percent", "costPlus15Percent"] as const).map((name) => (
-                  <Controller
-                    key={name}
-                    name={name}
-                    control={control}
-                    render={({ field }) => (
-                      <FormControlLabel
-                        control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
-                        label={t("costPlusRate", { rate: name === "costPlus5Percent" ? 5 : 15 })}
-                      />
-                    )}
-                  />
-                ))}
-              </Stack>
-            </Paper>
-          )}
-
-          {/* Content languages — which languages products and categories are typed in */}
-          {multilingual && (
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                {t("contentLanguages")}
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Controller
-                name="contentLanguages"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    select
-                    size="small"
-                    label={t("contentLanguagesLabel")}
-                    value={field.value}
-                    onChange={field.onChange}
-                    helperText={t("contentLanguagesHint")}
-                    sx={{ maxWidth: 360 }}
-                    fullWidth
-                  >
-                    {CONTENT_LANGUAGES.map((mode) => (
-                      <MenuItem key={mode} value={mode}>
-                        {t(`contentLanguagesOptions.${mode}`)}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-            </Paper>
-          )}
-
-          {/* Contact Info — visible to all admins */}
-          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>
-              {t("contactInfo")}
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Stack spacing={2}>
-              <TextField size="small" label={t("phone")} placeholder="+966 55 000 0000" {...register("phone")} />
-              <TextField size="small" label={t("whatsapp")} placeholder="+966 55 000 0000" {...register("whatsapp")} />
-              <TextField size="small" label={t("landLine")} placeholder="+966 1 000 0000" {...register("landLine")} />
-              <TextInputComponent name="email" label={t("email")} control={control} />
-              <TextInputComponent name="address" label={t("address")} control={control} multiline rows={2} />
+          {groups.map((g) => (
+            <Stack key={g.key} spacing={3} sx={{ display: current === g.key ? "flex" : "none" }}>
+              {g.content}
             </Stack>
-          </Paper>
-
-          {/* Social Media — visible to all admins */}
-          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-              <Typography variant="subtitle1" fontWeight={700}>
-                {t("socialMedia")}
-              </Typography>
-              <Button
-                size="small"
-                startIcon={<Add />}
-                onClick={() => appendSocial({ key: "INSTAGRAM", value: "" })}
-                variant="outlined"
-              >
-                {t("add")}
-              </Button>
-            </Stack>
-            <Divider sx={{ mb: 2 }} />
-
-            {socialFields.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                {t("noSocialMedia")}
-              </Typography>
-            ) : (
-              <Stack spacing={2}>
-                {socialFields.map((field, index) => (
-                  <Stack key={field.id} direction="row" spacing={1.5} alignItems="center">
-                    <Select
-                      size="small"
-                      defaultValue={field.key}
-                      {...register(`socialMedia.${index}.key`)}
-                      sx={{ minWidth: 150 }}
-                    >
-                      {SOCIAL_KEYS.map((k) => (
-                        <MenuItem key={k} value={k}>{k}</MenuItem>
-                      ))}
-                    </Select>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="https://..."
-                      {...register(`socialMedia.${index}.value`)}
-                      helperText={isShareLink(socialValues?.[index]?.value) ? t("socialShareLinkWarning") : undefined}
-                      slotProps={{ formHelperText: { sx: { color: "warning.main" } } }}
-                    />
-                    <IconButton color="error" onClick={() => removeSocial(index)} size="small">
-                      <Delete />
-                    </IconButton>
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-          </Paper>
+          ))}
 
           <Button
             type="submit"
@@ -621,7 +238,7 @@ const SettingsPage = () => {
       </Box>
 
       {/* Its own card and save: refund rules are finance settings, not part of this form. */}
-      {isSuper && sells && has("finance") && <RefundRulesCard />}
+      {hasRefunds && current === "store" && <RefundRulesCard />}
     </Stack>
   );
 };
